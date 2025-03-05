@@ -56,6 +56,6 @@ class Str
      */
     public static function slug(string $text, string $divider = '-'): string
     {
-        return strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', $divider, $text)));;
+        return strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', $divider, str_replace(['ı', 'ğ', 'ü', 'ş', 'ö', 'ç', 'İ', 'Ğ', 'Ü', 'Ö', 'Ç'], ['i', 'g', 'u', 's', 'o', 'c', 'i', 'g', 'u', 'o', 'c'], $text))));
     }
 }
