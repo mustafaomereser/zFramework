@@ -541,8 +541,6 @@ class DB
      */
     private function getWhere()
     {
-        if (!count($this->buildQuery['where'])) return;
-
         if (isset($this->softDelete)) $this->buildQuery['where'][] = [
             'type'     => 'row',
             'queries'  => [
@@ -554,6 +552,8 @@ class DB
                 ]
             ]
         ];
+
+        if (!count($this->buildQuery['where'])) return;
 
         $output = "";
         foreach ($this->buildQuery['where'] as $where_key => $where) {
