@@ -535,13 +535,14 @@ class DB
         return compact('key', 'operator', 'value', 'prev');
     }
 
+
     /**
      * Parse and get where.
      * @return void|string
      */
-    private function getWhere()
+    private function getWhere($checkSoftDelete = true)
     {
-        if (isset($this->softDelete)) $this->buildQuery['where'][] = [
+        if ($checkSoftDelete && isset($this->softDelete)) $this->buildQuery['where'][] = [
             'type'     => 'row',
             'queries'  => [
                 [
@@ -855,7 +856,8 @@ class DB
      */
     public function buildSQL(string $type = 'select'): string
     {
-        $limit = $this->getLimit();
+        $limit           = $this->getLimit();
+        $checkSoftDelete = true;
         switch ($type) {
             case 'select':
                 $select = $this->getSelect();
@@ -870,6 +872,7 @@ class DB
             case 'insert':
                 $type = "INSERT INTO";
                 $sets = $this->buildQuery['sets'];
+                $checkSoftDelete = false;
                 break;
 
             case 'update':
@@ -881,7 +884,7 @@ class DB
                 throw new \Exception('something wrong, buildSQL invalid type.');
         }
 
-        $sql = "$type $this->table" . @$sets . $this->getJoin() . $this->getWhere() . $this->getGroupBy() . $this->getOrderBy() . $limit;
+        $sql = "$type $this->table" . @$sets . $this->getJoin() . $this->getWhere($checkSoftDelete) . $this->getGroupBy() . $this->getOrderBy() . $limit;
 
         if ($this->sql_debug) {
             $debug_sql = $sql;
