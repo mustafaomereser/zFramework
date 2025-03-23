@@ -118,11 +118,12 @@ class File
      * @param string $file
      * @param int $width
      * @param int $height
+     * @param bool $force_to_desired_sizes
      * @param string $_target
      * @param bool $info_size
      * @return string
      */
-    public static function resizeImage(string $file, int $width = 50, int $height = 50, string $_target = null, bool $info_size = false): string
+    public static function resizeImage(string $file, int $width = 50, int $height = 50, bool $force_to_desired_sizes = true, string $_target = null, bool $info_size = false): string
     {
 
         $file = public_dir($file);
@@ -132,13 +133,15 @@ class File
 
         list($image_width, $image_height) = getimagesize($file);
 
-        $src_aspect = $image_width / $image_height;
-        $dst_aspect = $width / $height;
+        if (!$force_to_desired_sizes) {
+            $src_aspect = $image_width / $image_height;
+            $dst_aspect = $width / $height;
 
-        if ($src_aspect > $dst_aspect) {
-            $height = $width / $src_aspect;
-        } else {
-            $width  = $height * $src_aspect;
+            if ($src_aspect > $dst_aspect) {
+                $height = $width / $src_aspect;
+            } else {
+                $width  = $height * $src_aspect;
+            }
         }
 
         $source = [
@@ -178,6 +181,7 @@ class File
 
         return self::removePublic($file);
     }
+
 
     /**
      * Show human readable file size

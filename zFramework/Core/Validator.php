@@ -79,7 +79,7 @@ class Validator
             if (!$callback) {
                 if (Http::isAjax()) abort(400, Response::json($errors));
                 foreach ($errors as $key => $error_list) foreach ($error_list as $error) Alerts::danger($error);
-                // back();
+                back();
             } else {
                 $callback($errors, $statics);
             }
