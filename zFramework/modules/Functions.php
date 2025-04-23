@@ -39,11 +39,20 @@ function host()
     return $protocol . $_SERVER['SERVER_NAME'] . (!empty($port) && !in_array($port, $dont_show_port) ? ":$port" : null);
 }
 
+// no cache public asset
 function asset($value)
 {
     $value = str_replace("//", "/", "/$value");
     return host() . $value . "?v=" . filemtime(public_dir($value));
 }
+
+// file_put_content force make dirs.
+function file_put_contents2($file_name, $content, $flags = 0)
+{
+    @mkdir(dirname($file_name), 0777, true);
+    return  file_put_contents($file_name, $content, $flags);
+}
+
 
 // Redirect to url what are you want.
 function redirect($url = "/")

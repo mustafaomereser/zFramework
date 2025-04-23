@@ -2,6 +2,8 @@
 
 namespace zFramework\Core\Facades;
 
+use CURLFile;
+
 class cURL
 {
 
@@ -9,7 +11,8 @@ class cURL
      * target url
      */
     static $cURL;
-
+    static $postFields = [];
+    static $post = false;
     /**
      * set url and some options
      * @param string $url
@@ -30,8 +33,20 @@ class cURL
      */
     public static function post(array $fields = []): self
     {
-        curl_setopt(self::$cURL, CURLOPT_POST, 1);
-        curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, http_build_query($fields));
+        self::$post = true;
+        self::$postFields = self::$postFields + $fields;
+        return new self();
+    }
+
+    /**
+     * Post parameters
+     * @param string $path
+     * @return self
+     */
+    public static function file(string $key, string $content, string $mime_type = "text/plain"): self
+    {
+        self::$post = true;
+        self::$postFields[$key] = new CURLFile($content, $mime_type);
         return new self();
     }
 
@@ -66,6 +81,11 @@ class cURL
      */
     public static function send(\Closure $callback = null)
     {
+        if (self::$post) {
+            curl_setopt(self::$cURL, CURLOPT_POST, 1);
+            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, http_build_query(self::$postFields));
+        }
+
         $response = curl_exec(self::$cURL);
         $err      = curl_errno(self::$cURL);
         $errmsg   = curl_error(self::$cURL);
