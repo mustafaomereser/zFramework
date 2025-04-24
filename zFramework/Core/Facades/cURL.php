@@ -46,7 +46,7 @@ class cURL
     public static function file(string $key, string $content, string $mime_type = "text/plain"): self
     {
         self::$post = true;
-        self::$postFields[$key] = new CURLFile($content, $mime_type);
+        self::$postFields[$key] = new CURLFile($content, $mime_type, $key);
         return new self();
     }
 
@@ -83,7 +83,7 @@ class cURL
     {
         if (self::$post) {
             curl_setopt(self::$cURL, CURLOPT_POST, 1);
-            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, http_build_query(self::$postFields));
+            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postFields);
         }
 
         $response = curl_exec(self::$cURL);
