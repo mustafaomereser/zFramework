@@ -84,6 +84,8 @@ class cURL
         if (self::$post) {
             curl_setopt(self::$cURL, CURLOPT_POST, 1);
             curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postFields);
+            self::$postFields = [];
+            self::$post = false;
         }
 
         $response = curl_exec(self::$cURL);
