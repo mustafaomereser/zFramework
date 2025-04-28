@@ -56,7 +56,7 @@ class Date
 
     /**
      * TimeAgo
-     * @param string $date
+     * @param string|int $date
      * @return string
      */
     public static function timeago($date)
@@ -78,5 +78,26 @@ class Date
             $numberOfUnits = floor($time / $unit);
             return $numberOfUnits . ' ' . $text . (($numberOfUnits > 1) ? 's' : '');
         }
+    }
+
+    /**
+     * TimeDiff
+     * @param int $time1
+     * @param int $time2
+     * @return string
+     */
+    public static function timediff($time1, $time2)
+    {
+        $diff = abs($time2 - $time1);
+
+        $output  = [];
+        $output['years']   = floor($diff / (365 * 60 * 60 * 24));
+        $output['months']  = floor(($diff - $output['years'] * 365 * 60 * 60 * 24) / (30 * 60 * 60 * 24));
+        $output['days']    = floor(($diff - $output['years'] * 365 * 60 * 60 * 24 - $output['months'] * 30 * 60 * 60 * 24) / (60 * 60 * 24));
+        $output['hours']   = floor(($diff - $output['years'] * 365 * 60 * 60 * 24 - $output['months'] * 30 * 60 * 60 * 24 - $output['days'] * 60 * 60 * 24) / (60 * 60));
+        $output['minuts']  = floor(($diff - $output['years'] * 365 * 60 * 60 * 24 - $output['months'] * 30 * 60 * 60 * 24 - $output['days'] * 60 * 60 * 24 - $output['hours'] * 60 * 60) / 60);
+        $output['seconds'] = floor(($diff - $output['years'] * 365 * 60 * 60 * 24 - $output['months'] * 30 * 60 * 60 * 24 - $output['days'] * 60 * 60 * 24 - $output['hours'] * 60 * 60 - $output['minuts'] * 60));
+        foreach ($output as $key => $value) if (!$value) unset($output[$key]);
+        return $output;
     }
 }
