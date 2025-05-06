@@ -1,6 +1,6 @@
 <script>
     currentModal.find('.modal-title').addClass('w-100').css('font-size', '.9rem');
-    currentModal.find('.modal-header').css('padding', '10px')
+    currentModal.find('.modal-header').css('padding', '10px');
     modalTitle(currentModal, `
         <div class="nav nav-pills gap-2" role="tablist">
             <div class="nav-item" style="flex: auto;" role="presentation">

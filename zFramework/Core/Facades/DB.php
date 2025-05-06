@@ -15,16 +15,18 @@ class DB
     public $db;
     private $driver;
     private $dbname;
-    private $sql_debug = false;
+    private $sqlDebug = false;
     private $wherePrev = 'AND';
     /**
      * Options parameters
      */
     public $table;
-    public $buildQuery   = [];
-    public $cache        = [];
-    public $specialChars = false;
-    public $setClosures  = true;
+    public $originalTable;
+    public $stagingMode     = false;
+    public $buildQuery      = [];
+    public $cache           = [];
+    public $specialChars    = false;
+    public $setClosures     = true;
 
     /**
      * Initial, Select Database.
@@ -42,6 +44,7 @@ class DB
 
     /**
      * Create database connection or return already current connection.
+     * @return object
      */
     public function db()
     {
@@ -70,6 +73,64 @@ class DB
     }
 
     /**
+     * Staging Mode
+     * @param bool $mode
+     * @return self
+     */
+    public function staging(bool $mode = false)
+    {
+        $this->prepare('DROP TABLE IF EXISTS staging_' . $this->originalTable);
+        if ($mode) {
+            $this->setClosures = false;
+            $this->table = "staging_" . $this->originalTable;
+            $this->prepare('CREATE TABLE IF NOT EXISTS ' . $this->table . ' LIKE ' . $this->originalTable);
+        } elseif ($this->stagingMode) {
+            $this->setClosures = true;
+            $this->table = $this->originalTable;
+        }
+
+        $this->stagingMode = $mode;
+
+        return $this;
+    }
+
+    /**
+     * Staging Merge Table
+     * @param $column
+     * @return self
+     */
+
+    public function stagingMerge(string $column)
+    {
+        if (!$this->stagingMode) new \Exception('You can not merge while staging mode is off.');
+
+        $columns                   = $GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$this->originalTable]['columns'];
+        $no_pri_columns            = array_filter($columns, fn($data) => !in_array($data['COLUMN_KEY'], ['PRI']) ? true : false);
+        $no_pri_columns_names      = array_map(fn($data) => $data['COLUMN_NAME'], $no_pri_columns);
+        $non_special_columns       = array_filter($columns, fn($data) => !in_array($data['COLUMN_KEY'], ['UNI', 'PRI']) ? true : false);
+        $non_special_columns_names = array_map(fn($data) => $data['COLUMN_NAME'], $non_special_columns);
+
+        if ($created_at_column = array_search($this->created_at, $non_special_columns_names)) unset($non_special_columns_names[$created_at_column]);
+
+        $sql = "
+            -- update
+            UPDATE $this->originalTable AS u
+            JOIN staging_$this->originalTable AS s ON u.$column = s.$column
+            SET " . implode(",\n", array_map(fn($data) => "u.$data = COALESCE(NULLIF(s.$data, ''), u.$data)", $non_special_columns_names)) . ";
+            
+            -- insert
+            INSERT INTO $this->originalTable (" . implode(',', $no_pri_columns_names) . ")
+            SELECT " . implode(',', $no_pri_columns_names) . " FROM staging_$this->originalTable AS s
+            WHERE NOT EXISTS (SELECT 1 FROM $this->originalTable AS u WHERE u.$column = s.$column);
+        ";
+
+        $this->prepare($sql)->fetch(\PDO::FETCH_ASSOC);
+        $this->staging(false);
+        return $this;
+    }
+
+
+    /**
      * Execute sql query.
      * @param string $sql
      * @param array $data
@@ -90,7 +151,8 @@ class DB
      */
     public function table(string $table)
     {
-        $this->table = $table;
+        $this->table         = $table;
+        $this->originalTable = $table;
         return $this;
     }
 
@@ -120,6 +182,7 @@ class DB
 
     /**
      * Get primary key.
+     * @return string
      */
     private function getPrimary()
     {
@@ -844,7 +907,7 @@ class DB
      */
     public function sqlDebug(bool $mode)
     {
-        $this->sql_debug = $mode;
+        $this->sqlDebug = $mode;
         return $this;
     }
 
@@ -886,7 +949,7 @@ class DB
 
         $sql = "$type $this->table" . @$sets . $this->getJoin() . $this->getWhere($checkSoftDelete) . $this->getGroupBy() . $this->getOrderBy() . $limit;
 
-        if ($this->sql_debug) {
+        if ($this->sqlDebug) {
             $debug_sql = $sql;
             foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->db()->quote($value), $debug_sql);
 

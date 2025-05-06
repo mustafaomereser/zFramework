@@ -70,6 +70,20 @@ class HomeController extends Controller
 
         // print_r($output);
         // exit;
+
+        # "Staging system" for quick update or insert huge datasets.
+        // $users = (new User)->staging(true);
+        // $users->insert([
+        //     'username'  => 'test',
+        //     'password'  => 'test',
+        //     'email'     => 'test',
+        //     'api_token' => 'test'
+        // ]);
+
+
+        // echo "<pre>";
+        // $users->stagingMerge('username');
+        # 
     }
 
     /** Index page | GET: /

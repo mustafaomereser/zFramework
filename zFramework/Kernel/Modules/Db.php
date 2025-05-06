@@ -201,7 +201,7 @@ class Db
                             $data['extras'][] = " ADD UNIQUE (`$column`) ";
                             break;
 
-                            # String: start
+                        # String: start
                         case 'text':
                             $data['type'] = " TEXT ";
                             break;
@@ -221,9 +221,9 @@ class Db
                         case 'json':
                             $data['type'] = " JSON ";
                             break;
-                            # String: end
+                        # String: end
 
-                            # INT: start
+                        # INT: start
                         case 'bigint':
                             $data['type'] = " BIGINT ";
                             break;
@@ -256,9 +256,9 @@ class Db
                             $data['type'] = " REAL ";
                             break;
 
-                            # INT: end
+                        # INT: end
 
-                            # Date: start
+                        # Date: start
                         case 'date':
                             $data['type'] = " DATE ";
                             break;
@@ -270,7 +270,7 @@ class Db
                         case 'time':
                             $data['type'] = " TIME ";
                             break;
-                            # Date: end
+                        # Date: end
 
                         case 'default':
                             $data['default'] = " DEFAULT" . (@$switch[1] ? (!in_array($switch[1], $MySQL_defines) ? ((is_numeric($switch[1]) ? " " . $switch[1] : " '" . addslashes($switch[1]) . "' ")) : (" " . $switch[1])) : ' NULL') . " ";
