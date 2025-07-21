@@ -97,7 +97,7 @@ class DB
     /**
      * Staging Merge Table
      * @param $column
-     * @return self
+     * @return array
      */
 
     public function stagingMerge(string $column)
@@ -112,21 +112,27 @@ class DB
 
         if ($created_at_column = array_search($this->created_at, $non_special_columns_names)) unset($non_special_columns_names[$created_at_column]);
 
-        $sql = "
-            -- update
-            UPDATE $this->originalTable AS u
-            JOIN staging_$this->originalTable AS s ON u.$column = s.$column
-            SET " . implode(",\n", array_map(fn($data) => "u.$data = COALESCE(NULLIF(s.$data, ''), u.$data)", $non_special_columns_names)) . ";
-            
-            -- insert
+        $insert = $this->prepare("
+        -- insert
+            ALTER TABLE $this->originalTable DISABLE KEYS;
             INSERT INTO $this->originalTable (" . implode(',', $no_pri_columns_names) . ")
             SELECT " . implode(',', $no_pri_columns_names) . " FROM staging_$this->originalTable AS s
             WHERE NOT EXISTS (SELECT 1 FROM $this->originalTable AS u WHERE u.$column = s.$column);
-        ";
+            ALTER TABLE $this->originalTable ENABLE KEYS;
+        ")->fetch(\PDO::FETCH_ASSOC);
 
-        $this->prepare($sql)->fetch(\PDO::FETCH_ASSOC);
+        $update = $this->prepare("
+        -- update
+            START TRANSACTION;
+            UPDATE $this->originalTable AS u
+            JOIN staging_$this->originalTable AS s ON u.$column = s.$column
+            SET " . implode(",\n", array_map(fn($data) => "u.$data = COALESCE(NULLIF(s.$data, ''), u.$data)", $non_special_columns_names)) . ";
+            COMMIT;
+        ")->fetch(\PDO::FETCH_ASSOC);
+
+
         $this->staging(false);
-        return $this;
+        return compact('insert', 'update');
     }
 
 

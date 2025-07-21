@@ -50,7 +50,7 @@ class Auth
     public static function logout(): bool
     {
         self::$user = null;
-        setcookie('auth_stay_in', null, time() - 60, '/');
+        setcookie('auth_stay_in', '', (time() - 60), '/');
         unset($_SESSION['user_id']);
         return true;
     }
