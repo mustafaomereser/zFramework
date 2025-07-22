@@ -284,11 +284,11 @@ class DB
      */
     private function closures()
     {
-        if (isset($GLOBALS['model-closures'][$this->table])) return $this;
+        if (isset($GLOBALS['model-closures'][$this->db][$this->table])) return $this;
 
         $closures = [];
         foreach ((new ReflectionClass($this))->getMethods() as $closure) if (strstr($closure->class, 'Models') && !in_array($closure->name, $this->not_closures)) $closures[] = $closure->name;
-        $GLOBALS['model-closures'][$this->table] = $closures;
+        $GLOBALS['model-closures'][$this->db][$this->table] = $closures;
         return $this;
     }
 
@@ -727,7 +727,7 @@ class DB
         if ($this->setClosures) {
             $primary_key = $this->getPrimary();
             foreach ($rows as $key => $row) {
-                foreach ($GLOBALS['model-closures'][$this->table] as $closure) $rows[$key][$closure] = function () use ($row, $closure) {
+                foreach ($GLOBALS['model-closures'][$this->db][$this->table] as $closure) $rows[$key][$closure] = function () use ($row, $closure) {
                     return $this->{$closure}($row);
                 };
 
