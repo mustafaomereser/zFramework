@@ -25,20 +25,20 @@ class Lang
      */
     public static function list(): array
     {
-        return array_values(array_diff(scandir(base_path("resource/lang")), ['.', '..']));
+        return scan_dir(base_path("resource/lang"));
     }
 
     /**
      * Set Locale
-     * @param string $lang
+     * @param ?string $lang
      * @param bool $syncCookie
      * @return bool|self
      */
-    public static function locale(string $lang = null, bool $syncCookie = true): bool
+    public static function locale(?string $lang = null, bool $syncCookie = true): bool
     {
-        $lang = ($lang ?? substr($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? config('app.lang') ?? '', 0, 2));
+        $lang = strlen($lang) ? $lang : (substr($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? (config('app.lang') ?? ''), 0, 2));
         if (!$path = self::canSelect($lang)) return self::locale(Config::get('app.lang') ?? self::list()[0]);
-        if ($syncCookie) setcookie('lang', $lang, time() * 2, '/');
+        if ($syncCookie) Cookie::set('lang', $lang, time() * 2);
 
         self::$locale = $lang;
         self::$path = $path;

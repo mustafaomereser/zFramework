@@ -17,7 +17,7 @@ class Cache
 
         $option = Terminal::$commands[2];
 
-        $list = array_values(array_diff(scandir($storage_path), ['.', '..']));
+        $list = scan_dir($storage_path);
         if (!in_array($option, $list)) return Terminal::text("[color=red]Wrong Option!\nOptions: " . implode(', ', $list) . ".[/color]");
 
         Terminal::text("[color=yellow]Processing...[/color]");

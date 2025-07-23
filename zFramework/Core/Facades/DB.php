@@ -30,10 +30,10 @@ class DB
 
     /**
      * Initial, Select Database.
-     * @param string @db
+     * @param ?string @db
      * @return mixed
      */
-    public function __construct(string $db = null)
+    public function __construct(?string $db = null)
     {
         if ($db && isset($GLOBALS['databases']['connections'][$db])) $this->db = $db;
         else $this->db = array_keys($GLOBALS['databases']['connections'])[0];

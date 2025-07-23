@@ -176,7 +176,7 @@ function findFile($file, $ext = null, $path = null)
 
 
     try {
-        @$dirTree = array_values(array_diff(scandir(base_path($path)), ['.', '..']));
+        @$dirTree = scan_dir(base_path($path));
     } catch (\Throwable $e) {
     }
 

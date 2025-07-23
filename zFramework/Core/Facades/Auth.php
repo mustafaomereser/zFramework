@@ -14,12 +14,13 @@ class Auth
 
     public static function init()
     {
-        if (!self::check() && $api_token = @$_COOKIE['auth_stay_in']) self::attempt(['api_token' => Crypter::decode($api_token)]);
+        if (!self::check() && $api_token = Cookie::get('auth_stay_in')) self::attempt(['api_token' => $api_token]);
     }
 
     /**
      * Login from a User model result array.
      * @param array $user
+     * @return bool
      */
     public static function login(array $user): bool
     {
@@ -34,11 +35,11 @@ class Auth
     /**
      * Login with user's api_token
      * @param string $token
+     * @return bool
      */
-    public static function token_login(string $token)
+    public static function token_login(string $token): bool
     {
-        $user = (new User)->where('api_token', $token)->first();
-        if (isset($user['id'])) self::login($user);
+        return self::login((new User)->select('id')->where('api_token', $token)->first());
     }
 
     /**
@@ -48,7 +49,7 @@ class Auth
     public static function logout(): bool
     {
         self::$user = null;
-        setcookie('auth_stay_in', '', (time() - 60), '/');
+        Cookie::delete('auth_stay_in');
         Session::delete('user_id');
         return true;
     }
@@ -91,7 +92,7 @@ class Auth
 
         if (@$user['id']) {
             self::login($user);
-            if ($staymein) setcookie('auth_stay_in', Crypter::encode($user['api_token']), (time() + (86400 * 360)), '/');
+            if ($staymein) Cookie::set('auth_stay_in', $user['api_token'], time() * 2);
             return true;
         }
 

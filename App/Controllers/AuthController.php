@@ -30,7 +30,8 @@ class AuthController extends Controller
         $validate = $validate->validated();
         $response = ['status' => 0];
 
-        if (Auth::attempt(['email' => $validate['email'], 'password' => $validate['password']], !empty($valdiate['keep-logged-in']))) {
+
+        if (Auth::attempt(['email' => $validate['email'], 'password' => $validate['password']], (bool) $validate['keep-logged-in'])) {
             $response['status'] = 1;
             Alerts::success('Welcome again!');
         } else {

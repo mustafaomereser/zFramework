@@ -49,14 +49,10 @@ class Config
         $arr = self::parseUrl($config);
         if (!is_file($arr[0])) return;
 
-        opcache_invalidate($arr[0], true);
+        if (function_exists('opcache_invalidate')) opcache_invalidate($arr[0], true);
+
         $config = include($arr[0]);
-
-        if (isset($arr[1])) {
-            $keys = explode('.', $arr[1]);
-            foreach ($keys as $key) if (isset($config[$key])) $config = $config[$key];
-        }
-
+        if (isset($arr[1])) foreach (explode('.', $arr[1]) as $key) if (isset($config[$key])) $config = $config[$key];
         return $config;
     }
 

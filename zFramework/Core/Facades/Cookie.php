@@ -32,7 +32,6 @@ class Cookie
      */
     public static function set(string $key, string $value, ?int $expires = null): bool
     {
-        if (isset($_COOKIE[$key])) return false;
         if (is_array($value) || is_object($value)) $value = json_encode($value, JSON_UNESCAPED_UNICODE);
         return setcookie($key, Crypter::encode($value), ($expires ? (time() + $expires) : self::$options['expires']), self::$options['path'], self::$options['domain'], self::$options['security'], self::$options['http_only']);
     }

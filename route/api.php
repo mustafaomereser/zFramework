@@ -1,20 +1,21 @@
 <?php
 
+use App\Middlewares\API;
 use zFramework\Core\Facades\Auth;
-use zFramework\Core\Helpers\Http;
+use zFramework\Core\Facades\Response;
 use zFramework\Core\Route;
 
-Route::pre('/api')->noCSRF()->group(function () {
+Route::pre('/api')->middleware([API::class])->noCSRF()->group(function () {
     Route::pre('/v1')->group(function () {
         Route::get('/', function () {
-            $text = "Welcome to API Route.\nIf you wanna user login.\n/api?user_token={user_token}\n";
-
-            if (Auth::check()) {
-                $text .= "\nUser:";
-                $text .= var_export(Auth::user(), true);
-            }
-
-            return Http::isAjax() ? $text : str_replace("\n", '<br />', $text);
+            return Response::json([
+                'status'    => rand(0, 999),
+                'message'   => ["Welcome to API Route👋!", "If you wanna user login, send with 'Auth-Token' header in token."],
+                'user'      => Auth::check() ? Auth::user() : 'not logged in.',
+                'ip'        => ip(),
+                'time'      => time(),
+                'timezone'  => date_default_timezone_get()
+            ], JSON_PRETTY_PRINT);
         });
     });
 });
