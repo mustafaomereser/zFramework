@@ -39,7 +39,7 @@ class Alerts
      */
     public static function get(): array
     {
-        return Session::get('alerts');
+        return Session::get('alerts') ?? [];
     }
 
     /**

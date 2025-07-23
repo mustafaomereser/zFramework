@@ -292,6 +292,43 @@ class DB
         return $this;
     }
 
+    /**
+     * Add Closure on/off.
+     * @return self
+     */
+    public function closureMode(bool $mode = true)
+    {
+        $this->setClosures = $mode;
+        return $this;
+    }
+
+    /**
+     * Set Closures for rows
+     * @return array
+     */
+    public function setClosures(array $rows): array
+    {
+        $primary_key = $this->getPrimary();
+        foreach ($rows as $key => $row) {
+            foreach ($GLOBALS['model-closures'][$this->db][$this->table] as $closure) $rows[$key][$closure] = function () use ($row, $closure) {
+                return $this->{$closure}($row);
+            };
+
+            if (!isset($row[$primary_key])) continue;
+
+            $rows[$key]['update'] = function ($sets) use ($row, $primary_key) {
+                return $this->where($primary_key, $row[$primary_key])->update($sets);
+            };
+
+            $rows[$key]['delete'] = function () use ($row, $primary_key) {
+                return $this->where($primary_key, $row[$primary_key])->delete();
+            };
+
+            // $rows[$key] = new \ArrayObject($rows[$key], \ArrayObject::ARRAY_AS_PROPS);
+        }
+        // $rows = new \ArrayObject($rows, \ArrayObject::ARRAY_AS_PROPS);
+        return $rows;
+    }
 
     /**
      * Begin query for models.
@@ -724,29 +761,7 @@ class DB
     public function get()
     {
         $rows = $this->run()->fetchAll(\PDO::FETCH_ASSOC);
-        if ($this->setClosures) {
-            $primary_key = $this->getPrimary();
-            foreach ($rows as $key => $row) {
-                foreach ($GLOBALS['model-closures'][$this->db][$this->table] as $closure) $rows[$key][$closure] = function () use ($row, $closure) {
-                    return $this->{$closure}($row);
-                };
-
-                if (!isset($row[$primary_key])) continue;
-
-                $rows[$key]['update'] = function ($sets) use ($row, $primary_key) {
-                    return $this->where($primary_key, $row[$primary_key])->update($sets);
-                };
-
-                $rows[$key]['delete'] = function () use ($row, $primary_key) {
-                    return $this->where($primary_key, $row[$primary_key])->delete();
-                };
-
-                // $rows[$key] = new \ArrayObject($rows[$key], \ArrayObject::ARRAY_AS_PROPS);
-            }
-        }
-
-        // $rows = new \ArrayObject($rows, \ArrayObject::ARRAY_AS_PROPS);
-
+        if ($this->setClosures) $rows = $this->setClosures($rows);
         return $rows;
     }
 

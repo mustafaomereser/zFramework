@@ -75,7 +75,7 @@ function getCodeSnippets($stackTrace)
                     } elseif (is_null($arg)) {
                         $argStrings[] = 'null';
                     } elseif (is_array($arg)) {
-                        $argStrings[] = 'Array[' . count($arg) . ']';
+                        $argStrings[] = "<pre>" . print_r($arg, true) . "</pre>";
                     } elseif (is_object($arg)) {
                         $argStrings[] = get_class($arg);
                     } else {

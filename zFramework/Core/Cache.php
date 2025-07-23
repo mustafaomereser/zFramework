@@ -8,18 +8,6 @@ class Cache
 {
     private static $path = FRAMEWORK_PATH . "\storage";
 
-    static $caches;
-    static $timeouts;
-
-    /**
-     * Initial cache data.
-     */
-    public static function init()
-    {
-        self::$caches   = Session::get('caching');
-        self::$timeouts = Session::get('caching_timeout');
-    }
-
     /**
      * Cache a data and get it for before timeout.
      * 
@@ -30,13 +18,14 @@ class Cache
      */
     public static function cache(string $name, $callback, int $timeout = 5)
     {
+        return Session::callback(function () use ($name, $callback, $timeout) {
+            if (!isset($_SESSION['caching'][$name]) || time() > $_SESSION['caching_timeout'][$name]) {
+                $_SESSION['caching'][$name]         = $callback();
+                $_SESSION['caching_timeout'][$name] = (time() + $timeout);
+            }
 
-        if (!isset(self::$caches[$name]) || time() > self::$timeouts[$name]) {
-            self::$caches[$name] = $callback();
-            self::$timeouts[$name] = (time() + $timeout);
-        }
-
-        return self::$caches[$name];
+            return $_SESSION['caching'][$name];
+        });
     }
 
     /**
@@ -47,8 +36,10 @@ class Cache
      */
     public static function remove(string $name): bool
     {
-        unset(self::$caches[$name]);
-        return true;
+        return Session::callback(function () use ($name) {
+            unset($_SESSION['caching'][$name]);
+            return true;
+        });
     }
 
     // public static function cache_view(string $view_name, string $view)
