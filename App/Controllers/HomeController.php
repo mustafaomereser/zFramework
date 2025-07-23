@@ -5,6 +5,8 @@ namespace App\Controllers;
 use App\Models\User;
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
+use zFramework\Core\Csrf;
+use zFramework\Core\Facades\JustOneTime;
 
 class HomeController extends Controller
 {

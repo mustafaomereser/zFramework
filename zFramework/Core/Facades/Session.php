@@ -4,6 +4,20 @@ namespace zFramework\Core\Facades;
 
 class Session
 {
+
+    /**
+     * Session management.
+     * @param \Closure $callback
+     * @return mixed
+     */
+    public static function callback(\Closure $callback)
+    {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $data = $callback();
+        session_write_close();
+        return $data;
+    }
+
     /**
      * Set a session.
      * @param string $key
@@ -12,8 +26,10 @@ class Session
      */
     public static function set(string $key, mixed $value): self
     {
-        $_SESSION[$key] = $value;
-        return new self();
+        return self::callback(function () use ($key, $value) {
+            $_SESSION[$key] = $value;
+            return new self();
+        });
     }
 
     /**
@@ -23,7 +39,9 @@ class Session
      */
     public static function get(string $key): mixed
     {
-        return $_SESSION[$key] ?? NULL;
+        return self::callback(function () use ($key) {
+            return @$_SESSION[$key];
+        });
     }
 
     /**
@@ -33,7 +51,9 @@ class Session
      */
     public static function delete(string $key): self
     {
-        unset($_SESSION[$key]);
-        return new self();
+        return self::callback(function () use ($key) {
+            unset($_SESSION[$key]);
+            return new self();
+        });
     }
 }

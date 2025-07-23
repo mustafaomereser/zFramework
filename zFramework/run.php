@@ -79,7 +79,6 @@ class Run
                 'dir'     => BASE_PATH . '/resource/views',
                 'suffix'  => ''
             ], Config::get('view')));
-            if (!Config::get('crypt')) throw new \Exception('Create a crypt key with terminal. Command is: php terminal security key --regen', 1000);
 
             \zFramework\Core\Route::run();
             \zFramework\Core\Facades\Alerts::unset(); // forgot alerts

@@ -1,4 +1,5 @@
 push.bat
 composer.lock
+zFramework/modules/error_handlers/logs/*
 zFramework/storage/*
 config/crypt.php

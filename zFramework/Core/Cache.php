@@ -2,9 +2,23 @@
 
 namespace zFramework\Core;
 
+use zFramework\Core\Facades\Session;
+
 class Cache
 {
     private static $path = FRAMEWORK_PATH . "\storage";
+
+    static $caches;
+    static $timeouts;
+
+    /**
+     * Initial cache data.
+     */
+    public static function init()
+    {
+        self::$caches   = Session::get('caching');
+        self::$timeouts = Session::get('caching_timeout');
+    }
 
     /**
      * Cache a data and get it for before timeout.
@@ -16,12 +30,13 @@ class Cache
      */
     public static function cache(string $name, $callback, int $timeout = 5)
     {
-        if (!isset($_SESSION['caching'][$name]) || time() > $_SESSION['caching_timeout'][$name]) {
-            $_SESSION['caching'][$name] = $callback();
-            $_SESSION['caching_timeout'][$name] = (time() + $timeout);
+
+        if (!isset(self::$caches[$name]) || time() > self::$timeouts[$name]) {
+            self::$caches[$name] = $callback();
+            self::$timeouts[$name] = (time() + $timeout);
         }
 
-        return $_SESSION['caching'][$name];
+        return self::$caches[$name];
     }
 
     /**
@@ -32,7 +47,7 @@ class Cache
      */
     public static function remove(string $name): bool
     {
-        unset($_SESSION['caching'][$name]);
+        unset(self::$caches[$name]);
         return true;
     }
 

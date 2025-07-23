@@ -37,7 +37,6 @@ class AuthController extends Controller
             Alerts::danger('E-mail or Password not match!');
         }
 
-        $response['alerts'] = Alerts::get();
         return Response::json($response);
     }
 
@@ -56,7 +55,6 @@ class AuthController extends Controller
         $response['status'] = 1;
         Alerts::success('Signup Complete.');
 
-        $response['alerts'] = Alerts::get();
         return Response::json($response);
     }
 
@@ -69,7 +67,6 @@ class AuthController extends Controller
         $response['status'] = 1;
         Alerts::success('Bye.');
 
-        $response['alerts'] = Alerts::get();
         return Response::json($response);
     }
 

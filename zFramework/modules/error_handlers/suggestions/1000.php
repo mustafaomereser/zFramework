@@ -1,14 +1,14 @@
 <?php
 if (isset($_GET['crypt-key-create'])) {
     \zFramework\Kernel\Terminal::begin(["terminal", "security key --regen"]);
-?>
-    <meta http-equiv="refresh" content="0; url=/" />
-<?php
+    redirect();
 }
 ?>
-<div class="mb-2">
-    You must create a unique crypt key for per project.
-</div>
-<div>
-    <a href="?crypt-key-create=true" class="btn btn-success">Create Crypt Key & Salt</a>
+
+<div class="error-type">⚠️ Her proje için benzersiz bir şifreleme anahtarı oluşturmanız gerekir.</div>
+<div class="error-description">
+    <a href="?crypt-key-create=true" class="ide-button">Şifreleme Dosyasını Oluştur</a>
+    <div style="margin-top: 10px">
+        Eğer buton işe yaramıyor ise, Terminalde Komut şudur: <kbd>php terminal security key --regen</kbd>
+    </div>
 </div>

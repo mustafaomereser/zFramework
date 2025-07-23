@@ -23,6 +23,7 @@ class Response
 
         switch ($type) {
             case 'json':
+                if (config('response.ajax.include-alerts')) $data['alerts'] = Alerts::get();
                 $data = json_encode($data, JSON_UNESCAPED_UNICODE);
                 break;
         }

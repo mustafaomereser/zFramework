@@ -14,9 +14,12 @@ class Alerts
      */
     private static function set(): self
     {
-        $_SESSION['alerts'][self::$name ? self::$name : Str::rand(10)] = func_get_args();
-        self::$name = null;
-        return new self();
+        $args = func_get_args();
+        return Session::callback(function () use ($args) {
+            $_SESSION['alerts'][self::$name ? self::$name : Str::rand(10)] = $args;
+            self::$name = null;
+            return new self();
+        });
     }
 
     /**
@@ -36,7 +39,7 @@ class Alerts
      */
     public static function get(): array
     {
-        return $_SESSION['alerts'] ?? [];
+        return Session::get('alerts');
     }
 
     /**
@@ -45,7 +48,7 @@ class Alerts
      */
     public static function unset()
     {
-        unset($_SESSION['alerts']);
+        Session::delete('alerts');
     }
 
     /**

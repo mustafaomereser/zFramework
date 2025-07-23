@@ -1,10 +1,11 @@
-@php
-use zFramework\Core\Facades\Lang;
-$lang_list = Lang::list();
-@endphp
+<?php
 
+use zFramework\Core\Facades\Lang;
+
+$lang_list = Lang::list();
+?>
 <!DOCTYPE html>
-<html lang="{{ Lang::$locale }}" data-bs-theme="dark">
+<html lang="<?= Lang::$locale ?>" data-bs-theme="light">
 
 <head>
     <meta charset="UTF-8">
@@ -21,25 +22,26 @@ $lang_list = Lang::list();
 
 <body>
     <div class="container my-lg-5 my-2">
-        <div class="clearfix">
-            <div class="float-start">
-                <a href="https://github.com/mustafaomereser/Z-Framework-php-mvc" target="_blank">Github & Docs</a>
+        <div class="row align-items-center">
+            <div class="col-md-3 col-12 mb-md-0 mb-3">
+                <img src="/assets/images/zframework-transparent.png" alt="zFramework" class="w-100">
             </div>
-            <div class="float-end">
-                <div class="d-flex align-items-center gap-2">
-                    <a class="btn btn-sm border" href="/">
-                        <i class="fad fa-home"></i> <?= _l('lang.home-page') ?>
+            <div class="col-md-6 col-12 text-center mb-md-0 mb-3">
+                <a class="btn btn-sm border" href="/">
+                    <i class="fad fa-home"></i> <?= _l('lang.home-page') ?>
+                </a>
+                <?php foreach ($GLOBALS['menu'] ?? [] as $module => $menu) : ?>
+                    <a class="btn btn-sm border" href="<?= $menu['route'] ?>">
+                        <i class="<?= $menu['icon'] ?>"></i> <?= $menu['title'] ?>
                     </a>
-                    <?php foreach ($GLOBALS['menu'] ?? [] as $module => $menu) : ?>
-                        <a class="btn btn-sm border" href="<?= $menu['route'] ?>">
-                            <i class="<?= $menu['icon'] ?>"></i> <?= $menu['title'] ?>
-                        </a>
-                    <?php endforeach ?>
-
+                <?php endforeach ?>
+            </div>
+            <div class="col-md-3 col-12">
+                <div class="d-flex align-items-center justify-content-md-end justify-content-center gap-2">
                     <div id="auth-content"></div>
 
                     <div class="btn-group">
-                        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="width: 100px">
+                        <button class="btn btn-sm border dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="width: 100px">
                             {{ _l('lang.languages') }}
                         </button>
                         <ul class="dropdown-menu">
@@ -58,9 +60,10 @@ $lang_list = Lang::list();
 
         @yield('body')
 
-        <div class="row text-center">
-            <div class="col-lg-6 col-12 text-lg-start">
+        <div class="row text-center mb-3">
+            <div class="col-lg-6 col-12 text-lg-start mb-md-0 mb-3">
                 <a href="/api/v1">API</a>
+                <a href="https://github.com/mustafaomereser/Z-Framework-php-mvc" target="_blank">Github & Docs</a>
             </div>
             <div class="col-lg-6 col-12 text-lg-end">
                 <small data-toggle="tooltip" title="zFramework Version"><b>zFramework</b> v{{ FRAMEWORK_VERSION }}</small>

@@ -10,13 +10,15 @@ class JustOneTime
     /**
      * Set just one time data.
      * @param string $name
-     * @param mixed $val
+     * @param mixed $value
      * @return self
      */
-    public static function set(string $name, mixed $val): self
+    public static function set(string $name, mixed $value): self
     {
-        $_SESSION[self::$session_name][$name] = $val;
-        return new self();
+        return Session::callback(function () use ($name, $value) {
+            $_SESSION[self::$session_name][$name] = $value;
+            return new self();
+        });
     }
 
     /**
@@ -26,7 +28,9 @@ class JustOneTime
      */
     public static function get(string $name): mixed
     {
-        return @$_SESSION[self::$session_name][$name];
+        return Session::callback(function () use ($name) {
+            return @$_SESSION[self::$session_name][$name];
+        });
     }
 
     /**
@@ -35,6 +39,6 @@ class JustOneTime
      */
     public static function unset()
     {
-        unset($_SESSION[self::$session_name]);
+        Session::delete(self::$session_name);
     }
 }
