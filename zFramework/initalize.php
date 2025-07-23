@@ -13,7 +13,7 @@ $sessions_path = "$storage_path/sessions";
 session_save_path($sessions_path);
 ini_set('session.gc_probability', 1);
 
-session_start(); # disable for Session::class
+// session_start(); # disable for Session::class
 // Session: End
 
 $GLOBALS['databases'] = [
