@@ -939,12 +939,14 @@ function errorHandler($data)
                             <div class="error-details">
                                 <?php include($suggestion) ?>
                             </div>
-                        <?php else: ?>
-                            <div class="error-details">
-                                <div class="error-type"><?= $errorDetails['type'] ?></div>
-                                <div class="error-description"><?= $errorDetails['description'] ?></div>
-                            </div>
                         <?php endif ?>
+                    <?php endif ?>
+
+                    <?php if (!$err_code || !is_file($suggestion)): ?>
+                        <div class="error-details">
+                            <div class="error-type"><?= $errorDetails['type'] ?></div>
+                            <div class="error-description"><?= $errorDetails['description'] ?></div>
+                        </div>
                     <?php endif ?>
 
                     <div class="error-location" onclick="goIDE('<?= str_replace("\\", "/", $data[3]) ?>', <?= $data[4] ?>)">
@@ -1202,7 +1204,7 @@ function errorHandler($data)
 
 <?php
     $error_log = ob_get_clean();
-    file_put_contents2(__DIR__ . '/logs/' . date('Y-m-d-H-i-s') . '.html', $error_log);
+    if (config('app.error_log')) file_put_contents2(__DIR__ . '/logs/' . date('Y-m-d-H-i-s') . '.html', $error_log);
     if (!Config::get('app.debug')) abort(500);
     if (Http::isAjax()) abort(410, "CHECK DEVELOPER CONSOLE. \nAlso message: \n" . $message);
     echo $error_log;

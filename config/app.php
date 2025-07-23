@@ -1,13 +1,15 @@
 <?php
 
 return [
-    'debug'    => true, # turn false on production.
-    'lang'     => 'tr', # if browser haven't language in Languages list auto choose that default lang.
+    'debug'     => true, # turn false on production.
+    'error_log' => true,
 
-    'title'    => 'Z Framework Project',
-    'public'   => 'public_html',
+    'lang'      => 'tr', # if browser haven't language in Languages list auto choose that default lang.
 
-    'version'  => '1.0.0',
+    'title'     => 'Z Framework Project',
+    'public'    => 'public_html',
+
+    'version'   => '1.0.0',
 
     'pagination' => [
         'default-view' => 'layouts.pagination.default'
