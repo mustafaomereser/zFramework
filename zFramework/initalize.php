@@ -6,15 +6,13 @@ header("X-Powered-By: zFramework v" . FRAMEWORK_VERSION);
 // Initalize settings
 date_default_timezone_set('Europe/Istanbul');
 
-// Session: Start
+// Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
 $sessions_path = "$storage_path/sessions";
 @mkdir($sessions_path, 0777, true);
 session_save_path($sessions_path);
 ini_set('session.gc_probability', 1);
-
-// session_start(); # disable for Session::class
-// Session: End
+// Session settings: End
 
 $GLOBALS['databases'] = [
     'connected'   => [],

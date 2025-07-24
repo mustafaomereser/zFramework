@@ -40,7 +40,7 @@ class Session
     public static function get(string $key): mixed
     {
         return self::callback(function () use ($key) {
-            return @$_SESSION[$key];
+            return isset($_SESSION[$key]) ? $_SESSION[$key] : NULL;
         });
     }
 

@@ -2,7 +2,7 @@
 
 namespace zFramework\Core;
 
-use zFramework\Core\Facades\Session;
+use zFramework\Core\Facades\Cookie;
 use zFramework\Core\Facades\Str;
 
 class Csrf
@@ -26,8 +26,8 @@ class Csrf
      */
     public static function get(): string
     {
-        if ((!@Session::get('csrf_token') || time() > @Session::get('csrf_token_timeout'))) self::set();
-        return Session::get('csrf_token');
+        if ((!@Cookie::get('csrf_token') || time() > @Cookie::get('csrf_token_timeout'))) self::set();
+        return Cookie::get('csrf_token');
     }
 
     /**
@@ -36,7 +36,7 @@ class Csrf
      */
     private static function getStorage(): array
     {
-        return Session::get('csrf_storage') ?? [];
+        return json_decode(Cookie::get('csrf_storage') ?? '[]', true);
     }
 
     /**
@@ -49,7 +49,7 @@ class Csrf
         $tokens = self::getStorage();
         if (count($tokens) >= 2) unset($tokens[0]);
         $tokens[] = $csrf;
-        Session::set('csrf_storage', array_values($tokens));
+        Cookie::set('csrf_storage', json_encode(array_values($tokens), JSON_UNESCAPED_UNICODE));
     }
 
     /**
@@ -58,9 +58,9 @@ class Csrf
      */
     public static function set(): void
     {
-        Session::set('csrf_token_timeout', time() + self::$timeOut);
-        Session::set('csrf_token', Str::rand(30));
-        self::addStorage(Session::get('csrf_token'));
+        Cookie::set('csrf_token_timeout', time() + self::$timeOut);
+        Cookie::set('csrf_token', Str::rand(30));
+        self::addStorage(Cookie::get('csrf_token'));
     }
 
     /**
@@ -68,7 +68,7 @@ class Csrf
      */
     public static function unset(): void
     {
-        Session::delete('csrf_token');
+        Cookie::delete('csrf_token');
     }
 
     /**
@@ -77,7 +77,7 @@ class Csrf
      */
     public static function remainTimeOut(): int
     {
-        return  Session::get('csrf_token_timeout') - time();
+        return Cookie::get('csrf_token_timeout') - time();
     }
 
     /**

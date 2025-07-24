@@ -23,6 +23,17 @@ class Cookie
         // self::$options['domain']  = host();
     }
 
+
+    /**
+     * Crypt and parse for cookie key.
+     * @param string $key
+     * @return string
+     */
+    private static function keyparse($key): string
+    {
+        return str_replace(["=", ",", ";", " ", "\t", "\r", "\n", "\013", "\014", "+", "%"], '', Crypter::encode($key));
+    }
+
     /**
      * Set a Cookie
      * @param string $key
@@ -33,7 +44,8 @@ class Cookie
     public static function set(string $key, string $value, ?int $expires = null): bool
     {
         if (is_array($value) || is_object($value)) $value = json_encode($value, JSON_UNESCAPED_UNICODE);
-        return setcookie($key, Crypter::encode($value), ($expires ? (time() + $expires) : self::$options['expires']), self::$options['path'], self::$options['domain'], self::$options['security'], self::$options['http_only']);
+        $_COOKIE[self::keyparse($key)] = Crypter::encode($value);
+        return setcookie(self::keyparse($key), Crypter::encode($value), ($expires ? (time() + $expires) : self::$options['expires']), self::$options['path'], self::$options['domain'], self::$options['security'], self::$options['http_only']);
     }
 
     /**
@@ -43,7 +55,7 @@ class Cookie
      */
     public static function get(string $key)
     {
-        return isset($_COOKIE[$key]) ? Crypter::decode($_COOKIE[$key]) : false;
+        return isset($_COOKIE[self::keyparse($key)]) ? Crypter::decode($_COOKIE[self::keyparse($key)]) : NULL;
     }
 
     /**
@@ -53,6 +65,6 @@ class Cookie
      */
     public static function delete(string $key): bool
     {
-        return setcookie($key, '', -1, self::$options['path'], self::$options['domain'], self::$options['security'], self::$options['http_only']);
+        return setcookie(self::keyparse($key), '', -1, self::$options['path'], self::$options['domain'], self::$options['security'], self::$options['http_only']);
     }
 }

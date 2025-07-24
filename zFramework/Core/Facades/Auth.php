@@ -14,7 +14,7 @@ class Auth
 
     public static function init()
     {
-        if (!self::check() && $api_token = Cookie::get('auth_stay_in')) self::attempt(['api_token' => $api_token]);
+        if (!self::check() && $api_token = Cookie::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
     }
 
     /**
@@ -25,7 +25,8 @@ class Auth
     public static function login(array $user): bool
     {
         if (isset($user['id'])) {
-            Session::set('user_id', $user['id']);
+            Cookie::set('auth-password', $user['password']);
+            Cookie::set('auth-token', $user['id']);
             return true;
         }
 
@@ -49,8 +50,8 @@ class Auth
     public static function logout(): bool
     {
         self::$user = null;
-        Cookie::delete('auth_stay_in');
-        Session::delete('user_id');
+        Cookie::delete('auth-stay-in');
+        Cookie::delete('auth-token');
         return true;
     }
 
@@ -70,7 +71,7 @@ class Auth
      */
     public static function user()
     {
-        if (!$user_id = Session::get('user_id')) return false;
+        if (!$user_id = Cookie::get('auth-token')) return false;
         if (self::$user == null) self::$user = (new User)->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
         if (!@self::$user['id']) return self::logout();
         return self::$user;
@@ -86,13 +87,13 @@ class Auth
     {
         if (self::check()) return false;
 
-        $user = (new User)->select(['id', 'api_token']);
+        $user = (new User)->select(['id', 'api_token', 'password']);
         foreach ($fields as $key => $val) $user->where($key, ($key != 'password' ? $val : Crypter::encode($val)));
         $user = $user->first();
 
         if (@$user['id']) {
             self::login($user);
-            if ($staymein) Cookie::set('auth_stay_in', $user['api_token'], time() * 2);
+            if ($staymein) Cookie::set('auth-stay-in', $user['api_token'], time() * 2);
             return true;
         }
 
