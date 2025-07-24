@@ -73,7 +73,7 @@ class Auth
     {
         if (!$user_id = Cookie::get('auth-token')) return false;
         if (self::$user == null) self::$user = (new User)->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
-        if (!@self::$user['id']) return self::logout();
+        if (!@self::$user['id'] || self::$user['password'] != Cookie::get('auth-password')) return self::logout();
         return self::$user;
     }
 
