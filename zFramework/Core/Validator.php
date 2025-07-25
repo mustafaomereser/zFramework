@@ -57,7 +57,7 @@ class Validator
                     $case       = array_key_first($out);
                     $equivalent = $out[$case];
                     unset($out[$case]);
-                    foreach ($out as $key => $param) $parameters[$key] = $param;
+                    foreach ($out as $param_key => $param) $parameters[$param_key] = $param;
                 } else {
                     $case = $validate;
                 }
