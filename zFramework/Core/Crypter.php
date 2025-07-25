@@ -15,7 +15,6 @@ class Crypter
     public static function init()
     {
         if (!Config::get('crypt')) throw new \Exception('Terminal ile bir şifreleme anahtarı oluşturun.', 1000);
-
         self::$key  = Config::get('crypt.key');
         self::$salt = Config::get('crypt.salt');
     }

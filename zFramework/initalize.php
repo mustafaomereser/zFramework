@@ -16,6 +16,12 @@ ini_set('session.gc_probability', 1);
 
 // Error log: start
 define('ERROR_LOG_DIR', __DIR__ . '/modules/error_handlers/logs');
+
+function error_log_callback($last_log)
+{
+    return;
+}
+
 // Error log: end
 
 $GLOBALS['databases'] = [

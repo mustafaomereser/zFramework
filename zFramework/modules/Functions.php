@@ -50,7 +50,7 @@ function asset($value)
 function file_put_contents2($file_name, $content, $flags = 0)
 {
     @mkdir(dirname($file_name), 0777, true);
-    return  file_put_contents($file_name, $content, $flags);
+    return file_put_contents($file_name, $content, $flags);
 }
 
 

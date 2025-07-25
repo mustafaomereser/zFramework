@@ -985,7 +985,12 @@ function errorHandler($data)
                 <div class="debug-section">
                     <div class="debug-title">👤 Kullanıcı Bilgileri</div>
                     <div class="debug-content">
-                        <pre><?= print_r(Auth::check() ? Auth::user() : ['message' => 'Kullanıcı oturum açmamış'], true) ?></pre>
+                        <pre><?php
+                                try {
+                                    print_r(Auth::check() ? Auth::user() : ['message' => 'Kullanıcı oturum açmamış']);
+                                } catch (\Throwable $user_exception) {
+                                    echo 'CANNOT ACCESS USER INFORMATIONS';
+                                } ?></pre>
                     </div>
                 </div>
 
@@ -1204,7 +1209,11 @@ function errorHandler($data)
 
 <?php
     $error_log = ob_get_clean();
-    if (config('app.error_log')) file_put_contents2(ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '.html', $error_log);
+    if (config('app.error_log')) {
+        file_put_contents2(ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '.html', $error_log);
+        error_log_callback($error_log);
+    }
+
     if (!Config::get('app.debug')) abort(500, 'Beklenmedik bir hata oluştu, devam ederse lütfen yönetici ile iletişime geçiniz.');
     if (Http::isAjax()) abort(500, $message);
     echo $error_log;
