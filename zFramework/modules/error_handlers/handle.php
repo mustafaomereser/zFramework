@@ -1204,9 +1204,9 @@ function errorHandler($data)
 
 <?php
     $error_log = ob_get_clean();
-    if (config('app.error_log')) file_put_contents2(__DIR__ . '/logs/' . date('Y-m-d-H-i-s') . '.html', $error_log);
-    if (!Config::get('app.debug')) abort(500);
-    if (Http::isAjax()) abort(410, "CHECK DEVELOPER CONSOLE. \nAlso message: \n" . $message);
+    if (config('app.error_log')) file_put_contents2(ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '.html', $error_log);
+    if (!Config::get('app.debug')) abort(500, 'Beklenmedik bir hata oluştu, devam ederse lütfen yönetici ile iletişime geçiniz.');
+    if (Http::isAjax()) abort(500, $message);
     echo $error_log;
 }
 

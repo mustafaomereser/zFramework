@@ -14,6 +14,10 @@ session_save_path($sessions_path);
 ini_set('session.gc_probability', 1);
 // Session settings: End
 
+// Error log: start
+define('ERROR_LOG_DIR', __DIR__ . '/modules/error_handlers/logs');
+// Error log: end
+
 $GLOBALS['databases'] = [
     'connected'   => [],
     'connections' => include(BASE_PATH . '/database/connections.php') #db connections strings

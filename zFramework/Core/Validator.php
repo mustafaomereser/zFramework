@@ -48,21 +48,18 @@ class Validator
 
             $equivalent = null;
             $parameters = [];
+
             foreach ($validateArray as $validate) {
-                $e    = explode(':', $validate);
-                $case = $e[0];
-
-                if (isset($e[1])) {
-                    $_ = explode(' ', $e[1]);
-                    $equivalent = $_[0];
-
-                    if (!empty($_[1])) {
-                        foreach (@explode(',', $_[1]) as $parameter) {
-                            $parameter = explode('=', trim($parameter));
-                            if (isset($parameter[1])) $parameters[$parameter[0]] = $parameter[1];
-                            else $parameters[] = $parameter[0];
-                        }
-                    }
+                if (str_contains($validate, ':')) {
+                    preg_match_all('/(\w+):(?:"([^"]*)"|([^\s;]+))/', $validate, $m, PREG_SET_ORDER);
+                    $out = [];
+                    foreach ($m as $match) $out[$match[1]] = isset($match[2]) && $match[2] !== '' ? $match[2] : $match[3];
+                    $case       = array_key_first($out);
+                    $equivalent = $out[$case];
+                    unset($out[$case]);
+                    foreach ($out as $key => $param) $parameters[$key] = $param;
+                } else {
+                    $case = $validate;
                 }
 
                 if (self::{$case}(compact('value', 'equivalent', 'length', 'type', 'key'), $parameters, in_array('nullable', $validateArray), $validateArray, $data)) {
