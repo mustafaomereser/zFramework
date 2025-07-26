@@ -24,10 +24,10 @@ class Alerts
 
     /**
      * Set name alerts for not duplicate
-     * @param $name
+     * @param string $name
      * @return self
      */
-    public static function name($name): self
+    public static function name(string $name): self
     {
         self::$name = $name;
         return new self();
@@ -35,11 +35,14 @@ class Alerts
 
     /**
      * Get Alerts
+     * @param bool $unset_after_get
      * @return array
      */
-    public static function get(): array
+    public static function get(bool $unset_after_get = false): array
     {
-        return Session::get('alerts') ?? [];
+        $alerts = Session::get('alerts') ?? [];
+        if (!$unset_after_get) self::unset();
+        return $alerts;
     }
 
     /**
@@ -53,36 +56,40 @@ class Alerts
 
     /**
      * Set a danger Alert
+     * @param string $text
      * @return self
      */
-    public static function danger($text): self
+    public static function danger(string $text): self
     {
         return self::set(__FUNCTION__, $text);
     }
 
     /**
      * Set a success Alert
+     * @param string $text
      * @return self
      */
-    public static function success($text): self
+    public static function success(string $text): self
     {
         return self::set(__FUNCTION__, $text);
     }
 
     /**
      * Set a warning Alert
+     * @param string $text
      * @return self
      */
-    public static function warning($text): self
+    public static function warning(string $text): self
     {
         return self::set(__FUNCTION__, $text);
     }
 
     /**
      * Set a info Alert
+     * @param string $text
      * @return self
      */
-    public static function info($text): self
+    public static function info(string $text): self
     {
         return self::set(__FUNCTION__, $text);
     }
