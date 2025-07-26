@@ -45,7 +45,7 @@ class Run
         $include_modules = [];
         foreach ($modules as $module) {
             $info = include(base_path("/modules/$module/info.php"));
-            if ($info['status']) $include_modules[$info['sort']] = array_merge(['module' => $module], $info);
+            if ($info['status']) $include_modules[$info['sort']] = (['module' => $module] + $info);
         }
         ksort($include_modules);
         self::$modules = $include_modules;
@@ -74,11 +74,11 @@ class Run
             self::initProviders()::findModules()::loadModules();
             self::includer(BASE_PATH . '/route');
 
-            \zFramework\Core\View::settingUP(array_merge([
+            \zFramework\Core\View::settingUP([
                 'caches'  => FRAMEWORK_PATH . '/storage/views',
                 'dir'     => BASE_PATH . '/resource/views',
                 'suffix'  => ''
-            ], Config::get('view')));
+            ] + Config::get('view'));
 
             \zFramework\Core\Route::run();
             \zFramework\Core\Facades\Alerts::unset(); // forgot alerts

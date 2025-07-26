@@ -66,6 +66,7 @@ class Validator
                     $statics[$key] = $value;
                 } else {
                     $errors[$key][$case] = (Lang::get("validator.attributes.$key") ?? ($attributeNames[$key] ?? $key)) . " " . Lang::get("validator.errors.$case", self::$errors);
+                    Alerts::danger($errors[$key][$case]);
                     unset($data[$key]);
                 }
             }

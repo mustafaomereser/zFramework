@@ -8,7 +8,7 @@ cmd> composer install
 
 PHP VERSION
 ```php
-PHP>=7.0.23
+PHP>=7.0.23 (suggestion: >=8.0)
 ```
 
 ### 0.1. Z Framework (V2.6.5)
@@ -116,8 +116,8 @@ PHP>=7.0.23
     test.delete
 
     // two example for select name.
-    Route::findRoute('test.index'); // output: www.host.com/test
-    Route::findRoute('test.edit', ['id' => 1]); // output: www.host.com/test/1/edit
+    Route::find('test.index'); // output: www.host.com/test
+    Route::find('test.edit', ['id' => 1]); // output: www.host.com/test/1/edit
 
     // for Group usage:
     
@@ -125,7 +125,7 @@ PHP>=7.0.23
     Route::pre('/admin')->group(function() {
         Route::resource('/', ResourceController::class);
     });
-    Route::findRoute('admin.index'); // output www.host.com/admin
+    Route::find('admin.index'); // output www.host.com/admin
 
     // url: /admin/user/...
     Route::pre('/admin')->group(function() {
@@ -142,8 +142,12 @@ PHP>=7.0.23
     Route::pre('/admin')->noCSRF()->group(function() {
         Route::post(..., ...); // that not need a csrf token allow all request like GET method. and have /admin prefix.
     });
+    
+    Route::pre('/admin')->noCSRF()->middleware([App\Middlewares\IsAdmin::class])->group(function() {
+        Route::post(..., ...); // that not need a csrf token allow all request like GET method. and have /admin prefix.
+    });
 
-    // And you can use for findRoute
+    // And you can use for Route::find
     route('admin.index') // output www.host.com/admin
 
 
@@ -240,7 +244,7 @@ ALSO you can normal query like /1?test=true
     })->name('test');
 
     // Usage:
-    echo Route::findRoute('test', ['id' => 1, 'username' => 'Admin']); // output: www.host.com/test/1/Admin
+    echo Route::find('test', ['id' => 1, 'username' => 'Admin']); // output: www.host.com/test/1/Admin
     # or
     echo route('test', ['id' => 1, 'username' => 'Admin']) // same output.
 ```
@@ -285,8 +289,18 @@ ALSO you can normal query like /1?test=true
     // if you wanna get type class = ->get(true) | ->first(true);
 
     // Where example
-    $user->where('id', '=', 1)->where('email', '=', 'test@mail.com', 'OR')->get();
-    
+    $user->where('id', 1)->where('email', '=', 'test@mail.com', 'OR')->get();
+    $user->whereOr('email', 'test@mail.com')->get();
+    $user->whereIn('id', [1, 2])->get();
+    $user->whereNotIn('id', [1, 2])->get();
+    $user->whereBetween('id', 1, 10)->get();
+    $user->whereNotBetween('id', 1, 10)->get();
+    $user->whereRaw('(id = :id1 OR id = :id2)', ['id1' => 1, 'id2' => 2])->get();
+
+    // Where group
+    $user->where([['id', 1], ['email', '=', 'test@mail.com', 'OR']]);
+
+
     // Find example that is for primary key.
     $user->find(1);
 
@@ -306,10 +320,7 @@ ALSO you can normal query like /1?test=true
     $user->paginate(20, 'request_id', true|false);
 
     // Joins example
-    $user->join('LEFT|RIGHT|OUTER|FULL|NULL', App\Models\User::class, ['table_name.id', '=', 'this_table.id'])->get();
-    
-    // OR Joins example
-    $user->join('LEFT|RIGHT|OUTER|FULL|NULL', App\Models\User::class, ['table_name.id = this_table.id'])->get();
+    $user->join('LEFT|RIGHT|OUTER|FULL|NULL', App\Models\User::class, 'table_name.id = this_table.id')->get();
 
     // Debug Example
     $user->sqlDebug(true)->select('id, username')->where('id', 1)->update([
@@ -486,7 +497,7 @@ ALSO you can normal query like /1?test=true
         'required', 
         'nullable', 
         'default', // default NULL 
-        'default:default value', 
+        'default:{default value}', 
         'charset:utf8mb4_general_ci',
         'timestamps', // create updated_at, created_at columns
         'softDelete' // Use soft delete column
@@ -889,12 +900,12 @@ Run project.
     // Current: type, required, max, min, same, email, unique, exists.
     
     // Unique ussage: 
-    # unique:table_name cl=column_name,db=database // cl and db parameters is optional, if you not add cl parameter get request key name, if you not add db parameter get first in array connection.
+    # unique:table_name;key:column_name;db=database // key and db parameters is optional, if you not add key parameter get request key name, if you not add db parameter get first in array connection.
 
-    # exists:table_name cl=column_name,db=database // cl and db parameters is optional, if you not add cl parameter get request key name, if you not add db parameter get first in array connection.
+    # exists:table_name;key:column_name;db=database // key and db parameters is optional, if you not add key parameter get request key name, if you not add db parameter get first in array connection.
     
-    // Unique Example: 'email' => ["unique:users cl=email,db=local"]
-    // Exists Example: 'email' => ["exists:users cl=email,db=local"]
+    // Unique Example: 'email' => ["unique:users;key:email;db:local"]
+    // Exists Example: 'email' => ["exists:users;key:email;db:local"]
 
     Validator::validate($_REQUEST, [
         'test1' => ['type:string', 'required', 'max:10', 'min:5', 'same:test2'],
@@ -911,7 +922,7 @@ Run project.
     {
         public function __construct()
         {
-            if (@$_SESSION['user_id']) return true;
+            if (Auth::check()) return true;
         }
     
         public function error()
@@ -947,7 +958,7 @@ Run project.
     Route::get('/test', function () {
         echo "API Page / user_id: " . Auth::id();
     });
-    // example: http://localhost/api/test?user_token=12345678 (user logged in.)
+    // example: url: "http://localhost/api/v1"; headers: Auth-Token: {user_api_token} (user logged in.)
 ```
 
 ## 18. Development
@@ -976,21 +987,16 @@ Run project.
     
     
     # Folder config/app.php
-    # DEBUG MODE
+    # DEBUG MODE and Error Logging
 
     // debug mode is come default is true.
     'debug' => true|false
     // debug mode is for error page to abort
 
-    # Folder config/app.php
-    // Usage Crypter
-    'key'  => 'cryptkey',
-    'salt' => 'ThisSaltIsSecret',
 
-    # if you change that your hash encode's will change, and all hash need be unique for security.
-    # example
-    'key'  => '82FDFE2976AC2C8B8EBD5A5737118',
-    'salt' => '4ljd5AyZc9',
+    // Default error log dir in; zFramework/initalize.php
+    'error_log' => true|false,
+    // 
 
     # it is so secure. crypter make passwords or etc.
 ```

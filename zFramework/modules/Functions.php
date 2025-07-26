@@ -113,10 +113,10 @@ function view()
     return call_user_func_array([zFramework\Core\View::class, 'view'], func_get_args());
 }
 
-// Shortcut Route::findRoute method
+// Shortcut Route::find method
 function route()
 {
-    return call_user_func_array([zFramework\Core\Route::class, 'findRoute'], func_get_args());
+    return call_user_func_array([zFramework\Core\Route::class, 'find'], func_get_args());
 }
 
 // Shortcut Config::get method

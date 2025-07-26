@@ -39,7 +39,7 @@ class View
      */
     public static function view(string $view_name, array $data = [])
     {
-        if (isset(self::$binds[$view_name])) $data = array_merge(self::$binds[$view_name](), $data);
+        if (isset(self::$binds[$view_name])) $data = self::$binds[$view_name]() + $data;
 
         // search view path: start
         $view_path = self::$config['dir'] . '/' . self::parseViewName($view_name);
@@ -70,7 +70,7 @@ class View
         $output = ob_get_clean();
         self::reset();
 
-      if (@self::$config['minify'] ?? false) {
+        if (@self::$config['minify'] ?? false) {
             $parts = preg_split('/(<textarea.*?>.*?<\/textarea>|<pre.*?>.*?<\/pre>|<script.*?>.*?<\/script>|<input.*?>)/si', $output, -1, PREG_SPLIT_DELIM_CAPTURE);
             for ($i = 0; $i < count($parts); $i++) {
                 if ($i % 2 == 0) {

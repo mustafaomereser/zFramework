@@ -88,6 +88,8 @@ class Db
                 continue;
             }
 
+            $class = new $class;
+
             if (!isset($GLOBALS['databases']['connections'][$class::$db])) {
                 Terminal::text("[color=red]" . $class::$db . " database is not exists.[/color]");
                 continue;
@@ -109,7 +111,7 @@ class Db
             $consts = config('model.consts');
             if (strlen($key = array_search('timestamps', $columns))) {
                 unset($columns[$key]);
-                $columns = array_merge($columns, [
+                $columns = ($columns + [
                     $consts['updated_at'] => ['required', 'datetime', 'default:CURRENT_TIMESTAMP', 'onupdate'],
                     $consts['created_at'] => ['required', 'datetime', 'default:CURRENT_TIMESTAMP'],
                 ]);
@@ -117,7 +119,7 @@ class Db
 
             if (strlen($key = array_search('softDelete', $columns))) {
                 unset($columns[$key]);
-                $columns = array_merge($columns, [$consts['deleted_at'] => ['nullable', 'datetime', 'default']]);
+                $columns = ($columns + [$consts['deleted_at'] => ['nullable', 'datetime', 'default']]);
             }
             #
 

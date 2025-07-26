@@ -27,7 +27,7 @@ class Route
      * @param bool $return_bool
      * @return string|bool
      */
-    public static function findRoute(string $name, array $data = [], bool $return_bool = false)
+    public static function find(string $name, array $data = [], bool $return_bool = false)
     {
         $route_is_exists = true;
         $return = $name;
@@ -336,7 +336,7 @@ class Route
      */
     public static function middleware(array $list, $callback = null)
     {
-        self::$add_groups['middlewares'] = [array_merge((self::$add_groups['middlewares'][0] ?? []), $list), $callback];
+        self::$add_groups['middlewares'] = [(self::$add_groups['middlewares'][0] ?? []) + $list, $callback];
         return new self();
     }
 
