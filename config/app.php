@@ -6,7 +6,7 @@ return [
 
     'lang'      => 'tr', # if browser haven't language in Languages list auto choose that default lang.
 
-    'title'     => 'Z Framework Project',
+    'title'     => 'zFramework',
     'public'    => 'public_html',
 
     'version'   => '1.0.0',
