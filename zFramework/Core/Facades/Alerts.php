@@ -41,7 +41,7 @@ class Alerts
     public static function get(bool $unset_after_get = false): array
     {
         $alerts = Session::get('alerts') ?? [];
-        if (!$unset_after_get) self::unset();
+        if ($unset_after_get) self::unset();
         return $alerts;
     }
 
