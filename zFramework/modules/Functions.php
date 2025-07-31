@@ -147,7 +147,7 @@ function abort()
 // Get current uri but with parse
 function getQuery($adds = [], $except = [], $string = true)
 {
-    parse_str($_SERVER['QUERY_STRING'], $output);
+    @parse_str($_SERVER['QUERY_STRING'], $output);
 
     //
     foreach ($except as $key => $unset)
