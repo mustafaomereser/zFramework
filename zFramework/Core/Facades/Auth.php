@@ -10,11 +10,23 @@ class Auth
     /**
      * When you use ::user() method you must fill that and if you again use ::user() get from this parameter.
      */
-    static $user = null;
+    static $user     = null;
+
+    /**
+     * API mode for api requests. (Cookie not work with apis)
+     */
+    static $api_mode = false;
+
+
+    private static function getMode()
+    {
+        return self::$api_mode ? Session::class : Cookie::class;
+    }
+
 
     public static function init()
     {
-        if (!self::check() && $api_token = Cookie::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
+        if (!self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
     }
 
     /**
@@ -25,8 +37,8 @@ class Auth
     public static function login(array $user): bool
     {
         if (isset($user['id'])) {
-            Cookie::set('auth-password', $user['password']);
-            Cookie::set('auth-token', $user['id']);
+            (self::getMode())::set('auth-password', $user['password']);
+            (self::getMode())::set('auth-token', $user['id']);
             return true;
         }
 
@@ -40,7 +52,7 @@ class Auth
      */
     public static function token_login(string $token): bool
     {
-        return self::login((new User)->select('id')->where('api_token', $token)->first());
+        return self::login((new User)->select('id, password')->where('api_token', $token)->first());
     }
 
     /**
@@ -50,8 +62,8 @@ class Auth
     public static function logout(): bool
     {
         self::$user = null;
-        Cookie::delete('auth-stay-in');
-        Cookie::delete('auth-token');
+        (self::getMode())::delete('auth-stay-in');
+        (self::getMode())::delete('auth-token');
         return true;
     }
 
@@ -71,9 +83,9 @@ class Auth
      */
     public static function user()
     {
-        if (!$user_id = Cookie::get('auth-token')) return false;
+        if (!$user_id = (self::getMode())::get('auth-token')) return false;
         if (self::$user == null) self::$user = (new User)->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
-        if (!@self::$user['id'] || self::$user['password'] != Cookie::get('auth-password')) return self::logout();
+        if (!@self::$user['id'] || self::$user['password'] != (self::getMode())::get('auth-password')) return self::logout();
         return self::$user;
     }
 
@@ -93,7 +105,7 @@ class Auth
 
         if (@$user['id']) {
             self::login($user);
-            if ($staymein) Cookie::set('auth-stay-in', $user['api_token'], time() * 2);
+            if ($staymein) (self::getMode())::set('auth-stay-in', $user['api_token'], time() * 2);
             return true;
         }
 

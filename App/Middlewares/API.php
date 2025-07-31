@@ -9,12 +9,9 @@ class API
 {
     public function attempt()
     {
+        Auth::$api_mode = true;
         Auth::logout();
-
-        if (@$auth_token = getallheaders()['Auth-Token']) {
-            Auth::token_login($auth_token);
-        }
-
+        if (@$auth_token = getallheaders()['Auth-Token']) Auth::token_login($auth_token);
         return true;
     }
 }
