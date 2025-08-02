@@ -723,6 +723,8 @@ Run project.
 ## 8. Terminal
 ```php
     ....
+
+    # open advanced terminal (if don't give any arguman more open advanced mode.)
     > php terminal
     
     // Makes Usage:
@@ -788,9 +790,15 @@ Run project.
     #for example
     php terminal make controller TestController --resource --module=blog
 
-
     # cache delete
     php terminal cache clear sessions|caches|views
+
+    # clear terminal
+    php terminal clear
+    
+
+    # Help for modules
+    php terminal help
 ```
 
 ## 9. Csrf

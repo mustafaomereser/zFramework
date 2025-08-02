@@ -53,7 +53,7 @@ class HomeController extends Controller
     public function store(CommandRequest $command)
     {
         $command = $command->validated()['command'];
-        if (!$command) die(\zFramework\Kernel\Terminal::begin(["terminal", 'help', "--web"]));
+        if (!$command) die(\zFramework\Kernel\Terminal::begin(["terminal", 'start', "--web"]));
         die(\zFramework\Kernel\Terminal::begin(["terminal", $command, "--web"]));
     }
 

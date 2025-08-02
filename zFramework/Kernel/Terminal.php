@@ -27,19 +27,7 @@ class Terminal
         Terminal::text('[color=red]Terminal fired.[/color]');
         Terminal::clear();
 
-        Terminal::text("[color=red]v" . FRAMEWORK_VERSION . "
-        ______                                             __  
- ____  / ____/________ _____ ___  ___ _      ______  _____/ /__
-/_  / / /_  / ___/ __ `/ __ `__ \/ _ \ | /| / / __ \/ ___/ //_/
- / /_/ __/ / /  / /_/ / / / / / /  __/ |/ |/ / /_/ / /  / ,<   
-/___/_/   /_/   \__,_/_/ /_/ /_/\___/|__/|__/\____/_/  /_/|_|  
-[/color]");
-
-        Terminal::text('Do you need help? Type just "help".');
-
-        Terminal::text('e.g. use module: db migration --fresh --seed');
-
-        return self::readline();
+        return self::parseCommands('start');
     }
 
     public static function readline()
