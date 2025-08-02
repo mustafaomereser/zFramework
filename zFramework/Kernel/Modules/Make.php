@@ -13,8 +13,10 @@ class Make
     static $save_status = false;
     static $ask         = true;
 
-    public static function begin()
+    public static function begin($methods)
     {
+        if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
+
         if (isset(Terminal::$parameters['--module'])) {
             self::$save        = "Modules/" . ucfirst(Terminal::$parameters['--module']);
             self::$save_status = true;
@@ -88,21 +90,48 @@ class Make
     }
 
 
+    /**
+     * Description: Create an Request
+     * @important $make
+     * @param $make (third arguman)    
+     * @param --module={module_name} (optional)
+     */
     public static function request($make)
     {
         return self::save(self::$save . '\Requests', $make);
     }
 
+    /**
+     * Description: Create an Controller
+     * @important $make
+     * @param $make (third arguman)
+     * @param --resource (optional)
+     * @param --module={module_name} (optional)
+     */
     public static function controller($make)
     {
         return self::save(self::$save . '\Controllers', $make);
     }
 
+    /**
+     * Description: Create an Middleware
+     * @important $make
+     * @param $make (third arguman)
+     * @param --module={module_name} (optional)
+     */
     public static function middleware($make)
     {
         return self::save(self::$save . '\Middlewares', $make);
     }
 
+    /**
+     * Description: Create an Migration
+     * @important $make
+     * @param $make (third arguman)
+     * @param --module={module_name} (optional)
+     * @param --table (optional) (ifnull = Get self Migration Name)
+     * @param --dbname (optional) (ifnull = Get first DB KEY)
+     */
     public static function migration($make)
     {
         self::save(
@@ -123,6 +152,13 @@ class Make
         return true;
     }
 
+    /**
+     * Description: Create an Model
+     * @important $make
+     * @param $make (third arguman)
+     * @param --module={module_name} (optional)
+     * @param --table (optional) (ifnull = Get self Model Name)
+     */
     public static function model($make)
     {
         self::save(
@@ -141,11 +177,23 @@ class Make
         });
     }
 
+    /**
+     * Description: Create an Seeder
+     * @important $make
+     * @param $make (third arguman)
+     * @param --module={module_name} (optional)
+     */
     public static function seeder($make)
     {
         return self::save('Database\Seeders', $make);
     }
 
+    /**
+     * Description: Create an Observer
+     * @important $make
+     * @param $make (third arguman)
+     * @param --module={module_name} (optional)
+     */
     public static function observer($make)
     {
         return self::save(self::$save . '\Observers', $make);

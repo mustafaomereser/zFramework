@@ -20,7 +20,7 @@ class View
         self::reset();
         self::$config = $config;
     }
-    
+
     /**
      * reset all veriables.
      */

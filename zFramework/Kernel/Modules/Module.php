@@ -10,8 +10,10 @@ class Module
     static $assets_path = FRAMEWORK_PATH . "\Kernel\Includes\module\\";
     static $assets;
 
-    public static function begin()
+    public static function begin($methods)
     {
+        if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
+
         if (empty(Terminal::$commands[2])) return Terminal::text('[color=red]Module name is required.[/color]');
         self::{Terminal::$commands[1]}(Terminal::$commands[2]);
     }
@@ -23,6 +25,11 @@ class Module
         self::$assets = $assets;
     }
 
+    /**
+     * Description: Create an module
+     * @important $name
+     * @param $name (second arguman)
+     */
     public static function create($name)
     {
         self::assets();

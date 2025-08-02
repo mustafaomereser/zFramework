@@ -23,10 +23,10 @@ $lang_list = Lang::list();
 <body>
     <div class="container my-lg-5 my-2">
         <div class="row align-items-center">
-            <div class="col-md-3 col-12 mb-md-0 mb-3">
+            <div class="col-md-3 col-12 mb-md-0 mb-4">
                 <img src="/assets/images/zframework-transparent.png" alt="zFramework" class="w-100">
             </div>
-            <div class="col-md-6 col-12 mb-md-0 mb-3">
+            <div class="col-md-6 col-6">
                 <div class="d-flex align-items-center justify-content-center gap-2">
                     <a class="btn btn-sm border" href="/">
                         <i class="fad fa-home"></i> <?= _l('lang.home-page') ?>
@@ -38,7 +38,7 @@ $lang_list = Lang::list();
                     <?php endforeach ?>
                 </div>
             </div>
-            <div class="col-md-3 col-12">
+            <div class="col-md-3 col-6">
                 <div class="d-flex align-items-center justify-content-md-end justify-content-center gap-2">
                     <div id="auth-content"></div>
 
@@ -62,15 +62,19 @@ $lang_list = Lang::list();
 
         @yield('body')
 
-        <div class="row text-center mb-3">
-            <div class="col-lg-6 col-12 text-lg-start mb-md-0 mb-3">
-                <a href="/api/v1">API</a>
-                <a href="https://github.com/mustafaomereser/Z-Framework-php-mvc" target="_blank">Github & Docs</a>
+        <div class="row mb-3">
+            <div class="col-lg-6 col-12 mb-md-0 mb-3">
+                <div class="d-flex align-items-center justify-content-lg-start justify-content-center gap-2">
+                    <a href="/api/v1">API</a>
+                    <a href="https://github.com/mustafaomereser/Z-Framework-php-mvc" target="_blank">Github & Docs</a>
+                </div>
             </div>
-            <div class="col-lg-6 col-12 text-lg-end">
-                <small data-toggle="tooltip" title="zFramework Version"><b>zFramework</b> v{{ FRAMEWORK_VERSION }}</small>
-                <small data-toggle="tooltip" title="PHP Version">| <b>PHP</b> v{{ PHP_VERSION }}</small>
-                <small data-toggle="tooltip" title="Current Project Version">| <b>APP</b> v{{ config('app.version') }}</small>
+            <div class="col-lg-6 col-12">
+                <div class="d-flex align-items-center justify-content-lg-end justify-content-center gap-2">
+                    <small data-toggle="tooltip" title="zFramework Version"><b>zFramework</b> v{{ FRAMEWORK_VERSION }}</small>
+                    <small data-toggle="tooltip" title="PHP Version">| <b>PHP</b> v{{ PHP_VERSION }}</small>
+                    <small data-toggle="tooltip" title="Current Project Version">| <b>APP</b> v{{ config('app.version') }}</small>
+                </div>
             </div>
         </div>
     </div>

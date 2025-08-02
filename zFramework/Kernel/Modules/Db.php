@@ -13,8 +13,10 @@ class Db
     static $dbname;
     static $tables = null;
 
-    public static function begin()
+    public static function begin($methods)
     {
+        if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
+
         self::connectDB(Terminal::$parameters['db'] ?? array_keys($GLOBALS['databases']['connections'])[0]);
         self::{Terminal::$commands[1]}();
     }
@@ -46,6 +48,14 @@ class Db
         return $files;
     }
 
+    /**
+     * Description: Migrate Database
+     * @param --module={module_name} (optional)
+     * @param --db (optional) (ifnull = Get first DB KEY)
+     * @param --path (optional)
+     * @param --fresh (optional)
+     * @param --seed (optional)
+     */
     public static function migrate()
     {
         $MySQL_defines = ['CURRENT_TIMESTAMP'];
@@ -64,7 +74,7 @@ class Db
             #
         } else if (in_array('--module', Terminal::$parameters)) {
             # select all modules migrations
-            foreach (array_column(Run::findModules()::$modules, 'module') as $module) foreach (self::recursiveScanMigrations(BASE_PATH . ("/modules/$module") . "/$migrations_path") as $row) $migrations[] = $row;
+            foreach (array_column(Run::findModules(base_path('/modules'))::$modules, 'module') as $module) foreach (self::recursiveScanMigrations(BASE_PATH . ("/modules/$module") . "/$migrations_path") as $row) $migrations[] = $row;
             Terminal::text('[color=blue]All modules migrates selected.[/color]');
             #       
         } else {
@@ -350,6 +360,10 @@ class Db
         if (in_array('--seed', Terminal::$parameters)) self::seed();
     }
 
+    /**
+     * Description: Seeder
+     * @param --db (optional) (ifnull = Get first DB KEY)
+     */
     public static function seed()
     {
         $seeders = glob(BASE_PATH . '/database/seeders/*.php');
@@ -363,6 +377,11 @@ class Db
         return true;
     }
 
+    /**
+     * Description: Backup database
+     * @param --db (optional) (ifnull = Get first DB KEY)
+     * @param --compress (optional)
+     */
     public static function backup()
     {
         $title = date('Y-m-d H-i-s');
@@ -377,6 +396,10 @@ class Db
         return true;
     }
 
+    /**
+     * Description: Restore Backup
+     * @param --db (optional) (ifnull = Get first DB KEY)
+     */
     public static function restore()
     {
         $backups = glob(base_path('database/backups/' . self::$db->db . '/*'));

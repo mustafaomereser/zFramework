@@ -16,5 +16,7 @@ return [
     'email'          => 'E-posta',
     'password'       => 'Şifre',
     're-password'    => 'Tekrar Şifre',
-    'terms'          => 'Kullanıcı Sözleşmesi Politikası'
+    'terms'          => 'Kullanıcı Sözleşmesi Politikası',
+    
+    'loading'        => 'Yükleniyor'
 ];

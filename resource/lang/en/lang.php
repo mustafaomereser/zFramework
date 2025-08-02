@@ -16,5 +16,7 @@ return [
     'email'          => 'E-mail',
     'password'       => 'Password',
     're-password'    => 'Repeat Password',
-    'terms'          => 'User Agreement Policy'
+    'terms'          => 'User Agreement Policy',
+
+    'loading'        => 'Loading'
 ];

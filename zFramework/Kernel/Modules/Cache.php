@@ -6,16 +6,21 @@ use zFramework\Kernel\Terminal;
 
 class Cache
 {
-    public static function begin()
+    public static function begin($methods)
     {
+        if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
         self::{Terminal::$commands[1]}();
     }
 
+    /**
+     * Description: Cache Clear
+     * options: views, sessions
+     */
     public static function clear()
     {
         global $storage_path;
 
-        $option = Terminal::$commands[2];
+        $option = @Terminal::$commands[2];
 
         $list = scan_dir($storage_path);
         if (!in_array($option, $list)) return Terminal::text("[color=red]Wrong Option!\nOptions: " . implode(', ', $list) . ".[/color]");

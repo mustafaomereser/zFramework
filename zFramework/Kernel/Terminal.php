@@ -2,28 +2,42 @@
 
 namespace zFramework\Kernel;
 
+use zFramework\Kernel\Helpers\Module;
+
 class Terminal
 {
-    static $terminate = false;
-    static $commands;
-    static $parameters = [];
     static $history;
-    static $textlist = [];
+    static $commands;
+    static $terminate  = false;
+    static $parameters = [];
+    static $textlist   = [];
+    static $modules    = [];
 
     public static function begin($args)
     {
         unset($args[0]);
+
+        Module::getModules();
 
         if (count($args)) {
             self::$terminate = true;
             return self::parseCommands(implode(' ', $args));
         }
 
-        self::text('[color=red]Terminal fired.[/color]');
-        self::clear();
+        Terminal::text('[color=red]Terminal fired.[/color]');
+        Terminal::clear();
 
-        echo "Usable Modules:" . PHP_EOL . PHP_EOL;
-        foreach (array_diff(scandir(FRAMEWORK_PATH . "\Kernel\Modules"), ['.', '..']) as $module) if (!strstr($module, '---')) echo "• " . strtolower(str_replace('.php', '', $module)) . PHP_EOL;
+        Terminal::text("[color=red]v" . FRAMEWORK_VERSION . "
+        ______                                             __  
+ ____  / ____/________ _____ ___  ___ _      ______  _____/ /__
+/_  / / /_  / ___/ __ `/ __ `__ \/ _ \ | /| / / __ \/ ___/ //_/
+ / /_/ __/ / /  / /_/ / / / / / /  __/ |/ |/ / /_/ / /  / ,<   
+/___/_/   /_/   \__,_/_/ /_/ /_/\___/|__/|__/\____/_/  /_/|_|  
+[/color]");
+
+        Terminal::text('Do you need help? Type just "help".');
+
+        Terminal::text('e.g. use module: db migration --fresh --seed');
 
         return self::readline();
     }
@@ -31,15 +45,16 @@ class Terminal
     public static function readline()
     {
         echo PHP_EOL;
-        return self::parseCommands(readline('> '));
+        return self::parseCommands(readline('Command > '));
     }
 
     public static function parseCommands($commands)
     {
         // command add to history.
-        // unset(self::$history[array_search($commands, self::$commands)]);
-        self::$history[] = $commands;
-        readline_add_history($commands);
+        if ($commands) {
+            self::$history[] = $commands;
+            readline_add_history($commands);
+        }
         //
 
         $commands   = explode(' ', $commands);
@@ -71,10 +86,10 @@ class Terminal
         self::clear();
 
         try {
-            $module = "\zFramework\Kernel\Modules\\" . ucfirst(strtolower(self::$commands[0]));
-            $module::begin();
+            $module = "\zFramework\Kernel\Modules\\" . ($method = ucfirst(strtolower(self::$commands[0])));
+            $module::begin(array_column(Module::$list[strtolower($method)]['methods'], 'name'));
         } catch (\Throwable $e) {
-            self::text("[color=yellow]" . $e->getMessage() . "[/color]");
+            self::text("[color=yellow]Module not found, please select just in list.[/color]");
         }
 
         if (count(self::$textlist)) echo json_encode(self::$textlist, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);

@@ -15,7 +15,7 @@ class CommandRequest extends Request
     public function columns(): array
     {
         return [
-            'command' => ['required']
+            'command' => ['nullable']
         ];
     }
 }

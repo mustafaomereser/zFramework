@@ -18,7 +18,8 @@ class Run
             return include($_path);
         }
 
-        $path = array_values(array_diff(scandir($_path), ['.', '..']));
+        $path = [];
+        if (is_dir($_path)) $path = array_values(array_diff(scandir($_path), ['.', '..']));
         if ($reverse_include) $path = array_reverse($path);
 
         foreach ($path as $inc) {

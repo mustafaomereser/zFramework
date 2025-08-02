@@ -7,6 +7,7 @@ $.fn.sbmt = function (cb) {
         _.preventDefault();
         cb(this, $(this).find('[type="submit"]'));
     });
+    return this;
 };
 
 $.showAlerts = alerts => {

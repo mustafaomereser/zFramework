@@ -2,90 +2,15 @@
 
 namespace App\Controllers;
 
-use App\Models\User;
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
-use zFramework\Core\Csrf;
-use zFramework\Core\Facades\JustOneTime;
 
 class HomeController extends Controller
 {
 
     public function __construct($method)
     {
-        // $users = (new User);
-        // echo "<pre>";
-        // print_r(
-        //     $users->columns()
-        // );
-
-        // print_r(
-        //     $users->columnsLength()
-        // );
-
-        // print_r(
-        //     $users->compareColumnsLength([
-        //         'username' => 'testtesttesttesttesttesttesttesttesttesttesttesttesttest'
-        //     ])
-        // );
-        // exit;
-        // echo (new User)
-        //     ->where('username', 'Test')
-        //     ->whereOr([['phone', '1'], ['username', 'LIKE', 'test']])
-        //     ->where('phone', '1')
-        //     ->buildSQL();
-
-        // exit;
-
-        // echo "<pre>";
-
-        // $validate = Validator::validate([
-        //     'test'     => 'admin',
-        //     'password' => "asdasdasdadasdasdsadsad1231231"
-        // ], [
-        //     'test'     => ['unique:users key=username'],
-        //     'password' => ['type:string', 'min:30']
-        // ], [], function ($errors, $staticts) {
-        //     echo "<pre>";
-        //     echo "Errors:";
-        //     print_r($errors);
-        //     echo "Staticts:";
-        //     print_r($staticts);
-        // });
-
-        // exit;
-
-        // print_r((new User)->sqlDebug(true)->paginate());
-        // exit;
-        // $data    = [
-        //     ['test', 'naber'],
-        //     ['naber', 'test']
-        // ];
-        // $compare = [
-        //     ['test', 'naber'],
-        //     ['yiğit', 'mustafa']
-        // ];
-
-        // $output = _Array::filter($data, $compare, function ($data, $compare) {
-        //     return $data[0] != $compare[0] || $data[1] != $compare[1];
-        // });
-
-        // print_r($output);
-        // exit;
-
-        # "Staging system" for quick update or insert huge datasets.
-        // $users = (new User)->staging(true);
-        // $users->insert([
-        //     'username'  => 'test',
-        //     'password'  => 'test',
-        //     'email'     => 'test',
-        //     'api_token' => 'test'
-        // ]);
-
-
-        // echo "<pre>";
-        // $users->stagingMerge('username');
-        # 
+        //
     }
 
     /** Index page | GET: /
@@ -128,9 +53,8 @@ class HomeController extends Controller
     public function store(CommandRequest $command)
     {
         $command = $command->validated()['command'];
-        $message = \zFramework\Kernel\Terminal::begin(["terminal", $command, "--web"]);
-
-        echo $message;
+        if (!$command) die(\zFramework\Kernel\Terminal::begin(["terminal", 'info', "--web"]));
+        die(\zFramework\Kernel\Terminal::begin(["terminal", $command, "--web"]));
     }
 
     /** Update page | PATCH/PUT: /id
