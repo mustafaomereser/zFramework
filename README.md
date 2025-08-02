@@ -674,7 +674,7 @@ ALSO you can normal query like /1?test=true
 ## 7. zhelper (deprecated)
 ```php
     ....
-    C:\Users\...\Desktop\Project>php zhelper
+    > php zhelper
     
     // Makes Usage:
     # Controller                // what are u want  // if u want get ready resource controller (Optional)
@@ -714,16 +714,16 @@ Run project.
 ```php
     ....
     // Default run host's ip and 1000 port
-    C:\Users\...\Desktop\Project>php zhelper run (press enter)
+    > php zhelper run (press enter)
     
     // with custom ip and port
-    C:\Users\...\Desktop\Project>php zhelper run 127.0.0.1 2000 (press enter)
+    > php zhelper run 127.0.0.1 2000 (press enter)
 ```
 
 ## 8. Terminal
 ```php
     ....
-    C:\Users\...\Desktop\Project>php terminal
+    > php terminal
     
     // Makes Usage:
     # Controller                   # what are u want  // if u want get ready resource controller (Optional)
@@ -1090,8 +1090,8 @@ Run project.
 ```php
     ....
     // Default run host's ip and 80 port
-    C:\Users\...\Desktop\Project>php terminal run (press enter)
+    > php terminal run (press enter)
     
     // with custom ip and port
-    C:\Users\...\Desktop\Project>php terminal run host=127.0.0.1 port=2000 (press enter)
+    > php terminal run host=127.0.0.1 port=2000 (press enter)
 ```
