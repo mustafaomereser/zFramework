@@ -15,13 +15,12 @@ ini_set('session.gc_probability', 1);
 // Session settings: End
 
 // Error log: start
-define('ERROR_LOG_DIR', __DIR__ . '/modules/error_handlers/logs');
+define('ERROR_LOG_DIR', BASE_PATH . '/error_logs');
 
 function error_log_callback($last_log)
 {
     return;
 }
-
 // Error log: end
 
 $GLOBALS['databases'] = [
@@ -29,8 +28,10 @@ $GLOBALS['databases'] = [
     'connections' => include(BASE_PATH . '/database/connections.php') #db connections strings
 ];
 
-include(BASE_PATH . '/zFramework/run.php');
+if (((include(BASE_PATH . "/config/app.php"))['force-https'] ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off")) die(header('Location: https://' . ($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'])));
+
 include(BASE_PATH . '/zFramework/vendor/autoload.php');
+include(BASE_PATH . '/zFramework/run.php');
 
 spl_autoload_register(function ($class) {
     zFramework\Run::includer(BASE_PATH . "/$class.php");

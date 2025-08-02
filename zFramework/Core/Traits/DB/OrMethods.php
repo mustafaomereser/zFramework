@@ -9,7 +9,7 @@ trait OrMethods
      * @param mixed
      * @return mixed
      */
-    public function firstOrFail($exception = null)
+    public function firstOrFail(mixed $exception = null)
     {
         if ($exception == null) $exception = $this->_not_found;
 

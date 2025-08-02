@@ -15,12 +15,12 @@ class View
     /**
      * Prepare config.
      */
-    public static function settingUP(array $config = []): void
+    public static function setSettings(array $config = []): void
     {
         self::reset();
         self::$config = $config;
     }
-
+    
     /**
      * reset all veriables.
      */
@@ -44,7 +44,7 @@ class View
         // search view path: start
         $view_path = self::$config['dir'] . '/' . self::parseViewName($view_name);
         // if doesn't exists in config->dir go search in modules.
-        if (!is_file($view_path)) $view_path = base_path('Modules/' . self::parseViewName($view_name));
+        if (!is_file($view_path)) $view_path = base_path('modules/' . self::parseViewName($view_name));
         // if doesn't exists in config->dir go search in whole base path.
         if (!is_file($view_path)) $view_path = base_path(self::parseViewName($view_name));
         // search view path: end

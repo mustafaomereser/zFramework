@@ -994,8 +994,12 @@ Run project.
     // debug mode is for error page to abort
 
 
-    // Default error log dir in; zFramework/initalize.php
+    // Default error log dir in; zFramework/bootstrap.php
     'error_log' => true|false,
+    // 
+    
+    // Redirect https if come with http.
+    'force-https' => true|false
     // 
 
     # it is so secure. crypter make passwords or etc.
@@ -1006,6 +1010,9 @@ Run project.
     // main base path
     base_path("optional url add");
     
+    // Real Public path
+    public_dir("optional url add");
+  
     // Public path
     public_path("optional url add");
 
@@ -1073,8 +1080,11 @@ Run project.
         'size'   => 300000 # byte
     ]); // return array('/uploads/image.ext', '/uploads/image.ext');
 
-                                # width, height
-    File::resizeImage('file_path', 50, 50);
+                                    # width, height, desired_sizes (Automaticly orianted width and height or desired size.)
+    File::resizeImage('image.png', ['width' => 50, 'height' => 50, 'desired_sizes' => true], 'new_name');
+
+    // Convert file.
+    File::convertImage('image.png', 'avif');
 ```
 
 ## 20. Run Project

@@ -26,15 +26,17 @@ $lang_list = Lang::list();
             <div class="col-md-3 col-12 mb-md-0 mb-3">
                 <img src="/assets/images/zframework-transparent.png" alt="zFramework" class="w-100">
             </div>
-            <div class="col-md-6 col-12 text-center mb-md-0 mb-3">
-                <a class="btn btn-sm border" href="/">
-                    <i class="fad fa-home"></i> <?= _l('lang.home-page') ?>
-                </a>
-                <?php foreach ($GLOBALS['menu'] ?? [] as $module => $menu) : ?>
-                    <a class="btn btn-sm border" href="<?= $menu['route'] ?>">
-                        <i class="<?= $menu['icon'] ?>"></i> <?= $menu['title'] ?>
+            <div class="col-md-6 col-12 mb-md-0 mb-3">
+                <div class="d-flex align-items-center justify-content-center gap-2">
+                    <a class="btn btn-sm border" href="/">
+                        <i class="fad fa-home"></i> <?= _l('lang.home-page') ?>
                     </a>
-                <?php endforeach ?>
+                    <?php foreach ($GLOBALS['menu'] ?? [] as $module => $menu) : ?>
+                        <a class="btn btn-sm border" href="<?= $menu['route'] ?>">
+                            <i class="<?= $menu['icon'] ?>"></i> <?= $menu['title'] ?>
+                        </a>
+                    <?php endforeach ?>
+                </div>
             </div>
             <div class="col-md-3 col-12">
                 <div class="d-flex align-items-center justify-content-md-end justify-content-center gap-2">

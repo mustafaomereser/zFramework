@@ -7,30 +7,26 @@ use zFramework\Kernel\Terminal;
 
 class Module
 {
-    static $assets_path;
+    static $assets_path = FRAMEWORK_PATH . "\Kernel\Includes\module\\";
     static $assets;
 
     public static function begin()
     {
         if (empty(Terminal::$commands[2])) return Terminal::text('[color=red]Module name is required.[/color]');
-
-        self::assets();
         self::{Terminal::$commands[1]}(Terminal::$commands[2]);
     }
 
     private static function assets()
     {
-        self::$assets_path = FRAMEWORK_PATH . "\Kernel\Includes\module\\";
-        $assets = glob(self::$assets_path . "*");
-        foreach ($assets as $key => $val) {
-            unset($assets[$key]);
-            $assets[strtolower(str_replace(self::$assets_path, '', $val))] = $val;
-        }
+        $assets = [];
+        foreach (glob(self::$assets_path . "*") as $key => $val) $assets[strtolower(str_replace(self::$assets_path, '', $val))] = $val;
         self::$assets = $assets;
     }
 
     public static function create($name)
     {
+        self::assets();
+
         if (is_dir(base_path("/modules/$name"))) return Terminal::text("[color=red]`$name` module already exists.[/color]");
 
         foreach (['route', 'views', 'Controllers', 'Middlewares', 'Models', 'Requests', 'Observers', 'migrations'] as $folder) @mkdir(base_path("/modules/$name/$folder"), 0777, true);

@@ -79,7 +79,7 @@ class cURL
      * Send request to target with all settings.
      * @param \Closure $callback
      */
-    public static function send(\Closure $callback = null)
+    public static function send(?\Closure $callback = null)
     {
         if (self::$post) {
             curl_setopt(self::$cURL, CURLOPT_POST, 1);

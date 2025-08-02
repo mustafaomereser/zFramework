@@ -1,6 +1,6 @@
 <?php
 error_reporting(0);
 define('BASE_PATH', __DIR__);
-include('zFramework/initalize.php');
+include('zFramework/bootstrap.php');
 zFramework\Run::includer(BASE_PATH . '\zFramework\modules', false);
 zFramework\Kernel\Terminal::begin($argv);

@@ -12,7 +12,6 @@ class Run
 
     public static function includer($_path, $include_in_folder = true, $reverse_include = false, $ext = '.php')
     {
-
         $_path = str_replace('\\', '/', $_path);
         if (is_file($_path)) {
             self::$included[] = $_path;
@@ -38,25 +37,23 @@ class Run
         return new self();
     }
 
-    public static function findModules()
+    public static function findModules(string $path)
     {
-        if (!is_dir(base_path('/modules'))) return false;
-        $modules         = scan_dir(base_path('/modules'));
-        $include_modules = [];
-        foreach ($modules as $module) {
-            $info = include(base_path("/modules/$module/info.php"));
-            if ($info['status']) $include_modules[$info['sort']] = (['module' => $module] + $info);
+        if (!is_dir($path)) return new self();
+        foreach (scan_dir($path) as $module) {
+            $info = include("$path/$module/info.php");
+            if ($info['status']) self::$modules[$info['sort']] = (['module' => $module, 'path' => "$path/$module"] + $info);
         }
-        ksort($include_modules);
-        self::$modules = $include_modules;
+        ksort(self::$modules);
         return new self();
     }
 
     public static function loadModules()
     {
         foreach (self::$modules as $module) {
-            self::includer(base_path("/modules/" . $module['module'] . "/route"));
-            if ($module['status']) if (isset($module['callback'])) $module['callback']();
+            if (!$module['status']) continue;
+            self::includer($module['path'] . "/route");
+            if (isset($module['callback'])) $module['callback']();
         }
         return new self();
     }
@@ -65,24 +62,23 @@ class Run
     {
         ob_start();
         try {
-            # set view options
-
-            // includes
+            # includes
             self::includer(BASE_PATH . '/zFramework/modules', false);
             self::includer(BASE_PATH . '/zFramework/modules/error_handlers/handle.php');
             self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
-            self::initProviders()::findModules()::loadModules();
+            self::initProviders()::findModules(base_path('/modules'))::loadModules();
             self::includer(BASE_PATH . '/route');
 
-            \zFramework\Core\View::settingUP([
+            # set view options
+            \zFramework\Core\View::setSettings([
                 'caches'  => FRAMEWORK_PATH . '/storage/views',
                 'dir'     => BASE_PATH . '/resource/views',
                 'suffix'  => ''
             ] + Config::get('view'));
 
             \zFramework\Core\Route::run();
-            \zFramework\Core\Facades\Alerts::unset(); // forgot alerts
-            \zFramework\Core\Facades\JustOneTime::unset(); // forgot data
+            \zFramework\Core\Facades\Alerts::unset(); # forgot alerts
+            \zFramework\Core\Facades\JustOneTime::unset(); # forgot data
         } catch (\Throwable $errorHandle) {
             errorHandler($errorHandle);
         } catch (\Exception $errorHandle) {

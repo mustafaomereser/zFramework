@@ -222,21 +222,6 @@ class Route
         $URL = array_values($URL);
 
         $match = ((empty($method) || $method == method()) && $URI == $URL ? 1 : 0); #($match > 0 && (count($URL) - count($URI) == 0))) ? 1 : 0;
-
-        // echo "<pre>";
-        // echo "\n";
-        // print_r("Method: $method = " . method() . "\n");
-        // print_r("Match: $match\n");
-        // echo "URI:";
-        // print_r($URI);
-        // echo "URL:";
-        // print_r($URL);
-        // echo "original URL:";
-        // print_r($args[0]);
-        // var_dump($URI == $URL);
-        // echo str_repeat('-', 50);
-        // echo "</pre>";
-
         return compact('match', 'parameters', 'URI', 'URL');
     }
 

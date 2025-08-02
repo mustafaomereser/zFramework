@@ -105,7 +105,8 @@ class File
     public static function download(string $file)
     {
         $attachment_location = public_dir($file);
-        $filename = self::removePublic(@end(explode('/', str_replace('\\', '/', $file))));
+        $info     = pathinfo($file);
+        $filename = $info['filename'];
 
         if (!file_exists($attachment_location)) abort(404, 'File not exists.');
 
@@ -120,18 +121,26 @@ class File
 
     /**
      * Resize a image
+     *
+     * @important $file
+     * 
+     * @note $sizes default: ['width' => 50, 'height' => 50, 'desired_sizes' => true]
+     *
      * @param string $file
-     * @param int $width
-     * @param int $height
-     * @param bool $force_to_desired_sizes
-     * @param string $_target
-     * @param bool $info_size
+     * @param array $sizes
+     * @param string $new_name
      * @return string
      */
-    public static function resizeImage(string $file, int $width = 50, int $height = 50, bool $force_to_desired_sizes = true, string $_target = null, bool $info_size = false): string
+    public static function resizeImage(string $file, array $sizes = [], ?string $new_name = null): string
     {
         $file = public_dir($file);
         if (!is_file($file)) return false;
+
+        $sizes = [
+            'width'         => $sizes['width'] ?? 50,
+            'height'        => $sizes['height'] ?? 50,
+            'desired_sizes' => @$sizes['desired_sizes'] ? $sizes['desired_sizes'] : true
+        ];
 
         $info     = pathinfo($file);
         $filename = $info['filename'];
@@ -139,31 +148,29 @@ class File
 
         list($image_width, $image_height) = getimagesize($file);
 
-        if (!$force_to_desired_sizes) {
+        if (!$sizes['desired_sizes']) {
             $src_aspect = $image_width / $image_height;
-            $dst_aspect = $width / $height;
-            if ($src_aspect > $dst_aspect) $height = $width / $src_aspect;
-            else $width  = $height * $src_aspect;
+            $dst_aspect = $sizes['width'] / $sizes['height'];
+            if ($src_aspect > $dst_aspect) $sizes['height'] = $sizes['width'] / $src_aspect;
+            else $sizes['width'] = $sizes['height'] * $src_aspect;
         }
 
-        $to_save = self::removePublic($file);
-        if ($info_size) $to_save = str_replace(".$ext", '', $to_save) . "-$width" . "x" . "$height.$ext";
-        if ($_target) $to_save = "$_target/$filename";
+        if (!$new_name) $to_save = str_replace(".$ext", '', $file) . '-' . implode('x', [$sizes['width'], $sizes['height']]) . ".$ext";
+        else $to_save = str_replace($filename, $new_name, $file);
 
         $callbacks = [
-            'jpg'  => ['source' => fn() => imagecreatefromjpeg($file), 'target' => fn($target) => imagejpeg($target, public_dir($to_save), 100)],
-            'jpeg' => ['source' => fn() => imagecreatefromjpeg($file), 'target' => fn($target) => imagejpeg($target, public_dir($to_save), 100)],
-            'png'  => ['source' => fn() => imagecreatefrompng($file), 'target' => fn($target) => imagepng($target, public_dir($to_save), 100)],
-            'gif'  => ['source' => fn() => imagecreatefromgif($file), 'target' => fn($target) => imagegif($target, public_dir($to_save), 100)],
-            'webp' => ['source' => fn() => imagecreatefromwebp($file), 'target' => fn($target) => imagewebp($target, public_dir($to_save), 100)],
-            'bmp'  => ['source' => fn() => imagecreatefrombmp($file), 'target' => fn($target) => imagebmp($target, public_dir($to_save), 100)],
-            'avif' => ['source' => fn() => imagecreatefromavif($file), 'target' => fn($target) => imageavif($target, public_dir($to_save), 100)],
+            'jpg'  => ['source' => fn() => imagecreatefromjpeg($file), 'target' => fn($target) => imagejpeg($target, $to_save, 100)],
+            'jpeg' => ['source' => fn() => imagecreatefromjpeg($file), 'target' => fn($target) => imagejpeg($target, $to_save, 100)],
+            'png'  => ['source' => fn() => imagecreatefrompng($file), 'target' => fn($target) => imagepng($target, $to_save, 100)],
+            'gif'  => ['source' => fn() => imagecreatefromgif($file), 'target' => fn($target) => imagegif($target, $to_save, 100)],
+            'webp' => ['source' => fn() => imagecreatefromwebp($file), 'target' => fn($target) => imagewebp($target, $to_save, 100)],
+            'bmp'  => ['source' => fn() => imagecreatefrombmp($file), 'target' => fn($target) => imagebmp($target, $to_save, 100)],
+            'avif' => ['source' => fn() => imagecreatefromavif($file), 'target' => fn($target) => imageavif($target, $to_save, 100)],
         ][$ext];
 
         $source = $callbacks['source']();
-        $target = imagecreatetruecolor($width, $height);
-        imagecopyresampled($target, $source, 0, 0, 0, 0, $width, $height, $image_width, $image_height);
-
+        $target = imagecreatetruecolor($sizes['width'], $sizes['height']);
+        imagecopyresampled($target, $source, 0, 0, 0, 0, $sizes['width'], $sizes['height'], $image_width, $image_height);
         $callbacks['target']($target);
 
         // clear cache
@@ -171,9 +178,8 @@ class File
         imagedestroy($target);
         //
 
-        return self::removePublic($file);
+        return self::removePublic($to_save);
     }
-
 
     /**
      * Convert Image to different extension
@@ -181,7 +187,7 @@ class File
      * @param string $to
      * @return string
      */
-    public function convertImage(string $file, string $to)
+    public static function convertImage(string $file, string $to)
     {
         $file = public_dir($file);
         if (!is_file($file)) return false;
@@ -206,23 +212,22 @@ class File
         imagecopyresampled($target, $from, 0, 0, 0, 0, $width, $height, $width, $height);
 
         $to = [
-            'jpeg' => fn() => imagejpeg($target, public_dir($to_save), 100),
-            'jpg'  => fn() => imagejpeg($target, public_dir($to_save), 100),
-            'png'  => fn() => imagepng($target, public_dir($to_save), 100),
-            'gif'  => fn() => imagegif($target, public_dir($to_save), 100),
-            'webp' => fn() => imagewebp($target, public_dir($to_save), 100),
-            'bmp'  => fn() => imagebmp($target, public_dir($to_save), 100),
-            'avif' => fn() => imageavif($target, public_dir($to_save), 100),
+            'jpeg' => fn() => imagejpeg($target, $to_save, 100),
+            'jpg'  => fn() => imagejpeg($target, $to_save, 100),
+            'png'  => fn() => imagepng($target, $to_save, 100),
+            'gif'  => fn() => imagegif($target, $to_save, 100),
+            'webp' => fn() => imagewebp($target, $to_save, 100),
+            'bmp'  => fn() => imagebmp($target, $to_save, 100),
+            'avif' => fn() => imageavif($target, $to_save, 100),
         ][$to]();
 
         // clear cache
         imagedestroy($from);
-        imagedestroy($to);
+        imagedestroy($target);
         //
 
-        return $to_save;
+        return self::removePublic($to_save);
     }
-
 
     /**
      * Show human readable file size

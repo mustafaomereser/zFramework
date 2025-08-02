@@ -1,5 +1,11 @@
 <?php
 
+// check a host has SSl
+function is_https_supported(string $host): bool
+{
+    return !!@fclose(@fsockopen('ssl://' . $host, 443, 0, '', .5));
+}
+
 // Create new database connection string
 function MySQLcreateDatabase($host = "localhost", $dbname = "dbname", $user = "root", $pass = null, $name = null)
 {
@@ -11,22 +17,27 @@ function e($value, $emptycheck = false)
     return strlen($value) ? htmlspecialchars($value) : ($emptycheck ? '-' : null);
 }
 
-// Get project base path.
-function base_path($url = null)
+function path_fix($path)
 {
-    return BASE_PATH . ($url ? "/$url" : null);
+    return rtrim(str_replace(['\\\\', '//', '\\'], '/', $path), "/");
+}
+
+// Get project base path.
+function base_path($add = null)
+{
+    return path_fix(BASE_PATH . "/$add");
 }
 
 // Get project real public dir.
-function public_dir($url = null)
+function public_dir($add = null)
 {
-    return PUBLIC_DIR . @$url;
+    return path_fix(PUBLIC_DIR . "/$add");
 }
 
 // Get project's public path
-function public_path($url = null)
+function public_path($add = null)
 {
-    return base_path(zFramework\Core\Facades\Config::get('app.public')) . $url;
+    return base_path(zFramework\Core\Facades\Config::get('app.public') . $add);
 }
 
 // Get Run's server's host.
@@ -40,10 +51,10 @@ function host()
 }
 
 // no cache public asset
-function asset($value)
+function asset($file)
 {
-    $value = str_replace("//", "/", "/$value");
-    return host() . $value . "?v=" . filemtime(public_dir($value));
+    $file = path_fix($file);
+    return host() . $file . "?v=" . filemtime(public_dir($file));
 }
 
 // file_put_content force make dirs.
@@ -145,7 +156,7 @@ function abort()
 }
 
 // Get current uri but with parse
-function getQuery($adds = [], $except = [], $string = true)
+function getQuery($adds = [], $except = [], bool $string = true)
 {
     @parse_str($_SERVER['QUERY_STRING'], $output);
 
@@ -157,7 +168,7 @@ function getQuery($adds = [], $except = [], $string = true)
     foreach ($adds as $key => $add) $output[$key] = $add;
     //
 
-    if ($string) return "?" . http_build_query($output);
+    if ($string) return count($output) ? "?" . http_build_query($output) : null;
 
     return $output;
 }
@@ -173,8 +184,6 @@ function request($name = null, $val = NULL)
 function findFile($file, $ext = null, $path = null)
 {
     if ($path) $path .= "/";
-
-
     try {
         @$dirTree = scan_dir(base_path($path));
     } catch (\Throwable $e) {
@@ -261,6 +270,7 @@ function model($model)
     return new $model;
 }
 
+// scan dir remove dots.
 function scan_dir($dir)
 {
     return array_values(array_diff(scandir($dir), ['.', '..']));
