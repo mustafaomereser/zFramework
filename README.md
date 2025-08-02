@@ -1,10 +1,9 @@
 You can select version on branch list.
 
-Install packages (Vendors included because modified some modules)
+Install packages
 ```php
 cmd> composer install
 ```
-
 
 PHP VERSION
 ```php
