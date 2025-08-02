@@ -1,6 +1,6 @@
 <?php
 define('FRAMEWORK_PATH', __DIR__);
-define('FRAMEWORK_VERSION', '2.6.5');
+define('FRAMEWORK_VERSION', '2.7.0');
 header("X-Powered-By: zFramework v" . FRAMEWORK_VERSION);
 
 // Initalize settings
