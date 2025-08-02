@@ -1,7 +1,5 @@
 @extends('app.main')
-
 @section('body')
-
 <div class="container my-5">
     <div class="text-center">
         <h1><?= $category['title'] ?></h1>
@@ -32,7 +30,4 @@
     <?php endif ?>
 </div>
 <div class="page-space"></div>
-@endsection
-
-@section('footer')
 @endsection

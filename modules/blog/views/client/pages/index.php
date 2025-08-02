@@ -1,7 +1,5 @@
 @extends('app.main')
-
 @section('body')
-
 <div class="container my-5">
     <div class="text-center">
         <h1><?= $title ?></h1>
@@ -64,8 +62,4 @@
         </div>
     <?php endif ?>
 </div>
-
-@endsection
-
-@section('footer')
 @endsection

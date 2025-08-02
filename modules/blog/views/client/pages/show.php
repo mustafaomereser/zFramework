@@ -1,5 +1,4 @@
 @extends('app.main')
-
 @section('header')
 <style>
     img {
@@ -11,7 +10,6 @@
 @endsection
 
 @section('body')
-
 <div class="container my-5">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
@@ -93,7 +91,4 @@
         </div>
     </div>
 </div>
-@endsection
-
-@section('footer')
 @endsection

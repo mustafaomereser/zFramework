@@ -1,10 +1,10 @@
 @extends('app.main')
 @section('body')
-<?php $duzenle = isset($post['id']) ?>
+<?php $editing = isset($post['id']) ?>
 <div class="clearfix mb-3 mt-5">
     <div class="float-start">
         <div class="d-flex align-items-center gap-2">
-            <?php if ($duzenle) : ?>
+            <?php if ($editing) : ?>
                 <h3>Edit Blog</h3>
             <?php else : ?>
                 <h3>Add Blog</h3>
@@ -20,12 +20,12 @@
     </div>
 </div>
 
-<form action="<?= route('admin.blog.' . ($duzenle ? 'update' : 'store'), ['id' => @$post['id']]) ?>" method="POST" enctype="multipart/form-data">
+<form action="<?= route('admin.blog.' . ($editing ? 'update' : 'store'), ['id' => @$post['id']]) ?>" method="POST" enctype="multipart/form-data">
     <div class="row">
         <div class="col-7">
             <div class="card">
                 <div class="card-body">
-                    <?= csrf() . ($duzenle ? inputMethod('PATCH') : null) ?>
+                    <?= csrf() . ($editing ? inputMethod('PATCH') : null) ?>
 
                     <div class="form-group mb-2">
                         <label for="title">Title</label>
@@ -35,7 +35,7 @@
                     <div class="mb-2">
                         <div class="title mb-2">
                             <span>Blog Cover Image</span>
-                            <?php if ($duzenle) : ?>
+                            <?php if ($editing) : ?>
                                 <a href="<?= $post['image'] ?>" target="_blank"><i class="far fa-lg fa-eye"></i></a>
                             <?php endif ?>
                         </div>
@@ -52,7 +52,7 @@
                     </div>
 
                     <div class="d-flex align-items-center justify-content-end gap-2">
-                        <?php if ($duzenle) : ?>
+                        <?php if ($editing) : ?>
                             <a href="<?= route('blog.show', ['id' => $post['slug']]) ?>" target="_blank" class="btn btn-outline-warning"><i class="fa fa-eye me-1"></i> Preview</a>
                         <?php endif ?>
                         <button type="submit" class="btn btn-outline-success"><i class="fa fa-save me-1"></i> Save</button>
@@ -102,20 +102,11 @@
 @endsection
 
 @section('footer')
-<?php if ($duzenle) : ?>
+<?php if ($editing) : ?>
     <?php foreach ($categories as $category) : ?>
         <script>
             $('#category-<?= $category['category_id'] ?>').prop('checked', true)
         </script>
     <?php endforeach ?>
 <?php endif ?>
-
-<script>
-    let content_editor;
-    ClassicEditor.create($('#content')[0], {
-        ckfinder: {
-            uploadUrl: '<?= route('admin.blog.upload-image') ?>'
-        }
-    }).then(editor => content_editor = editor);
-</script>
 @endsection
