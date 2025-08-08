@@ -22,11 +22,26 @@ class Config
     private static function parseUrl(string $config): array
     {
         $config = explode(".", $config);
-        $output['name'] = $config[0];
-        $output['path'] = self::$path . "/" . $config[0] . ".php";
-        unset($config[0]);
-        $output['args'] = implode('.', array_filter($config));
+
+        $find = "";
+        foreach ($config as $key => $file) {
+            $find .= "/$file";
+            unset($config[$key]);
+            if (file_exists($config_path = self::$path . $find . ".php")) {
+                $config_name = $file;
+                break;
+            }
+        }
+
+        $output['name'] = $config_name;
+        $output['path'] = $config_path;
+
+        $output['args'] = implode('.', array_filter($config, fn($var) => strlen((string) $var)));
         if (isset($output['args']) && !$output['args']) unset($output['args']);
+
+
+        print_r($output);
+
         return $output;
     }
 
@@ -38,6 +53,7 @@ class Config
     public static function get(string $config)
     {
         $data = self::parseUrl($config);
+
         if (!is_file($data['path'])) return;
 
         $cache = isset(self::$caches[$data['name']]);
