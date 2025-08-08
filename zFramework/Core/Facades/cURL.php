@@ -83,7 +83,7 @@ class cURL
     {
         if (self::$post) {
             curl_setopt(self::$cURL, CURLOPT_POST, 1);
-            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, http_build_query(self::$postFields));
+            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postFields);
             self::$postFields = [];
             self::$post = false;
         }
