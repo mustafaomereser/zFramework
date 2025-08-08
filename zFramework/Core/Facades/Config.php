@@ -39,9 +39,6 @@ class Config
         $output['args'] = implode('.', array_filter($config, fn($var) => strlen((string) $var)));
         if (isset($output['args']) && !$output['args']) unset($output['args']);
 
-
-        print_r($output);
-
         return $output;
     }
 
