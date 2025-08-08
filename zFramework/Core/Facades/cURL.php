@@ -83,7 +83,6 @@ class cURL
             curl_setopt(self::$cURL, CURLOPT_POST, 1);
             curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postFields);
             self::$postFields = [];
-            self::$postType = "query";
             self::$post = false;
         }
 
