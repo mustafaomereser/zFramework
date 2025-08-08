@@ -94,7 +94,7 @@ class cURL
     {
         if (self::$post) {
             curl_setopt(self::$cURL, CURLOPT_POST, 1);
-            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postTypeParse[self::$postType]);
+            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postTypeParse[self::$postType]());
             self::$postFields = [];
             self::$postType = "query";
             self::$post = false;
