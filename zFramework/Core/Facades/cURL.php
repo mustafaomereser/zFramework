@@ -6,13 +6,22 @@ use CURLFile;
 
 class cURL
 {
-
-    /**
-     * target url
-     */
     static $cURL;
-    static $postFields = [];
-    static $post = false;
+    static $postFields      = [];
+    static $postType        = 'query';
+    static $postTypeParse;
+    static $post            = false;
+
+
+    public static function init()
+    {
+        self::$postTypeParse = [
+            'query' => fn() => http_build_query(self::$postFields),
+            'json'  => fn() => json_encode(self::$postFields, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK)
+        ];
+    }
+
+
     /**
      * set url and some options
      * @param string $url
@@ -29,12 +38,14 @@ class cURL
     /**
      * Post parameters
      * @param array $fiels
+     * @param string $type
      * @return self
      */
-    public static function post(array $fields = []): self
+    public static function post(array $fields = [], string $type = 'query'): self
     {
         self::$post = true;
         self::$postFields = self::$postFields + $fields;
+        self::$postType = $type;
         return new self();
     }
 
@@ -83,8 +94,9 @@ class cURL
     {
         if (self::$post) {
             curl_setopt(self::$cURL, CURLOPT_POST, 1);
-            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postFields);
+            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postTypeParse[self::$postType]);
             self::$postFields = [];
+            self::$postType = "query";
             self::$post = false;
         }
 
