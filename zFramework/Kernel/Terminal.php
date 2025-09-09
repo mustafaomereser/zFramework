@@ -75,9 +75,9 @@ class Terminal
 
         try {
             $module = "\zFramework\Kernel\Modules\\" . ($method = ucfirst(strtolower(self::$commands[0])));
-            $module::begin(array_column(Module::$list[strtolower($method)]['methods'], 'name'));
+            $module::begin(array_column(Module::$list[strtolower($method)]['methods'] ?? [], 'name'));
         } catch (\Throwable $e) {
-            self::text("[color=yellow]Module not found, please select just in list.[/color]");
+            self::text("[color=yellow]" . $e->getMessage() . "[/color]");
         }
 
         if (count(self::$textlist)) echo json_encode(self::$textlist, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);

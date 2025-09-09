@@ -51,7 +51,7 @@ class Validator
 
             foreach ($validateArray as $validate) {
                 if (str_contains($validate, ':')) {
-                    preg_match_all('/(\w+):(?:"([^"]*)"|([^\s;]+))/', $validate, $m, PREG_SET_ORDER);
+                    preg_match_all('/([\w$.()]+):(?:"([^"]*)"|([^\s;]+))/', $validate, $m, PREG_SET_ORDER);
                     $out = [];
                     foreach ($m as $match) $out[$match[1]] = isset($match[2]) && $match[2] !== '' ? $match[2] : $match[3];
                     $case       = array_key_first($out);
@@ -137,7 +137,7 @@ class Validator
 
     public static function exists($data, $parameters)
     {
-        $exists = (new DB(@$parameters['db']))->table($data['equivalent'])->where(($parameters['key'] ?? $data['key']), $data['value']);
+        $exists = (new DB(@$parameters['db']))->table($data['equivalent'])->whereRaw(($parameters['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
         if ($ex = @$parameters['ex']) $exists->where('id', '!=', $ex);
         if ($exists->count()) return true;
         return false;
@@ -145,7 +145,7 @@ class Validator
 
     public static function unique($data, $parameters)
     {
-        $unique = (new DB(@$parameters['db']))->table($data['equivalent'])->where(($parameters['key'] ?? $data['key']), $data['value']);
+        $unique = (new DB(@$parameters['db']))->table($data['equivalent'])->whereRaw(($parameters['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
         if ($ex = @$parameters['ex']) $unique->where('id', '!=', $ex);
         if ($unique->count()) return false;
         return true;
