@@ -29,7 +29,7 @@ class Date
      * @param string $format
      * @return string 
      */
-    public static function format(string $date, string $format = 'd.m.Y'): string
+    public static function format(?string $date = null, string $format = 'd.m.Y'): string
     {
         return $date ? date($format, (is_string($date) ? strtotime($date) : $date)) : '-';
     }

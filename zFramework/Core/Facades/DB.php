@@ -193,7 +193,7 @@ class DB
     private function getPrimary()
     {
         if (!$this->table) throw new \Exception('firstly you must select a table for get primary key.');
-        return $this->primary ?? $GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$this->table]['primary'];
+        return $this->primary ?? @$GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$this->table]['primary'];
     }
 
     #region Columns Controls

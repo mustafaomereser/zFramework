@@ -275,3 +275,10 @@ function scan_dir($dir)
 {
     return array_values(array_diff(scandir($dir), ['.', '..']));
 }
+
+// seconds to hours.
+function secondsToHours($seconds)
+{
+    $t = explode("/", sprintf('%02d/%02d/%02d', ($seconds / 3600), ($seconds / 60 % 60), $seconds % 60));
+    return ['h' => $t[0], 'm' => $t[1], 's' => $t[2]];
+}
