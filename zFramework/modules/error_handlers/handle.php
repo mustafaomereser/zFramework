@@ -1214,10 +1214,10 @@ function errorHandler($data)
         error_log_callback($error_log);
     }
 
-    // if (!Config::get('app.debug')) {
-    //     if (Http::isAjax()) abort(500, $message);
-    //     abort(500, 'Beklenmedik bir hata oluştu, devam ederse lütfen yönetici ile iletişime geçiniz.');
-    // }
+    if (!Config::get('app.debug')) {
+        if (Http::isAjax()) abort(500, $message);
+        abort(500, 'Beklenmedik bir hata oluştu, devam ederse lütfen yönetici ile iletişime geçiniz.');
+    }
 
     echo $error_log;
 }
