@@ -41,7 +41,7 @@ class Response
 
         switch ($type) {
             case 'json':
-                if (config('response.ajax.include-alerts')) $data['alerts'] = Alerts::get(true);
+                if (config('response.ajax.include-alerts')) $data['alerts'] = Alerts::get();
                 $data = json_encode($data + self::$addinationals, JSON_UNESCAPED_UNICODE | $flags);
                 self::$addinationals = [];
                 break;
