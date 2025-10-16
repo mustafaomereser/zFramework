@@ -13,12 +13,13 @@ class DB
     use OrMethods;
 
     public $db;
-    private $driver;
     public $dbname;
+    private $driver;
     private $builder;
     private $sqlDebug  = false;
     private $wherePrev = 'AND';
     public $cache_dir  = FRAMEWORK_PATH . "/Caches/DB";
+
     /**
      * Options parameters
      */
@@ -26,7 +27,6 @@ class DB
     public $originalTable;
     public $buildQuery      = [];
     public $cache           = [];
-    public $specialChars    = false;
     public $setClosures     = true;
 
 
@@ -182,10 +182,8 @@ class DB
      */
     private function trigger(string $name, array $args = [])
     {
-        if (!isset($this->observe) || !count($this->observe)) return false;
-        $output = [];
-        foreach ($this->observe as $observe) $output[] = call_user_func_array([new $observe, 'router'], [$name, $args]);
-        return $output[$this->observe_key ?? 0];
+        if (!isset($this->observe)) return false;
+        return call_user_func_array([new ($this->observe), 'router'], [$name, $args]);
     }
 
     /**
@@ -202,6 +200,7 @@ class DB
             'orderBy' => [],
             'groupBy' => [],
             'limit'   => [],
+            'having'  => [],
             'sets'    => ""
         ];
         return $this;
@@ -239,23 +238,13 @@ class DB
     {
         $primary_key = $this->getPrimary();
         foreach ($rows as $key => $row) {
-            foreach ($GLOBALS['model-closures'][$this->db][$this->table] as $closure) $rows[$key][$closure] = function () use ($row, $closure) {
-                return $this->{$closure}($row);
-            };
+            foreach ($GLOBALS['model-closures'][$this->db][$this->table] as $closure) $rows[$key][$closure] = fn(...$args) => $this->{$closure}(...array_merge($args, [$row]));
 
             if (!isset($row[$primary_key])) continue;
 
-            $rows[$key]['update'] = function ($sets) use ($row, $primary_key) {
-                return $this->where($primary_key, $row[$primary_key])->update($sets);
-            };
-
-            $rows[$key]['delete'] = function () use ($row, $primary_key) {
-                return $this->where($primary_key, $row[$primary_key])->delete();
-            };
-
-            // $rows[$key] = new \ArrayObject($rows[$key], \ArrayObject::ARRAY_AS_PROPS);
+            $rows[$key]['update'] = fn($sets) => $this->where($primary_key, $row[$primary_key])->update($sets);
+            $rows[$key]['delete'] = fn() => $this->where($primary_key, $row[$primary_key])->delete();
         }
-        // $rows = new \ArrayObject($rows, \ArrayObject::ARRAY_AS_PROPS);
         return $rows;
     }
 
@@ -679,7 +668,6 @@ class DB
 
         $hashed_keys = [];
         foreach ($sets as $key => $value) {
-            if ($this->specialChars) $value = htmlspecialchars($value);
             $hashed_key    = $this->hashedKey($key);
             $hashed_keys[] = $hashed_key;
             $this->buildQuery['data'][$hashed_key] = $value;
@@ -708,7 +696,6 @@ class DB
         if ($new_sets = $this->trigger('update', $sets)) $sets = $new_sets;
 
         foreach ($sets as $key => $value) {
-            if ($this->specialChars) $value = htmlspecialchars($value);
             $hashed_key = $this->hashedKey($key);
             $this->buildQuery['data'][$hashed_key] = $value;
             $this->buildQuery['sets'] .= "$key = :$hashed_key, ";
