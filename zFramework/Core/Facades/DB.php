@@ -15,15 +15,15 @@ class DB
     public $db;
     private $driver;
     private $dbname;
+    private $builder;
     private $sqlDebug  = false;
     private $wherePrev = 'AND';
-    public $cache_dir = FRAMEWORK_PATH . "/Caches/DB";
+    public $cache_dir  = FRAMEWORK_PATH . "/Caches/DB";
     /**
      * Options parameters
      */
     public $table;
     public $originalTable;
-    public $stagingMode     = false;
     public $buildQuery      = [];
     public $cache           = [];
     public $specialChars    = false;
@@ -66,77 +66,14 @@ class DB
             $new_connection = true;
         }
 
-        $this->dbname = $GLOBALS['databases']['connected'][$this->db]['name'];
-        $this->driver = $GLOBALS['databases']['connected'][$this->db]['driver'];
+        $this->dbname  = $GLOBALS['databases']['connected'][$this->db]['name'];
+        $this->driver  = $GLOBALS['databases']['connected'][$this->db]['driver'];
+        $this->builder = (new ("\zFramework\Core\Facades\DB\Drivers\\$this->driver")($this));
 
         if (isset($new_connection)) $this->tables();
 
         return $GLOBALS['databases']['connections'][$this->db];
     }
-
-    /**
-     * Staging Mode
-     * @param bool $mode
-     * @return self
-     */
-    public function staging(bool $mode = false)
-    {
-        $this->prepare('DROP TABLE IF EXISTS staging_' . $this->originalTable);
-        if ($mode) {
-            $this->setClosures = false;
-            $this->table = "staging_" . $this->originalTable;
-            $this->prepare('CREATE TABLE IF NOT EXISTS ' . $this->table . ' LIKE ' . $this->originalTable);
-        } elseif ($this->stagingMode) {
-            $this->setClosures = true;
-            $this->table = $this->originalTable;
-        }
-
-        $this->stagingMode = $mode;
-
-        return $this;
-    }
-
-    /**
-     * Staging Merge Table
-     * @param $column
-     * @return array
-     */
-
-    public function stagingMerge(string $column)
-    {
-        if (!$this->stagingMode) new \Exception('You can not merge while staging mode is off.');
-
-        $columns                   = $GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$this->originalTable]['columns'];
-        $no_pri_columns            = array_filter($columns, fn($data) => !in_array($data['COLUMN_KEY'], ['PRI']) ? true : false);
-        $no_pri_columns_names      = array_map(fn($data) => $data['COLUMN_NAME'], $no_pri_columns);
-        $non_special_columns       = array_filter($columns, fn($data) => !in_array($data['COLUMN_KEY'], ['UNI', 'PRI']) ? true : false);
-        $non_special_columns_names = array_map(fn($data) => $data['COLUMN_NAME'], $non_special_columns);
-
-        if ($created_at_column = array_search($this->created_at, $non_special_columns_names)) unset($non_special_columns_names[$created_at_column]);
-
-        $insert = $this->prepare("
-        -- insert
-            ALTER TABLE $this->originalTable DISABLE KEYS;
-            INSERT INTO $this->originalTable (" . implode(',', $no_pri_columns_names) . ")
-            SELECT " . implode(',', $no_pri_columns_names) . " FROM staging_$this->originalTable AS s
-            WHERE NOT EXISTS (SELECT 1 FROM $this->originalTable AS u WHERE u.$column = s.$column);
-            ALTER TABLE $this->originalTable ENABLE KEYS;
-        ")->fetch(\PDO::FETCH_ASSOC);
-
-        $update = $this->prepare("
-        -- update
-            START TRANSACTION;
-            UPDATE $this->originalTable AS u
-            JOIN staging_$this->originalTable AS s ON u.$column = s.$column
-            SET " . implode(",\n", array_map(fn($data) => "u.$data = COALESCE(NULLIF(s.$data, ''), u.$data)", $non_special_columns_names)) . ";
-            COMMIT;
-        ")->fetch(\PDO::FETCH_ASSOC);
-
-
-        $this->staging(false);
-        return compact('insert', 'update');
-    }
-
 
     /**
      * Execute sql query.
@@ -384,27 +321,6 @@ class DB
     }
 
     /**
-     * Get Select
-     * @return null|string
-     */
-    private function getSelect()
-    {
-        switch (gettype($this->buildQuery['select'])) {
-            case 'array':
-                if (!count($this->buildQuery['select'])) return null;
-                return is_array(($select = $this->buildQuery['select'])) ? implode(', ', $select) : $select;
-                break;
-
-            case 'string':
-                return $this->buildQuery['select'];
-                break;
-
-            default:
-                return null;
-        }
-    }
-
-    /**
      * add a join
      * @param string $type
      * @param string $model
@@ -415,20 +331,6 @@ class DB
     {
         $this->buildQuery['join'][] = [$type, $model, $on];
         return $this;
-    }
-
-    /**
-     * get joins output
-     * @return string
-     */
-    private function getJoin(): string
-    {
-        $output = "";
-        foreach ($this->buildQuery['join'] as $join) {
-            $model = new $join[1]();
-            $output .= " " . $join[0] . " JOIN $model->table ON " . $join[2] . " ";
-        }
-        return $output;
     }
 
     /**
@@ -648,56 +550,6 @@ class DB
         return compact('key', 'operator', 'value', 'prev');
     }
 
-
-    /**
-     * Parse and get where.
-     * @return void|string
-     */
-    private function getWhere($checkSoftDelete = true)
-    {
-        if ($checkSoftDelete && isset($this->softDelete)) $this->buildQuery['where'][] = [
-            'type'     => 'row',
-            'queries'  => [
-                [
-                    'key'      => $this->deleted_at,
-                    'operator' => 'IS NULL',
-                    'value'    => null,
-                    'prev'     => "AND"
-                ]
-            ]
-        ];
-
-        if (!count($this->buildQuery['where'])) return;
-
-        $output = "";
-        foreach ($this->buildQuery['where'] as $where_key => $where) {
-            $response = "";
-            foreach ($where['queries'] as $query_key => $query) {
-                $query['prev'] = strtoupper($query['prev']);
-
-                if (!isset($query['raw'])) if (strlen($query['value'] ?? '') > 0) {
-                    $hashed_key = $this->hashedKey($query['key']);
-                    $this->buildQuery['data'][$hashed_key] = $query['value'];
-                }
-
-                if (count($where['queries']) == 1) $prev = ($where_key + $query_key > 0) ? $query['prev'] : null;
-                else $prev = ($query_key > 0) ? $query['prev'] : null;
-
-                $response .= implode(" ", [
-                    $prev,
-                    $query['key'],
-                    $query['operator'],
-                    (isset($query['raw']) ? $query['value'] . " " : (strlen($query['value'] ?? '') > 0 ? ":$hashed_key " : null))
-                ]);
-            }
-
-            if ($where['type'] == 'group') $response = (!empty($output) ? $where['queries'][0]['prev'] . " " : null) . "(" . rtrim($response) . ") ";
-            $output .= $response;
-        }
-
-        return " WHERE $output ";
-    }
-
     /**
      * Set Order By
      * @param array $data
@@ -709,20 +561,6 @@ class DB
         return $this;
     }
 
-    private function getOrderBy()
-    {
-        $orderBy = $this->buildQuery['orderBy'] ?? [];
-
-        if (count($orderBy)) {
-            $orderByStr = '';
-            foreach ($orderBy as $column => $order) $orderByStr .= "$column $order, ";
-            $orderByStr = rtrim($orderByStr, ', ');
-            return " ORDER BY $orderByStr ";
-        }
-
-        return null;
-    }
-
     /**
      * Set Group By
      * @param array $data
@@ -732,12 +570,6 @@ class DB
     {
         $this->buildQuery['groupBy'] = $data;
         return $this;
-    }
-
-
-    private function getGroupBy()
-    {
-        return @$this->buildQuery['groupBy'] ? " GROUP BY " . implode(", ", $this->buildQuery['groupBy']) : null;
     }
 
     /**
@@ -752,11 +584,6 @@ class DB
         return $this;
     }
 
-    private function getLimit()
-    {
-        $limit = @$this->buildQuery['limit'];
-        return $limit ? " LIMIT " . ($limit[0] . ($limit[1] ? ", " . $limit[1] : null)) : null;
-    }
     #endregion
 
     #region CRUD Proccesses
@@ -778,7 +605,8 @@ class DB
      */
     public function count(): int
     {
-        return $this->run()->rowCount();
+        // return $this->run()->rowCount();
+        return $this->select("COUNT($this->table." . $this->getPrimary() . ") count")->first()['count'];
     }
 
     /**
@@ -809,7 +637,7 @@ class DB
     public function paginate(int $per_page = 20, string $page_id = 'page')
     {
         $last_query       = $this->buildQuery;
-        $row_count        = $this->select("COUNT($this->table." . $this->getPrimary() . ") count")->first()['count'];
+        $row_count        = $this->count();
         $this->buildQuery = $last_query;
 
         $uniqueID         = uniqid();
@@ -947,35 +775,7 @@ class DB
      */
     public function buildSQL(string $type = 'select'): string
     {
-        $limit           = $this->getLimit();
-        $checkSoftDelete = true;
-        switch ($type) {
-            case 'select':
-                $select = $this->getSelect();
-                $select = strlen($select ?? '') ? $select : (count($this->guard ?? []) ? "$this->table." . implode(", $this->table.", $this->columns()) : "$this->table.*");
-                $type   = "SELECT $select FROM";
-                break;
-
-            case 'delete':
-                $type = "DELETE FROM";
-                break;
-
-            case 'insert':
-                $type = "INSERT INTO";
-                $sets = $this->buildQuery['sets'];
-                $checkSoftDelete = false;
-                break;
-
-            case 'update':
-                $type = "UPDATE";
-                $sets = $this->buildQuery['sets'];
-                break;
-
-            default:
-                throw new \Exception('something wrong, buildSQL invalid type.');
-        }
-
-        $sql = "$type $this->table" . @$sets . $this->getJoin() . $this->getWhere($checkSoftDelete) . $this->getGroupBy() . $this->getOrderBy() . $limit;
+        $sql = $this->builder->build($type);
 
         if ($this->sqlDebug) {
             $debug_sql = $sql;
