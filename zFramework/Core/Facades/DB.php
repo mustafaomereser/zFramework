@@ -14,7 +14,7 @@ class DB
 
     public $db;
     private $driver;
-    private $dbname;
+    public $dbname;
     private $builder;
     private $sqlDebug  = false;
     private $wherePrev = 'AND';
@@ -54,21 +54,20 @@ class DB
         if (!isset($GLOBALS['databases']['connected'][$this->db])) {
             try {
                 $parameters = $GLOBALS['databases']['connections'][$this->db];
-                $conenction = new \PDO($parameters[0], $parameters[1], ($parameters[2] ?? null));
-                foreach ($parameters['options'] ?? [] as $option) $conenction->setAttribute($option[0], $option[1]);
+                $connection = new \PDO($parameters[0], $parameters[1], ($parameters[2] ?? null));
+                foreach ($parameters['options'] ?? [] as $option) $connection->setAttribute($option[0], $option[1]);
             } catch (\Throwable $err) {
                 die(errorHandler($err));
             }
 
-            $GLOBALS['databases']['connected'][$this->db]   = ['name' => $conenction->query('SELECT DATABASE()')->fetchColumn(), 'driver' => $conenction->getAttribute(\PDO::ATTR_DRIVER_NAME)];
-            $GLOBALS['databases']['connections'][$this->db] = $conenction;
-
             $new_connection = true;
+            $GLOBALS['databases']['connected'][$this->db]['driver'] = $connection->getAttribute(\PDO::ATTR_DRIVER_NAME);
+            $GLOBALS['databases']['connections'][$this->db] = $connection;
         }
 
-        $this->dbname  = $GLOBALS['databases']['connected'][$this->db]['name'];
         $this->driver  = $GLOBALS['databases']['connected'][$this->db]['driver'];
         $this->builder = (new ("\zFramework\Core\Facades\DB\Drivers\\$this->driver")($this));
+        $this->dbname  = $GLOBALS['databases']['connected'][$this->db]['name'];
 
         if (isset($new_connection)) $this->tables();
 
@@ -109,21 +108,7 @@ class DB
     {
         $data = json_decode(@file_get_contents($this->cache_dir . "/" . $this->dbname . ".json"), true) ?? false;
         if (!$data) {
-            $engines = [];
-            $tables  = $this->prepare("SELECT TABLE_NAME, ENGINE FROM information_schema.tables WHERE table_schema = :table_scheme", ['table_scheme' => $this->dbname])->fetchAll(\PDO::FETCH_ASSOC);
-            foreach ($tables as $key => $table) {
-                $tables[$key] = $table['TABLE_NAME'];
-                $engines[$table['TABLE_NAME']] = $table['ENGINE'];
-
-                $columns = $this->prepare("SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH, COLUMN_TYPE, COLUMN_KEY FROM information_schema.columns where table_schema = DATABASE() AND table_name = :table", ['table' => $table['TABLE_NAME']])->fetchAll(\PDO::FETCH_ASSOC);
-                $data["TABLE_COLUMNS"][$table['TABLE_NAME']] = [
-                    'primary' => $columns[array_search("PRI", array_column($columns, 'COLUMN_KEY'))]['COLUMN_NAME'],
-                    'columns' => $columns
-                ];
-            }
-
-            $data["TABLES"]         = $tables;
-            $data["TABLE_ENGINES"]  = $engines;
+            $data = $this->builder->tables();
             file_put_contents2($this->cache_dir . "/" . $this->dbname . ".json", json_encode($data, JSON_UNESCAPED_UNICODE));
         }
 
@@ -636,9 +621,8 @@ class DB
      */
     public function paginate(int $per_page = 20, string $page_id = 'page')
     {
-        $last_query       = $this->buildQuery;
         $row_count        = $this->count();
-        $this->buildQuery = $last_query;
+        $this->buildQuery = $this->cache['buildQuery'];
 
         $uniqueID         = uniqid();
         $current_page     = (request($page_id) ?? 1);
@@ -653,7 +637,6 @@ class DB
         parse_str(@$_SERVER['QUERY_STRING'], $queryString);
         $queryString[$page_id] = "change_page_$uniqueID";
         $url = "?" . http_build_query($queryString);
-
 
         return [
             'items'          => $row_count ? self::limit($start_count, $per_page)->get() : [],
@@ -682,7 +665,6 @@ class DB
             }
         ];
     }
-
 
     /**
      * Insert a row to database

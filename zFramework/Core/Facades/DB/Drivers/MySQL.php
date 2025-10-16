@@ -8,6 +8,32 @@ class MySQL
     public function __construct($parent)
     {
         $this->parent = $parent;
+        $GLOBALS['databases']['connected'][$this->parent->db]['name'] = $GLOBALS['databases']['connections'][$this->parent->db]->query('SELECT DATABASE()')->fetchColumn();
+    }
+
+    /**
+     * Table scheme blueprint
+     * @return array
+     */
+    public function tables(): array
+    {
+        $engines = [];
+        $tables  = $this->parent->prepare("SELECT TABLE_NAME, ENGINE FROM information_schema.tables WHERE table_schema = :table_scheme", ['table_scheme' => $this->parent->dbname])->fetchAll(\PDO::FETCH_ASSOC);
+        foreach ($tables as $key => $table) {
+            $tables[$key] = $table['TABLE_NAME'];
+            $engines[$table['TABLE_NAME']] = $table['ENGINE'];
+
+            $columns = $this->parent->prepare("SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH, COLUMN_TYPE, COLUMN_KEY FROM information_schema.columns where table_schema = DATABASE() AND table_name = :table", ['table' => $table['TABLE_NAME']])->fetchAll(\PDO::FETCH_ASSOC);
+            $data["TABLE_COLUMNS"][$table['TABLE_NAME']] = [
+                'primary' => $columns[array_search("PRI", array_column($columns, 'COLUMN_KEY'))]['COLUMN_NAME'],
+                'columns' => $columns
+            ];
+        }
+
+        $data["TABLES"]         = $tables;
+        $data["TABLE_ENGINES"]  = $engines;
+
+        return $data;
     }
 
     /**
@@ -115,17 +141,17 @@ class MySQL
 
     /**
      * Get order by list
-     * @return string
+     * @return string|null
      */
-    private function getOrderBy(): string
+    private function getOrderBy(): string|null
     {
         $orderBy = $this->parent->buildQuery['orderBy'] ?? [];
-        if (!count($orderBy)) return "";
+        if (!count($orderBy)) return null;
 
-        $orderByStr = '';
-        foreach ($orderBy as $column => $order) $orderByStr .= "$column $order, ";
-        $orderByStr = rtrim($orderByStr, ', ');
-        return " ORDER BY $orderByStr ";
+        $output = '';
+        foreach ($orderBy as $column => $order) $output .= "$column $order, ";
+        $output = rtrim($output, ', ');
+        return " ORDER BY $output ";
     }
 
 
@@ -138,6 +164,7 @@ class MySQL
     {
         $table           = $this->parent->table;
         $checkSoftDelete = true;
+        $limit           = $this->getLimit();
 
         switch ($type) {
             case 'select':
@@ -165,6 +192,6 @@ class MySQL
                 throw new \Exception('something wrong, build invalid type.');
         }
 
-        return "$type " . $this->parent->table . " " . @$sets . $this->getJoin() . $this->getWhere($checkSoftDelete) . $this->getGroupBy() . $this->getOrderBy() . $this->getLimit();
+        return "$type " . $this->parent->table . " " . @$sets . $this->getJoin() . $this->getWhere($checkSoftDelete) . $this->getGroupBy() . $this->getOrderBy() . $limit;
     }
 }
