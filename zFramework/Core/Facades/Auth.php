@@ -23,7 +23,6 @@ class Auth
         return self::$api_mode ? Session::class : Cookie::class;
     }
 
-
     public static function init()
     {
         if (!self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);

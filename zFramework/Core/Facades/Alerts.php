@@ -7,6 +7,16 @@ class Alerts
 
     static $name = null;
 
+
+    /**
+     * Get current Alerts list.
+     * @return array
+     */
+    private static function list(): array
+    {
+        return json_decode(Cookie::get('alerts') ?? '[]', true);
+    }
+
     /**
      * Set just one time alerts.
      * @param mixed
@@ -14,12 +24,11 @@ class Alerts
      */
     private static function set(): self
     {
-        $args = func_get_args();
-        return Session::callback(function () use ($args) {
-            $_SESSION['alerts'][self::$name ? self::$name : Str::rand(10)] = $args;
-            self::$name = null;
-            return new self();
-        });
+        $alerts = self::list();
+        $alerts[self::$name ? self::$name : Str::rand(10)] = func_get_args();
+        Cookie::set('alerts', json_encode($alerts, JSON_UNESCAPED_UNICODE));
+        self::$name = null;
+        return new self();
     }
 
     /**
@@ -40,7 +49,7 @@ class Alerts
      */
     public static function get(bool $unset_after_get = false): array
     {
-        $alerts = Session::get('alerts') ?? [];
+        $alerts = self::list();
         if ($unset_after_get) self::unset();
         return $alerts;
     }
@@ -49,9 +58,9 @@ class Alerts
      * Unset All Alerts.
      * @return void
      */
-    public static function unset()
+    public static function unset(): void
     {
-        Session::delete('alerts');
+        Cookie::delete('alerts');
     }
 
     /**
