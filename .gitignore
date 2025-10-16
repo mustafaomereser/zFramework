@@ -1,7 +1,7 @@
 push.bat
 composer.lock
-error_logs/*
-zFramework/storage/*
+error_logs
+zFramework/storage
 public_html/uploads
 zFramework/vendor
 zFramework/Caches
