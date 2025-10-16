@@ -58,8 +58,6 @@ class Db
      */
     public static function migrate()
     {
-        @unlink((new \zFramework\Core\Facades\DB)->cache_file);
-
         $MySQL_defines = ['CURRENT_TIMESTAMP'];
         $migrations      = [];
         $path            = Terminal::$parameters['--path'] ?? null;
@@ -357,6 +355,8 @@ class Db
                 Terminal::text("[color=green]Seeded.[/color]");
             }
         }
+
+        @unlink((new \zFramework\Core\Facades\DB)->cache_file);
 
         if (in_array('--seed', Terminal::$parameters)) self::seed();
     }
