@@ -58,7 +58,7 @@ class Db
      */
     public static function migrate()
     {
-        @unlink(FRAMEWORK_PATH . "/Caches/DB.cache");
+        @unlink((new \zFramework\Core\Facades\DB)->cache_file);
 
         $MySQL_defines = ['CURRENT_TIMESTAMP'];
         $migrations      = [];
