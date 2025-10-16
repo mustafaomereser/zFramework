@@ -17,7 +17,7 @@ class DB
     private $dbname;
     private $sqlDebug  = false;
     private $wherePrev = 'AND';
-    public $cache_file = FRAMEWORK_PATH . "/Caches/DB.cache";
+    public $cache_dir = FRAMEWORK_PATH . "/Caches/DB";
     /**
      * Options parameters
      */
@@ -170,8 +170,8 @@ class DB
      */
     private function tables(): void
     {
-        $data = json_decode(@file_get_contents($this->cache_file), true) ?? [];
-        if (!isset($data[$this->dbname])) {
+        $data = json_decode(@file_get_contents($this->cache_dir . "/" . $this->dbname . ".json"), true) ?? false;
+        if (!$data) {
             $engines = [];
             $tables  = $this->prepare("SELECT TABLE_NAME, ENGINE FROM information_schema.tables WHERE table_schema = :table_scheme", ['table_scheme' => $this->dbname])->fetchAll(\PDO::FETCH_ASSOC);
             foreach ($tables as $key => $table) {
@@ -179,18 +179,18 @@ class DB
                 $engines[$table['TABLE_NAME']] = $table['ENGINE'];
 
                 $columns = $this->prepare("SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH, COLUMN_TYPE, COLUMN_KEY FROM information_schema.columns where table_schema = DATABASE() AND table_name = :table", ['table' => $table['TABLE_NAME']])->fetchAll(\PDO::FETCH_ASSOC);
-                $data[$this->dbname]["TABLE_COLUMNS"][$table['TABLE_NAME']] = [
+                $data["TABLE_COLUMNS"][$table['TABLE_NAME']] = [
                     'primary' => $columns[array_search("PRI", array_column($columns, 'COLUMN_KEY'))]['COLUMN_NAME'],
                     'columns' => $columns
                 ];
             }
 
-            $data[$this->dbname]["TABLES"]         = $tables;
-            $data[$this->dbname]["TABLE_ENGINES"]  = $engines;
-            file_put_contents2($this->cache_file, json_encode($data, JSON_UNESCAPED_UNICODE));
+            $data["TABLES"]         = $tables;
+            $data["TABLE_ENGINES"]  = $engines;
+            file_put_contents2($this->cache_dir . "/" . $this->dbname . ".json", json_encode($data, JSON_UNESCAPED_UNICODE));
         }
 
-        $GLOBALS['DB'] = $data;
+        $GLOBALS['DB'][$this->dbname] = $data;
     }
 
     /**

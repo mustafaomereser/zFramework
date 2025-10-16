@@ -11,7 +11,7 @@ class HomeController extends Controller
 
     public function __construct($method)
     {
-        (new DB('local2'))->table('users')->get();
+        //
     }
 
     /** Index page | GET: /

@@ -108,6 +108,9 @@ class Db
             self::connectDB($class::$db);
             $columns = $class::columns();
 
+            Terminal::text("[color=green]`" . self::$dbname . "` database begin:[/color]");
+
+
             # setting prefix.
             if (isset($class::$prefix)) foreach ($columns as $name => $val) {
                 unset($columns[$name]);
@@ -354,9 +357,9 @@ class Db
                 $class::oncreateSeeder();
                 Terminal::text("[color=green]Seeded.[/color]");
             }
-        }
 
-        @unlink((new \zFramework\Core\Facades\DB)->cache_file);
+            @unlink((new \zFramework\Core\Facades\DB)->cache_dir . "/" . self::$dbname . ".json");
+        }
 
         if (in_array('--seed', Terminal::$parameters)) self::seed();
     }
