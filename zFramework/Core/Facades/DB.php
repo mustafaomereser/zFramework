@@ -579,8 +579,7 @@ class DB
      */
     public function count(): int
     {
-        // return $this->run()->rowCount();
-        return $this->select("COUNT($this->table." . $this->getPrimary() . ") count")->first()['count'];
+        return $this->run()->rowCount();
     }
 
     /**
@@ -610,8 +609,9 @@ class DB
      */
     public function paginate(int $per_page = 20, string $page_id = 'page')
     {
-        $row_count        = $this->count();
-        $this->buildQuery = $this->cache['buildQuery'];
+        $last_query       = $this->buildQuery;
+        $row_count        = $this->select("COUNT($this->table." . $this->getPrimary() . ") count")->first()['count'];
+        $this->buildQuery = $last_query;
 
         $uniqueID         = uniqid();
         $current_page     = (request($page_id) ?? 1);

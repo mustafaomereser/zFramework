@@ -2,7 +2,7 @@
 
 namespace zFramework\Core\Facades\DB\Drivers;
 
-class SqlSrv extends MySQL
+class sqlsrv extends mysql
 {
     protected $parent;
     public function __construct($parent)

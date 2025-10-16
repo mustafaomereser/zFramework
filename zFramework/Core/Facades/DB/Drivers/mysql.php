@@ -2,7 +2,7 @@
 
 namespace zFramework\Core\Facades\DB\Drivers;
 
-class MySQL
+class mysql
 {
     protected $parent;
     public function __construct($parent)
