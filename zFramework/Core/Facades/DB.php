@@ -62,7 +62,7 @@ class DB
 
             $new_connection = true;
             $GLOBALS['databases']['connected'][$this->db]['driver'] = $connection->getAttribute(\PDO::ATTR_DRIVER_NAME);
-            $GLOBALS['databases']['connections'][$this->db] = $connection;
+            $GLOBALS['databases']['connections'][$this->db]         = $connection;
         }
 
         $this->driver  = $GLOBALS['databases']['connected'][$this->db]['driver'];
