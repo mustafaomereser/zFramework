@@ -15,8 +15,9 @@ class DB
     public $db;
     private $driver;
     private $dbname;
-    private $sqlDebug = false;
+    private $sqlDebug  = false;
     private $wherePrev = 'AND';
+    public $cache_file = FRAMEWORK_PATH . "/Caches/DB.cache";
     /**
      * Options parameters
      */
@@ -27,6 +28,7 @@ class DB
     public $cache           = [];
     public $specialChars    = false;
     public $setClosures     = true;
+
 
     /**
      * Initial, Select Database.
@@ -163,27 +165,32 @@ class DB
     }
 
     /**
-     * Fetch all tables in database.
-     * @return array
+     * Set all tables informations in database.
+     * @return void
      */
-    private function tables()
+    private function tables(): void
     {
-        $engines = [];
-        $tables  = $this->prepare("SELECT TABLE_NAME, ENGINE FROM information_schema.tables WHERE table_schema = :table_scheme", ['table_scheme' => $this->dbname])->fetchAll(\PDO::FETCH_ASSOC);
+        $data = json_decode(@file_get_contents(FRAMEWORK_PATH . "/Caches/DB.cache"), true) ?? [];
+        if (!isset($data[$this->dbname])) {
+            $engines = [];
+            $tables  = $this->prepare("SELECT TABLE_NAME, ENGINE FROM information_schema.tables WHERE table_schema = :table_scheme", ['table_scheme' => $this->dbname])->fetchAll(\PDO::FETCH_ASSOC);
+            foreach ($tables as $key => $table) {
+                $tables[$key] = $table['TABLE_NAME'];
+                $engines[$table['TABLE_NAME']] = $table['ENGINE'];
 
-        foreach ($tables as $key => $table) {
-            $tables[$key] = $table['TABLE_NAME'];
-            $engines[$table['TABLE_NAME']] = $table['ENGINE'];
+                $columns = $this->prepare("SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH, COLUMN_TYPE, COLUMN_KEY FROM information_schema.columns where table_schema = DATABASE() AND table_name = :table", ['table' => $table['TABLE_NAME']])->fetchAll(\PDO::FETCH_ASSOC);
+                $data[$this->dbname]["TABLE_COLUMNS"][$table['TABLE_NAME']] = [
+                    'primary' => $columns[array_search("PRI", array_column($columns, 'COLUMN_KEY'))]['COLUMN_NAME'],
+                    'columns' => $columns
+                ];
+            }
 
-            $columns = $this->prepare("SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH, COLUMN_TYPE, COLUMN_KEY FROM information_schema.columns where table_schema = DATABASE() AND table_name = :table", ['table' => $table['TABLE_NAME']])->fetchAll(\PDO::FETCH_ASSOC);
-            $GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$table['TABLE_NAME']] = [
-                'primary' => $columns[array_search("PRI", array_column($columns, 'COLUMN_KEY'))]['COLUMN_NAME'],
-                'columns' => $columns
-            ];
+            $data[$this->dbname]["TABLES"]         = $tables;
+            $data[$this->dbname]["TABLE_ENGINES"]  = $engines;
+            file_put_contents2(FRAMEWORK_PATH . "/Caches/DB.cache", json_encode($data, JSON_UNESCAPED_UNICODE));
         }
 
-        $GLOBALS["DB"][$this->dbname]["TABLES"]         = $tables;
-        $GLOBALS["DB"][$this->dbname]["TABLE_ENGINES"]  = $engines;
+        $GLOBALS['DB'] = $data;
     }
 
     /**

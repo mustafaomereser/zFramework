@@ -58,8 +58,9 @@ class Db
      */
     public static function migrate()
     {
-        $MySQL_defines = ['CURRENT_TIMESTAMP'];
+        @unlink(FRAMEWORK_PATH . "/Caches/DB.cache");
 
+        $MySQL_defines = ['CURRENT_TIMESTAMP'];
         $migrations      = [];
         $path            = Terminal::$parameters['--path'] ?? null;
         $migrations_path = 'migrations' . ($path ? "/$path" : null);
