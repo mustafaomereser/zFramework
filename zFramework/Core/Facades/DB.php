@@ -170,7 +170,7 @@ class DB
      */
     private function tables(): void
     {
-        $data = json_decode(@file_get_contents(FRAMEWORK_PATH . "/Caches/DB.cache"), true) ?? [];
+        $data = json_decode(@file_get_contents($this->cache_file), true) ?? [];
         if (!isset($data[$this->dbname])) {
             $engines = [];
             $tables  = $this->prepare("SELECT TABLE_NAME, ENGINE FROM information_schema.tables WHERE table_schema = :table_scheme", ['table_scheme' => $this->dbname])->fetchAll(\PDO::FETCH_ASSOC);
@@ -187,7 +187,7 @@ class DB
 
             $data[$this->dbname]["TABLES"]         = $tables;
             $data[$this->dbname]["TABLE_ENGINES"]  = $engines;
-            file_put_contents2(FRAMEWORK_PATH . "/Caches/DB.cache", json_encode($data, JSON_UNESCAPED_UNICODE));
+            file_put_contents2($this->cache_file, json_encode($data, JSON_UNESCAPED_UNICODE));
         }
 
         $GLOBALS['DB'] = $data;
