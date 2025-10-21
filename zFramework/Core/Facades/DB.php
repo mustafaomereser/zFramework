@@ -123,7 +123,7 @@ class DB
     private function getPrimary()
     {
         if (!$this->table) throw new \Exception('firstly you must select a table for get primary key.');
-        return $this->primary ?? @$GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$this->table]['primary'];
+        return $this->primary ?? @$GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$this->table]['primary'] ?? null;
     }
 
     #region Columns Controls
@@ -195,14 +195,15 @@ class DB
     {
         $this->cache['buildQuery'] = $this->buildQuery;
         $this->buildQuery = [
-            'select'  => [],
-            'join'    => [],
-            'where'   => [],
-            'orderBy' => [],
-            'groupBy' => [],
-            'limit'   => [],
-            'having'  => [],
-            'sets'    => ""
+            'select'    => [],
+            'join'      => [],
+            'where'     => [],
+            'orderBy'   => [],
+            'groupBy'   => [],
+            'limit'     => [],
+            'having'    => [],
+            'sets'      => "",
+            'fetchType' => \PDO::FETCH_ASSOC
         ];
         return $this;
     }
@@ -247,6 +248,17 @@ class DB
             $rows[$key]['delete'] = fn() => $this->where($primary_key, $row[$primary_key])->delete();
         }
         return $rows;
+    }
+
+    /**
+     * PDO Fetch Type.
+     * @param null|string $type
+     * @return self
+     */
+    public function fetchType(null|string $type = null)
+    {
+        $this->buildQuery['fetchType'] = ['unique' => \PDO::FETCH_UNIQUE, 'lazy' => \PDO::FETCH_LAZY, 'keypair' => \PDO::FETCH_KEY_PAIR][$type] ?? \PDO::FETCH_ASSOC;
+        return $this;
     }
 
     /**
@@ -569,7 +581,7 @@ class DB
      */
     public function get()
     {
-        $rows = $this->run()->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $this->run()->fetchAll($this->buildQuery['fetchType']);
         if ($this->setClosures) $rows = $this->setClosures($rows);
         return $rows;
     }
@@ -675,9 +687,9 @@ class DB
         }
 
         $this->buildQuery['sets'] = " (" . implode(', ', array_keys($sets)) . ") VALUES (:" . implode(', :', $hashed_keys) . ") ";
-        $insert = $this->run(__FUNCTION__);
-        if ($insert) {
-            $inserted_row = $this->resetBuild()->where('id', $this->db()->lastInsertId())->first() ?? [];
+        $insert = $this->run(__FUNCTION__)->rowCount();
+        if ($insert && $primary = $this->getPrimary()) {
+            $inserted_row = $this->resetBuild()->where($primary, $this->db()->lastInsertId())->first() ?? [];
             $this->trigger('inserted', $inserted_row);
         }
 
@@ -749,7 +761,6 @@ class DB
         if ($this->sqlDebug) {
             $debug_sql = $sql;
             foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->db()->quote($value), $debug_sql);
-
             echo "#Begin SQL Query:\n";
             var_dump($debug_sql);
             echo "#End of SQL Query\n";

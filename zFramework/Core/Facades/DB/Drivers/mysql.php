@@ -42,19 +42,10 @@ class mysql
      */
     private function getSelect(): null|string
     {
-        switch (gettype($this->parent->buildQuery['select'])) {
-            case 'array':
-                if (!count($this->parent->buildQuery['select'])) return null;
-                return is_array(($select = $this->parent->buildQuery['select'])) ? implode(', ', $select) : $select;
-                break;
-
-            case 'string':
-                return $this->parent->buildQuery['select'];
-                break;
-
-            default:
-                return null;
-        }
+        return [
+            'array'  => fn() => count($this->parent->buildQuery['select']) ? (is_array(($select = $this->parent->buildQuery['select'])) ? implode(', ', $select) : $select) : null,
+            'string' => fn() => $this->parent->buildQuery['select']
+        ][gettype($this->parent->buildQuery['select'])]() ?? null;
     }
 
     /**
