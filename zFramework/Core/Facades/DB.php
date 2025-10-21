@@ -14,6 +14,7 @@ class DB
 
     public $db;
     public $dbname;
+    public $connection = null;
     private $driver;
     private $builder;
     private $sqlDebug  = false;
@@ -50,6 +51,7 @@ class DB
      */
     public function db()
     {
+        if ($this->connection !== null) return $this->connection;
         if (!isset($GLOBALS['databases']['connections'][$this->db])) die('Böyle bir veritabanı yok!');
         if (!isset($GLOBALS['databases']['connected'][$this->db])) {
             try {
@@ -70,8 +72,8 @@ class DB
         $this->dbname  = $GLOBALS['databases']['connected'][$this->db]['name'];
 
         if (isset($new_connection)) $this->tables();
-
-        return $GLOBALS['databases']['connections'][$this->db];
+        $this->connection = $GLOBALS['databases']['connections'][$this->db];
+        return $this->connection;
     }
 
     /**
@@ -111,7 +113,6 @@ class DB
             $data = $this->builder->tables();
             file_put_contents2($this->cache_dir . "/" . $this->dbname . ".json", json_encode($data, JSON_UNESCAPED_UNICODE));
         }
-
         $GLOBALS['DB'][$this->dbname] = $data;
     }
 
@@ -674,7 +675,6 @@ class DB
         }
 
         $this->buildQuery['sets'] = " (" . implode(', ', array_keys($sets)) . ") VALUES (:" . implode(', :', $hashed_keys) . ") ";
-
         $insert = $this->run(__FUNCTION__);
         if ($insert) {
             $inserted_row = $this->resetBuild()->where('id', $this->db()->lastInsertId())->first() ?? [];
