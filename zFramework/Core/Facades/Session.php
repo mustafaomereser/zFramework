@@ -39,9 +39,7 @@ class Session
      */
     public static function get(string $key): mixed
     {
-        return self::callback(function () use ($key) {
-            return isset($_SESSION[$key]) ? $_SESSION[$key] : NULL;
-        });
+        return self::callback(fn() => isset($_SESSION[$key]) ? $_SESSION[$key] : NULL);
     }
 
     /**

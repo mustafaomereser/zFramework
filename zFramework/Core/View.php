@@ -143,9 +143,7 @@ class View
      */
     public static function parsePHP(): void
     {
-        self::$view = preg_replace_callback('/@php(.*?)@endphp/s', function ($code) {
-            return '<?php ' . $code[1] . ' ?>';
-        }, self::$view);
+        self::$view = preg_replace_callback('/@php(.*?)@endphp/s', fn($code) => '<?php ' . $code[1] . ' ?>', self::$view);
     }
 
     /**
@@ -153,9 +151,7 @@ class View
      */
     public static function parseVariables(): void
     {
-        self::$view = preg_replace_callback('/{{(.*?)}}/', function ($variable) {
-            return '<?=' . trim($variable[1]) . '?>';
-        }, self::$view);
+        self::$view = preg_replace_callback('/{{(.*?)}}/', fn($variable) => '<?=' . trim($variable[1]) . '?>', self::$view);
     }
 
     /**
@@ -165,9 +161,7 @@ class View
      */
     public static function parseForEach(): void
     {
-        self::$view = preg_replace_callback('/@foreach\((.*?)\)/', function ($expression) {
-            return '<?php foreach(' . $expression[1] . '): ?>';
-        }, self::$view);
+        self::$view = preg_replace_callback('/@foreach\((.*?)\)/', fn($expression) => '<?php foreach(' . $expression[1] . '): ?>', self::$view);
 
         self::$view = preg_replace('/@endforeach/', '<?php endforeach; ?>', self::$view);
     }
@@ -178,9 +172,7 @@ class View
      */
     public static function parseIncludes(): void
     {
-        self::$view = preg_replace_callback('/@include\(\'(.*?)\'\)/', function ($viewName) {
-            return file_get_contents(self::$config['views'] . '/' . self::parseViewName($viewName[1]));
-        }, self::$view);
+        self::$view = preg_replace_callback('/@include\(\'(.*?)\'\)/', fn($viewName) => file_get_contents(self::$config['views'] . '/' . self::parseViewName($viewName[1])), self::$view);
     }
 
     /**
@@ -189,9 +181,7 @@ class View
      */
     public static function parseExtends(): void
     {
-        self::$view = preg_replace_callback('/@extends\(\'(.*?)\'\)/', function ($viewName) {
-            return self::view($viewName[1], self::$data, true);
-        }, self::$view);
+        self::$view = preg_replace_callback('/@extends\(\'(.*?)\'\)/', fn($viewName) => self::view($viewName[1], self::$data, true), self::$view);
     }
 
     /**
@@ -200,9 +190,7 @@ class View
      */
     public static function parseYields(): void
     {
-        self::$view = preg_replace_callback('/@yield\(\'(.*?)\'\)/', function ($yieldName) {
-            return self::$sections[$yieldName[1]] ?? '';
-        }, self::$view);
+        self::$view = preg_replace_callback('/@yield\(\'(.*?)\'\)/', fn($yieldName) => self::$sections[$yieldName[1]] ?? '', self::$view);
     }
 
     /**
@@ -238,11 +226,7 @@ class View
      */
     public static function customDirectives(): void
     {
-        foreach (self::$directives as $key => $callback) {
-            self::$view = preg_replace_callback('/@' . $key . '(\(\'(.*?)\'\)|)/', function ($expression) use ($callback) {
-                return call_user_func($callback, $expression[2] ?? null);
-            }, self::$view);
-        }
+        foreach (self::$directives as $key => $callback) self::$view = preg_replace_callback('/@' . $key . '(\(\'(.*?)\'\)|)/', fn($expression) => call_user_func($callback, $expression[2] ?? null), self::$view);
     }
 
     /**
@@ -265,9 +249,7 @@ class View
      */
     public static function parseEmpty(): void
     {
-        self::$view = preg_replace_callback('/@empty\((.*?)\)/', function ($expression) {
-            return '<?php if (empty(' . $expression[1] . ')): ?>';
-        }, self::$view);
+        self::$view = preg_replace_callback('/@empty\((.*?)\)/', fn($expression) => '<?php if (empty(' . $expression[1] . ')): ?>', self::$view);
         self::$view = preg_replace('/@endempty/', '<?php endif; ?>', self::$view);
     }
 
@@ -278,9 +260,7 @@ class View
      */
     public static function parseIsset(): void
     {
-        self::$view = preg_replace_callback('/@isset\((.*?)\)/', function ($expression) {
-            return '<?php if (isset(' . $expression[1] . ')): ?>';
-        }, self::$view);
+        self::$view = preg_replace_callback('/@isset\((.*?)\)/', fn($expression) => '<?php if (isset(' . $expression[1] . ')): ?>', self::$view);
     }
 
     /**

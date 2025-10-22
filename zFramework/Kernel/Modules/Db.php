@@ -419,9 +419,7 @@ class Db
 
         Terminal::clear()::text("[color=yellow]Clearing...[/color]");
         $clear = self::$db->prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = :DB_NAME", ['DB_NAME' => self::$dbname])->fetchAll(\PDO::FETCH_ASSOC);
-        if (count($clear)) self::$db->prepare(implode(';', array_map(function ($table_name) {
-            return "DROP TABLE IF EXISTS $table_name";
-        }, array_column($clear, 'table_name'))));
+        if (count($clear)) self::$db->prepare(implode(';', array_map(fn($table_name) => "DROP TABLE IF EXISTS $table_name", array_column($clear, 'table_name'))));
 
         Terminal::clear()::text("[color=green]Cleared...[/color]");
         Terminal::text("[color=yellow]Restoring...[/color]");

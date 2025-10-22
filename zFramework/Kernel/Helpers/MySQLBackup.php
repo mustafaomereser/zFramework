@@ -9,6 +9,7 @@ class MySQLBackup
 
     private $config = [];
     private $db;
+    private $dbname;
     private $sql;
 
     /**
@@ -54,9 +55,7 @@ class MySQLBackup
             if (count($rows) > 0) {
 
                 $columns = $this->getAll('SHOW COLUMNS FROM %s', [$tableName]);
-                $columns = array_map(function ($column) {
-                    return $column['Field'];
-                }, $columns);
+                $columns = array_map(fn($column) => $column['Field'], $columns);
 
                 // INSERT INTO kategoriler (kategori_id, kategori_adi) VALUES (1,'test'), (2, 'test2')
 
@@ -71,9 +70,7 @@ class MySQLBackup
                 // }
                 // $this->sql .= implode(',' . PHP_EOL, $columnsData) . ';' . str_repeat(PHP_EOL, 5);
 
-                foreach ($rows as $row) $this->sql .= 'INSERT INTO `' . $tableName . '` (`' . implode('`,`', $columns) . '`) VALUES  (' . implode(',', array_map(function ($item) {
-                    return $this->db->quote($item);
-                }, $row)) . ');' . PHP_EOL;
+                foreach ($rows as $row) $this->sql .= 'INSERT INTO `' . $tableName . '` (`' . implode('`,`', $columns) . '`) VALUES  (' . implode(',', array_map(fn($item) => $this->db->quote($item), $row)) . ');' . PHP_EOL;
             }
         }
 

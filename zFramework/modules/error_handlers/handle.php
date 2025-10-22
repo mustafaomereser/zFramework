@@ -997,9 +997,7 @@ function errorHandler($data)
                 <div class="debug-section">
                     <div class="debug-title">🌐 Server Bilgileri</div>
                     <div class="debug-content">
-                        <pre><?= print_r(array_filter($_SERVER, function ($key) {
-                                    return !in_array($key, ['HTTP_COOKIE', 'HTTP_AUTHORIZATION']);
-                                }, ARRAY_FILTER_USE_KEY), true) ?></pre>
+                        <pre><?= print_r(array_filter($_SERVER, fn($key) => !in_array($key, ['HTTP_COOKIE', 'HTTP_AUTHORIZATION']), ARRAY_FILTER_USE_KEY), true) ?></pre>
                     </div>
                 </div>
             </div>
@@ -1138,9 +1136,7 @@ function errorHandler($data)
 
                 codeLines.forEach(function(line) {
                     // Eğer zaten highlight edilmişse tekrar yapma
-                    if (line.querySelector('.keyword, .string, .comment, .variable, .number')) {
-                        return;
-                    }
+                    if (line.querySelector('.keyword, .string, .comment, .variable, .number')) return;
 
                     let code = line.textContent;
 
