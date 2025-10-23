@@ -115,7 +115,7 @@ class Db
 
             # connect to model's database
             self::connectDB($class::$db);
-            $last_migrate  = json_decode(@file_get_contents(self::$db->cache_dir . "/" . self::$dbname . "-last-migrate.json") ?? '[]', true);
+            $last_migrate  = json_decode(@file_get_contents(self::$db->cache_dir . "/" . self::$dbname . "/last-migrate.json") ?? '[]', true);
             $columns       = $class::columns();
             $storageEngine = $class::$storageEngine ?? 'InnoDB';
             $charset       = $class::$charset ?? null;
@@ -287,7 +287,7 @@ class Db
                     }
                 }
 
-                $column_need_update = isset($last_migrate['tables'][$table]['columns'][$column]['data']) && $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
+                $column_need_update = !isset($last_migrate['tables'][$table]['columns'][$column]['data']) || $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
                 $column_indexes     = $indexes[$column] ?? [];
                 if ($column_need_update) {
                     foreach ($column_indexes as $index) {
@@ -366,11 +366,9 @@ class Db
                 Terminal::text("-> [color=green]Seeded.[/color]", true);
             }
 
-            @unlink(self::$db->cache_dir . "/" . self::$dbname . ".json");
-
-            file_put_contents2(self::$db->cache_dir . "/" . self::$dbname . "-last-migrate.json", json_encode(['date' => date('Y-m-d H:i:s')] + $last_migrate, JSON_UNESCAPED_UNICODE));
+            @unlink(self::$db->cache_dir . "/" . self::$dbname . "/scheme.json");
+            file_put_contents2(self::$db->cache_dir . "/" . self::$dbname . "/last-migrate.json", json_encode(['date' => date('Y-m-d H:i:s')] + $last_migrate, JSON_UNESCAPED_UNICODE));
         }
-
 
         if (in_array('--seed', Terminal::$parameters)) self::seed();
     }

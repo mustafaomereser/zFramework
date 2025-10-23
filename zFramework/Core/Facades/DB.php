@@ -108,10 +108,10 @@ class DB
      */
     private function tables(): void
     {
-        $data = json_decode(@file_get_contents($this->cache_dir . "/" . $this->dbname . ".json"), true) ?? false;
+        $data = json_decode(@file_get_contents($this->cache_dir . "/" . $this->dbname . "/scheme.json"), true) ?? false;
         if (!$data) {
             $data = $this->builder->tables();
-            file_put_contents2($this->cache_dir . "/" . $this->dbname . ".json", json_encode($data, JSON_UNESCAPED_UNICODE));
+            file_put_contents2($this->cache_dir . "/" . $this->dbname . "/scheme.json", json_encode($data, JSON_UNESCAPED_UNICODE));
         }
         $GLOBALS['DB'][$this->dbname] = $data;
     }
