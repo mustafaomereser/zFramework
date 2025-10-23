@@ -96,10 +96,10 @@ class Terminal
     /**
      * CLI send text.
      * @param string $text
-     * @param string $color
+     * @param bool $addTime
      * @return void
      */
-    public static function text(string $text): void
+    public static function text(string $text, bool $addTime = false): void
     {
         $json = in_array('--json', self::$parameters);
         $cli  = !in_array('--web', self::$parameters) && !$json;
@@ -143,6 +143,7 @@ class Terminal
             'light-cyan'    => "#56d4dd",
         ];
 
+        if ($addTime) $text = "[color=dark-gray][" . date('H:i:s') . "][/color] $text";
         while (true) {
             preg_match_all('#\[color=(.+?)\](.+?)\[/color\]#si', $text, $matches);
             if (!$matches[0]) break;

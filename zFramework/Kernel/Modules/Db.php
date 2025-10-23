@@ -12,12 +12,14 @@ class Db
     static $db;
     static $dbname;
     static $tables = null;
+    static $all_modules = [];
 
     public static function begin($methods)
     {
         if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
 
         self::connectDB(Terminal::$parameters['db'] ?? array_keys($GLOBALS['databases']['connections'])[0]);
+        self::$all_modules = array_column(Run::findModules(base_path('/modules'))::$modules, 'module');
         self::{Terminal::$commands[1]}();
     }
 
@@ -58,39 +60,47 @@ class Db
      */
     public static function migrate()
     {
-        $MySQL_defines = ['CURRENT_TIMESTAMP'];
-        $migrations      = [];
-        $path            = Terminal::$parameters['--path'] ?? null;
-        $migrations_path = 'migrations' . ($path ? "/$path" : null);
+        $MySQL_defines      = ['CURRENT_TIMESTAMP'];
+        $migrations         = [];
+        $path               = Terminal::$parameters['--path'] ?? null;
+        $migrations_path    = 'migrations' . ($path ? "/$path" : null);
+        $migrate_fresh      = in_array('--fresh', Terminal::$parameters) ?? false;
+        $last_migrate       = json_decode(@file_get_contents(self::$db->cache_dir . "/last-migrate.json") ?? '[]', true);
+        $init_column_name   = "table_initilazing";
 
+        $scans = [BASE_PATH . "/database/$migrations_path"];
 
-        if (isset(Terminal::$parameters['--module'])) {
-            # select one module migrations
-            $module = BASE_PATH . ("/modules/" . Terminal::$parameters['--module']);
-            if (!is_dir($module)) return Terminal::text("[color=red]You haven't a module like this.[/color]");
-            foreach (self::recursiveScanMigrations("$module/$migrations_path") as $row) $migrations[] = $row;
-            Terminal::text('[color=blue]You have selected a module: `' . Terminal::$parameters['--module'] . '`.[/color]');
-            #
-        } else if (in_array('--module', Terminal::$parameters)) {
-            # select all modules migrations
-            foreach (array_column(Run::findModules(base_path('/modules'))::$modules, 'module') as $module) foreach (self::recursiveScanMigrations(BASE_PATH . ("/modules/$module") . "/$migrations_path") as $row) $migrations[] = $row;
-            Terminal::text('[color=blue]All modules migrates selected.[/color]');
-            #       
+        if (in_array('--all', Terminal::$parameters)) {
+            foreach (self::$all_modules as $module) $scans[] = BASE_PATH . "/modules/$module/$migrations_path";
         } else {
-            # default migrations
-            foreach (self::recursiveScanMigrations(BASE_PATH . "/database/$migrations_path") as $row) $migrations[] = $row;
-            # 
+            if (isset(Terminal::$parameters['--module'])) {
+                # select one module migrations
+                $module = Terminal::$parameters['--module'];
+                if (!in_array($module, self::$all_modules)) return Terminal::text("[color=red]You haven't a module like this.[/color]");
+                $scans = ["$module/$migrations_path"];
+                Terminal::text("[color=blue]You have selected a module: `$module`.[/color]");
+                #
+            } else if (in_array('--module', Terminal::$parameters)) {
+                # select all modules migrations
+                $scans = [];
+                foreach (self::$all_modules as $module) $scans[] = BASE_PATH . ("/modules/$module") . "/$migrations_path";
+                Terminal::text('[color=blue]All modules migrates selected.[/color]');
+                #
+            }
         }
 
+        foreach ($scans as $scan) $migrations = array_merge($migrations, self::recursiveScanMigrations($scan));
+
         if (!count($migrations)) {
-            Terminal::text("[color=red]You haven't a migration in `$migrations_path`.[/color]"); //  . ($path ? " [color=yellow]in `" . $path . "` folder[/color]" : null)
+            Terminal::text("[color=red]You haven't a migration in `" . implode(', ', $scans) . "`.[/color]");
             return false;
         }
 
         foreach ($migrations as $migration) {
-            // if (!in_array($migration, \zFramework\Run::$included)) \zFramework\Run::includer($migration);
+            $last_modify     = filemtime($migration);
+            $drop_columns    = [];
+            $class           = str_replace(['.php', BASE_PATH, '/'], ['', '', '\\'], $migration);
 
-            $class = str_replace(['.php', BASE_PATH, '/'], ['', '', '\\'], $migration);
             // control
             if (!class_exists($class)) {
                 Terminal::text("[color=red]There are not a $class migrate class.[/color]");
@@ -106,10 +116,19 @@ class Db
 
             # connect to model's database
             self::connectDB($class::$db);
-            $columns = $class::columns();
+            $columns       = $class::columns();
+            $storageEngine = $class::$storageEngine ?? 'InnoDB';
+            $charset       = $class::$charset ?? null;
+            $table         = $class::$table;
+            if (strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
+                Terminal::text("\n[color=green]`" . self::$dbname . ".$table` already updated.[/color]");
+                continue;
+            }
 
-            Terminal::text("[color=green]`" . self::$dbname . "` database begin:[/color]");
-
+            # detect indexes
+            $indexes = [];
+            foreach (self::$db->prepare("SHOW INDEX FROM $table")->fetchAll(\PDO::FETCH_ASSOC) as $index) if ($index['Key_name'] != 'PRIMARY') $indexes[$index['Column_name']][] = $index['Key_name'];
+            #
 
             # setting prefix.
             if (isset($class::$prefix)) foreach ($columns as $name => $val) {
@@ -134,29 +153,19 @@ class Db
                 $columns = ($columns + [$consts['deleted_at'] => ['nullable', 'datetime', 'default']]);
             }
             #
-
-            $storageEngine = $class::$storageEngine ?? 'InnoDB';
-            $charset       = $class::$charset ?? null;
-            $table         = $class::$table;
             //
 
-            echo str_repeat(PHP_EOL, 2);
-            Terminal::text("[color=green]`$table` migrating:[/color]");
-
-            $drop_columns = [];
+            Terminal::text("\n[color=green]`" . self::$dbname . ".$table` migrating:[/color]");
 
             # Reset Table.
-            $migrate_fresh = in_array('--fresh', Terminal::$parameters) ?? false;
-            if (!$migrate_fresh && !self::table_exists($table)) $migrate_fresh = true;
-
-            if ($migrate_fresh) {
+            $fresh = $migrate_fresh;
+            if (!$fresh && !self::table_exists($table)) $fresh = true;
+            if ($fresh) {
                 Terminal::text('[color=blue]Info: Migrate forcing.[/color]');
-
-                $init_column_name = "table_initilazing";
                 try {
                     self::$db->prepare("DROP TABLE $table");
                 } catch (\PDOException $e) {
-                    // Terminal::text($e->getMessage(), 'red');
+                    // Terminal::text($e->getMessage());
                 }
                 self::$db->prepare("CREATE TABLE $table ($init_column_name int DEFAULT 1 NOT NULL)" . ($charset ? " CHARACTER SET " . strtok($charset, '_') . " COLLATE $charset" : null));
 
@@ -169,32 +178,10 @@ class Db
             foreach ($tableColumns as $column) if (!isset($columns[$column])) $drop_columns[] = $column;
             #
 
-            # detect indexes and remove
-            $indexes = array_column(self::$db->prepare("SHOW INDEX FROM $table")->fetchAll(\PDO::FETCH_ASSOC), 'Key_name');
-            unset($indexes[array_search('PRIMARY', $indexes)]);
-            foreach ($indexes as $index) {
-                try {
-                    self::$db->prepare("ALTER TABLE $table DROP INDEX " . $index);
-                    Terminal::text("[color=yellow]-> `$index`[/color] [color=dark-gray]cleared index key[/color]");
-                } catch (\PDOException $e) {
-                    Terminal::text('[color=red]' . $e->getMessage() . '[/color]');
-                }
-            }
-            if (count($indexes)) Terminal::text('[color=black]' . str_repeat('.', 30) . '[/color]');
-            #
-
             # Migrate stuff
             $last_column = null;
             foreach ($columns as $column => $parameters) {
-                $data = [
-                    'type' => 'INT'
-                ];
-
-                try {
-                    self::$db->prepare("ALTER TABLE $table DROP index $column;");
-                } catch (\PDOException $e) {
-                    // Terminal::text('Warning: ' . $e->getMessage(), 'yellow');
-                }
+                $data = ['type' => 'INT'];
 
                 foreach ($parameters as $parameter) {
                     $switch = explode(':', $parameter);
@@ -212,7 +199,7 @@ class Db
                             break;
 
                         case 'unique':
-                            $data['extras'][] = " ADD UNIQUE (`$column`) ";
+                            $data['extras'][] = " ADD CONSTRAINT `" . $column . "_unique` UNIQUE (`$column`) ";
                             break;
 
                         # String: start
@@ -300,39 +287,59 @@ class Db
                     }
                 }
 
-                $buildSQL = str_replace(['  ', ' ;'], [' ', ';'], ("ALTER TABLE $table ADD $column " . (@$data['type'] . @$data['charset'] . @$data['nullstatus'] . @$data['default'] . @$data['index']) . ($last_column ? " AFTER $last_column " : ' FIRST ') . (isset($data['extras']) ? ", " . implode(', ', $data['extras']) : null) . ";"));
-
-                $while = ['loop' => true, 'continue' => false, 'status' => 0];
-                while ($while['loop'] == true) {
-                    try {
-                        self::$db->prepare($buildSQL);
-                        # insert edildiği anlamına geliyor.
-                        if ($while['status'] == 0) $while['status'] = 1;
-                        #
-                        $while['loop'] = false;
-                    } catch (\PDOException $e) {
-                        switch ((string) $e->errorInfo['1']) {
-                            case '1060':
-                                $buildSQL = str_replace("$table ADD", "$table MODIFY", $buildSQL);
-                                $while['status'] = 2;
-                                break;
-
-                            case '1068':
-                                $while['status'] = 3;
-                                $while['loop']   = false;
-                                break;
-
-                            default:
-                                Terminal::text('[color=red]Unkown Error: ' . $e->getMessage() . '[/color]');
-                                $while['loop'] = false;
-                                continue 2;
+                $column_need_update = isset($last_migrate['tables'][$table]['columns'][$column]['data']) && $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
+                $column_indexes     = $indexes[$column] ?? [];
+                if ($column_need_update) {
+                    foreach ($column_indexes as $index) {
+                        try {
+                            self::$db->prepare("ALTER TABLE $table DROP INDEX $index");
+                            Terminal::text("[color=yellow]-> `$index`[/color] [color=dark-gray]cleared index key[/color]");
+                        } catch (\Throwable $e) {
+                            Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
                         }
                     }
+                    if (count($column_indexes)) Terminal::text('[color=black]' . str_repeat('.', 30) . '[/color]');
+                }
+
+                $result = ['loop' => true, 'status' => 0];
+                if ($column_need_update) {
+                    $buildSQL = str_replace(['  ', ' ;'], [' ', ';'], ("ALTER TABLE $table ADD $column " . (@$data['type'] . @$data['charset'] . @$data['nullstatus'] . @$data['default'] . @$data['index']) . ($last_column ? " AFTER $last_column " : ' FIRST ') . (isset($data['extras']) ? ", " . implode(', ', $data['extras']) : null) . ";"));
+                    while ($result['loop'] == true) {
+                        try {
+                            self::$db->prepare($buildSQL);
+                            # insert edildiği anlamına geliyor.
+                            if ($result['status'] == 0) $result['status'] = 1;
+                            #
+                            $result['loop'] = false;
+                        } catch (\PDOException $e) {
+                            switch ((string) $e->errorInfo['1']) {
+                                case '1060':
+                                    $buildSQL = str_replace("$table ADD", "$table MODIFY", $buildSQL);
+                                    $result['status'] = 2;
+                                    break;
+
+                                case '1068':
+                                    $result['status'] = 3;
+                                    $result['loop']   = false;
+                                    break;
+
+                                default:
+                                    Terminal::text('[color=red]Unkown Error: ' . $e->getMessage() . '[/color]');
+                                    $result['loop'] = false;
+                                    continue 2;
+                            }
+                        }
+                    }
+                } else {
+                    $result['status'] = 3;
+                    $result['loop']   = false;
                 }
 
                 $types = [3 => ['not changed.', 'dark-gray'], 1 => ['added', 'green'], 2 => ['modified', 'yellow']];
-                Terminal::text("[color=" . $types[$while['status']][1] . "]-> `$column` " . $types[$while['status']][0] . "[/color]");
+                Terminal::text("[color=" . $types[$result['status']][1] . "]-> `$column` " . $types[$result['status']][0] . "[/color]");
 
+                $last_migrate['tables'][$table]['date']             = date('Y-m-d H:i:s');
+                $last_migrate['tables'][$table]['columns'][$column] = ['result' => ['status' => $result['status'], 'message' => $types[$result['status']][0]], 'data' => $data];
                 $last_column = $column;
             }
             #
@@ -348,18 +355,21 @@ class Db
 
             # update storage engine.
             self::$db->prepare("ALTER TABLE $table ENGINE = '$storageEngine'");
-            Terminal::text("[color=yellow]`$table` storage engine is[/color] [color=blue]`$storageEngine`[/color]");
+            Terminal::text("[color=yellow]`" . self::$dbname . ".$table` storage engine is[/color] [color=blue]`$storageEngine`[/color]");
 
-            Terminal::text("[color=green]`$table` migrate complete.[/color]");
+            Terminal::text("[color=green]`" . self::$dbname . ".$table` migrate complete.[/color]");
 
-            if ($migrate_fresh && in_array('oncreateSeeder', get_class_methods($class))) {
-                Terminal::text("[color=green]Seeding.[/color]");
+            if ($fresh && in_array('oncreateSeeder', get_class_methods($class))) {
+                Terminal::text("\n[color=green]`" . self::$dbname . ".$table` Oncreate seeder.[/color]");
+                Terminal::text("-> [color=green]Seeding.[/color]", true);
                 $class::oncreateSeeder();
-                Terminal::text("[color=green]Seeded.[/color]");
+                Terminal::text("-> [color=green]Seeded.[/color]", true);
             }
 
-            @unlink((new \zFramework\Core\Facades\DB)->cache_dir . "/" . self::$dbname . ".json");
+            @unlink(self::$db->cache_dir . "/" . self::$dbname . ".json");
         }
+
+        file_put_contents2(self::$db->cache_dir . "/last-migrate.json", json_encode(['date' => date('Y-m-d H:i:s')] + $last_migrate, JSON_UNESCAPED_UNICODE));
 
         if (in_array('--seed', Terminal::$parameters)) self::seed();
     }
