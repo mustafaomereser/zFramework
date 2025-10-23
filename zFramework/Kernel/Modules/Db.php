@@ -65,7 +65,6 @@ class Db
         $path               = Terminal::$parameters['--path'] ?? null;
         $migrations_path    = 'migrations' . ($path ? "/$path" : null);
         $migrate_fresh      = in_array('--fresh', Terminal::$parameters) ?? false;
-        $last_migrate       = json_decode(@file_get_contents(self::$db->cache_dir . "/last-migrate.json") ?? '[]', true);
         $init_column_name   = "table_initilazing";
 
         $scans = [BASE_PATH . "/database/$migrations_path"];
@@ -116,6 +115,7 @@ class Db
 
             # connect to model's database
             self::connectDB($class::$db);
+            $last_migrate  = json_decode(@file_get_contents(self::$db->cache_dir . "/" . self::$dbname . "-last-migrate.json") ?? '[]', true);
             $columns       = $class::columns();
             $storageEngine = $class::$storageEngine ?? 'InnoDB';
             $charset       = $class::$charset ?? null;
@@ -367,9 +367,10 @@ class Db
             }
 
             @unlink(self::$db->cache_dir . "/" . self::$dbname . ".json");
+
+            file_put_contents2(self::$db->cache_dir . "/" . self::$dbname . "-last-migrate.json", json_encode(['date' => date('Y-m-d H:i:s')] + $last_migrate, JSON_UNESCAPED_UNICODE));
         }
 
-        file_put_contents2(self::$db->cache_dir . "/last-migrate.json", json_encode(['date' => date('Y-m-d H:i:s')] + $last_migrate, JSON_UNESCAPED_UNICODE));
 
         if (in_array('--seed', Terminal::$parameters)) self::seed();
     }
