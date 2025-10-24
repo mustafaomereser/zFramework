@@ -120,14 +120,35 @@ class Db
             $storageEngine = $class::$storageEngine ?? 'InnoDB';
             $charset       = $class::$charset ?? null;
             $table         = $class::$table;
-            if (strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
+
+            # Reset Table.
+            $fresh = $migrate_fresh;
+            if (!$fresh && !self::table_exists($table)) $fresh = true;
+            if ($fresh) {
+                Terminal::text('[color=blue]Info: Migrate forcing.[/color]');
+                try {
+                    self::$db->prepare("DROP TABLE $table");
+                } catch (\PDOException $e) {
+                    // Terminal::text($e->getMessage());
+                }
+                self::$db->prepare("CREATE TABLE $table ($init_column_name int DEFAULT 1 NOT NULL)" . ($charset ? " CHARACTER SET " . strtok($charset, '_') . " COLLATE $charset" : null));
+
+                $drop_columns[] = $init_column_name;
+            }
+            #
+
+            if (!$fresh && strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
                 Terminal::text("\n[color=green]`" . self::$dbname . ".$table` already updated.[/color]");
                 continue;
             }
 
             # detect indexes
             $indexes = [];
-            foreach (self::$db->prepare("SHOW INDEX FROM $table")->fetchAll(\PDO::FETCH_ASSOC) as $index) if ($index['Key_name'] != 'PRIMARY') $indexes[$index['Column_name']][] = $index['Key_name'];
+            try {
+                foreach (self::$db->prepare("SHOW INDEX FROM $table")->fetchAll(\PDO::FETCH_ASSOC) as $index) if ($index['Key_name'] != 'PRIMARY') $indexes[$index['Column_name']][] = $index['Key_name'];
+            } catch (\PDOException $e) {
+                Terminal::text("\n[color=yellow]`" . self::$dbname . ".$table` cannot access indexes.[/color]");
+            }
             #
 
             # setting prefix.
@@ -157,21 +178,6 @@ class Db
 
             Terminal::text("\n[color=green]`" . self::$dbname . ".$table` migrating:[/color]");
 
-            # Reset Table.
-            $fresh = $migrate_fresh;
-            if (!$fresh && !self::table_exists($table)) $fresh = true;
-            if ($fresh) {
-                Terminal::text('[color=blue]Info: Migrate forcing.[/color]');
-                try {
-                    self::$db->prepare("DROP TABLE $table");
-                } catch (\PDOException $e) {
-                    // Terminal::text($e->getMessage());
-                }
-                self::$db->prepare("CREATE TABLE $table ($init_column_name int DEFAULT 1 NOT NULL)" . ($charset ? " CHARACTER SET " . strtok($charset, '_') . " COLLATE $charset" : null));
-
-                $drop_columns[] = $init_column_name;
-            }
-            #
 
             # detect dropped columns
             $tableColumns = self::$db->prepare("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN);
@@ -302,7 +308,7 @@ class Db
                 }
 
                 $result = ['loop' => true, 'status' => 0];
-                if ($column_need_update) {
+                if ($fresh || $column_need_update) {
                     $buildSQL = str_replace(['  ', ' ;'], [' ', ';'], ("ALTER TABLE $table ADD $column " . (@$data['type'] . @$data['charset'] . @$data['nullstatus'] . @$data['default'] . @$data['index']) . ($last_column ? " AFTER $last_column " : ' FIRST ') . (isset($data['extras']) ? ", " . implode(', ', $data['extras']) : null) . ";"));
                     while ($result['loop'] == true) {
                         try {
