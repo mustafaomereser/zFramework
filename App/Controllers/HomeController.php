@@ -11,10 +11,7 @@ class HomeController extends Controller
 
     public function __construct($method)
     {
-        $ssl = new AutoSSL(AutoSSL::STAGING, 'D:\xampp\apache\conf\openssl.cnf');
-        $ssl->ensureAccount();
-        $ssl->issue('domain.com');
-        $ssl->renewAll();
+        //
     }
 
     /** Index page | GET: /
