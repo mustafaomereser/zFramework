@@ -1112,7 +1112,11 @@ Run project.
     # if openssl won't create a key;
     $ssl = new AutoSSL(AutoSSL::STAGING | AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');
     $ssl->ensureAccount(); # register account. (just once time for k id)
+    $ssl->unlinkAccount(); # remove account. (need again ensureAccount.)
 
     $ssl->issue('domain.com'); # create issue for domain.
     $ssl->renewAll(); # renew all issued domains lower than 20 days.
+    $ssl->list(); # list issued domains.
+
+    print_r($ssl->checkSSL('domain.com')); # info website's ssl.
 ```

@@ -182,7 +182,6 @@ class AutoSSL
         return glob($this->sslPath . '/*', GLOB_ONLYDIR);
     }
 
-
     public function issue(string $domain): bool
     {
         $domain = trim($domain);
@@ -294,7 +293,7 @@ class AutoSSL
 
     public function renewAll(): void
     {
-        foreach (glob($this->sslPath . '/*', GLOB_ONLYDIR) as $domain) {
+        foreach ($this->list() as $domain) {
             $full   = "$domain/ca_bundle.pem";
             $domain = basename($domain);
             $days   = file_exists($full) ? $this->getDaysLeftFromBundle($full) : $this->checkSSL($domain)['days_left'];
