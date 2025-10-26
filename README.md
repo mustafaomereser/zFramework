@@ -42,6 +42,7 @@ PHP>=7.0.23 (suggestion: >=8.0)
 - [18. Development](#18-development)
 - [19. Helper Methods](#19-helper-methods)
 - [20. Run Project](#20-run-project)
+- [21. AutoSSL (Lets Encrypt)](#21-autossl-lets-encrypt)
 
 ## 1. Route
 ```php
@@ -1102,4 +1103,16 @@ Run project.
     
     // with custom ip and port
     > php terminal run host=127.0.0.1 port=2000 (press enter)
+```
+
+## 21. AutoSSL (Lets Encrypt)
+```php
+    $ssl = new AutoSSL(AutoSSL::STAGING | AutoSSL::PROD);
+
+    # if openssl won't create a key;
+    $ssl = new AutoSSL(AutoSSL::STAGING | AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');
+    $ssl->ensureAccount(); # register account. (just once time for k id)
+
+    $ssl->issue('domain.com'); # create issue for domain.
+    $ssl->renewAll(); # renew all issued domains lower than 20 days.
 ```

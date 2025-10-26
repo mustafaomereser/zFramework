@@ -4,13 +4,17 @@ namespace App\Controllers;
 
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
+use zFramework\Core\AutoSSL;
 
 class HomeController extends Controller
 {
 
     public function __construct($method)
     {
-        //
+        $ssl = new AutoSSL(AutoSSL::STAGING, 'D:\xampp\apache\conf\openssl.cnf');
+        $ssl->ensureAccount();
+        $ssl->issue('domain.com');
+        $ssl->renewAll();
     }
 
     /** Index page | GET: /
