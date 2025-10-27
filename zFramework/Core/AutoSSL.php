@@ -191,7 +191,7 @@ class AutoSSL
         $folder  = $this->sslPath . "/$domain";
         if (!is_dir($folder)) throw new \Exception("Domain is not exists");
 
-        $zip = new ZipArchive();
+        $zip      = new ZipArchive();
         $temp_zip = tempnam(sys_get_temp_dir(), 'zip');
         if ($zip->open($temp_zip, ZipArchive::CREATE) !== TRUE) exit("Zip cannot open!");
         $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($folder, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::LEAVES_ONLY);
