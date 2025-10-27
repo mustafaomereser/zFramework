@@ -2,6 +2,10 @@
 
 namespace zFramework\Core;
 
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use ZipArchive;
+
 class AutoSSL
 {
     public const STAGING = 'https://acme-staging-v02.api.letsencrypt.org/directory';
@@ -180,6 +184,27 @@ class AutoSSL
     public function list(): array
     {
         return glob($this->sslPath . '/*', GLOB_ONLYDIR);
+    }
+
+    public function download(string $domain): array
+    {
+        $folder  = $this->sslPath . "/$domain";
+        if (!is_dir($folder)) throw new \Exception("Domain is not exists");
+
+        $zip = new ZipArchive();
+        $tempMemoryFile = tempnam(sys_get_temp_dir(), 'zip');
+        if ($zip->open($tempMemoryFile, ZipArchive::CREATE) !== TRUE) exit("Zip cannot open!");
+        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($folder, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::LEAVES_ONLY);
+        foreach ($files as $file) {
+            $filePath = $file->getRealPath();
+            $zip->addFile($filePath, substr($filePath, strlen($folder) + 1));
+        }
+        $zip->close();
+
+        $filesize = filesize($tempMemoryFile);
+        $raw      = file_get_contents($tempMemoryFile);
+        unlink($tempMemoryFile);
+        return ['filename' => "$domain.zip", 'raw' => $raw, 'filesize' => $filesize];
     }
 
     public function issue(string $domain): bool
