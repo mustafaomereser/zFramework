@@ -192,8 +192,8 @@ class AutoSSL
         if (!is_dir($folder)) throw new \Exception("Domain is not exists");
 
         $zip = new ZipArchive();
-        $tempMemoryFile = tempnam(sys_get_temp_dir(), 'zip');
-        if ($zip->open($tempMemoryFile, ZipArchive::CREATE) !== TRUE) exit("Zip cannot open!");
+        $temp_zip = tempnam(sys_get_temp_dir(), 'zip');
+        if ($zip->open($temp_zip, ZipArchive::CREATE) !== TRUE) exit("Zip cannot open!");
         $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($folder, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::LEAVES_ONLY);
         foreach ($files as $file) {
             $filePath = $file->getRealPath();
@@ -201,10 +201,13 @@ class AutoSSL
         }
         $zip->close();
 
-        $filesize = filesize($tempMemoryFile);
-        $raw      = file_get_contents($tempMemoryFile);
-        unlink($tempMemoryFile);
-        return ['filename' => "$domain.zip", 'raw' => $raw, 'filesize' => $filesize];
+        ob_start();
+        readfile($temp_zip);
+        $raw      = ob_get_clean();
+        $filesize = filesize($temp_zip);
+
+        unlink($temp_zip);
+        return ['filename' => "$domain.zip", 'filesize' => $filesize, 'raw' => $raw];
     }
 
     public function issue(string $domain): bool
