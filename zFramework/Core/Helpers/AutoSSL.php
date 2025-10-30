@@ -1,6 +1,6 @@
 <?php
 
-namespace zFramework\Core;
+namespace zFramework\Core\Helpers;
 
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
