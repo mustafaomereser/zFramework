@@ -15,8 +15,8 @@ $lang_list = Lang::list();
 
     <link rel="stylesheet" href="https://pro.fontawesome.com/releases/v5.15.4/css/all.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="<?= asset('/assets/libs/notify/style.css') ?>" />
-    <link rel="stylesheet" href="<?= asset('/assets/css/style.css') ?>" />
+    <link rel="stylesheet" href="<?= asset('/assets/libs/notify/style.auto.min.css') ?>" />
+    <link rel="stylesheet" href="<?= asset('/assets/css/style.auto.min.css') ?>" />
     @yield('header')
 </head>
 
@@ -84,8 +84,8 @@ $lang_list = Lang::list();
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/assets/js/main.js"></script>
-    <script src="/assets/libs/notify/script.js"></script>
+    <script src="<?= asset('/assets/js/main.auto.min.js') ?>"></script>
+    <script src="<?= asset('/assets/libs/notify/script.auto.min.js') ?>"></script>
     <script>
         $.showAlerts(<?= json_encode(\zFramework\Core\Facades\Alerts::get()) ?>);
     </script>

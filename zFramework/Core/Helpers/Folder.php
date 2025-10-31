@@ -15,7 +15,7 @@ class Folder
     }
 
     /**
-     * Recursive delete folder.
+     * Recursive delete file and folder.
      * @param string $path
      * @return bool
      */

@@ -1,10 +1,9 @@
 {
-    
-    "config": { 
-        "vendor-dir": "zFramework/vendor/" 
+    "config": {
+        "vendor-dir": "zFramework/vendor/"
     },
-      
     "require": {
-        "phpmailer/phpmailer": "^6.6"
+        "phpmailer/phpmailer": "^6.6",
+        "tedivm/jshrink": "~1.0"
     }
 }
