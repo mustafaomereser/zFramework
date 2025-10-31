@@ -43,6 +43,7 @@ PHP>=7.0.23 (suggestion: >=8.0)
 - [19. Helper Methods](#19-helper-methods)
 - [20. Run Project](#20-run-project)
 - [21. AutoSSL (Lets Encrypt)](#21-autossl-lets-encrypt)
+- [22. cPanel](#22-cpanel)
 
 ## 1. Route
 ```php
@@ -1119,4 +1120,23 @@ Run project.
     $ssl->list(); # list issued domains.
 
     print_r($ssl->checkSSL('domain.com')); # info website's ssl.
+```
+
+## 22. cPanel
+```php
+    use zFramework\Core\Helpers\cPanel\API;
+    use zFramework\Core\Helpers\cPanel\Database;
+    use zFramework\Core\Helpers\cPanel\DatabaseUser;
+    use zFramework\Core\Helpers\cPanel\Domain;
+    use zFramework\Core\Helpers\cPanel\Cron;
+    use zFramework\Core\Helpers\cPanel\Email;
+    use zFramework\Core\Helpers\cPanel\File;
+    use zFramework\Core\Helpers\cPanel\SSL;
+
+    API::$domain   = "domain.com";
+    API::$username = "cpanel_username";
+    API::$apiToken = "cpanel_api_token"; // from cpanel->manage tokens
+
+
+
 ```

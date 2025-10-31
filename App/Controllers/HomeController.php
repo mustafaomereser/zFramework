@@ -4,6 +4,11 @@ namespace App\Controllers;
 
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
+use zFramework\Core\Helpers\cPanel\API;
+use zFramework\Core\Helpers\cPanel\Database;
+use zFramework\Core\Helpers\cPanel\DatabaseUser;
+use zFramework\Core\Helpers\cPanel\Domain;
+use zFramework\Core\Helpers\cPanel\SSL;
 
 class HomeController extends Controller
 {
