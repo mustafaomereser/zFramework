@@ -13,10 +13,7 @@ Route::middleware([App\Middlewares\Guest::class])->group(function () {
     Route::post('/sign-up', [AuthController::class, 'signup'])->name('sign-up');
 });
 
-Route::middleware([App\Middlewares\Auth::class])->group(function () {
-    Route::any('/sign-out', [AuthController::class, 'signout'])->name('sign-out');
-});
+Route::middleware([App\Middlewares\Auth::class])->group(fn() => Route::any('/sign-out', [AuthController::class, 'signout'])->name('sign-out'));
 
 Route::get('/auth-content', [AuthController::class, 'content'])->name('auth-content');
-
 Route::resource('/', HomeController::class);
