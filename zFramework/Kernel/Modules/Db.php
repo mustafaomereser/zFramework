@@ -53,6 +53,7 @@ class Db
     /**
      * Description: Migrate Database
      * @param --module={module_name} (optional)
+     * @param --all (optional) (for all migrations do migrate)
      * @param --db (optional) (ifnull = Get first DB KEY)
      * @param --path (optional)
      * @param --fresh (optional)
