@@ -55,18 +55,18 @@ class Release
         $zip = new ZipArchive();
         @mkdir(BASE_PATH . "/Releases/$release_name", 0777, true);
         if ($zip->open(BASE_PATH . "/Releases/$release_name/" . (!$release_date ? 'initial' : date('Y-m-d-H-i-s')) . ".zip", ZipArchive::CREATE) !== TRUE) die("Zip cannot open!");
-        foreach ($files as $key => $file) {
+        foreach ($files as $key => $path) {
             Terminal::bar($count, $key + 1);
+            $file = str_replace([BASE_PATH . DIRECTORY_SEPARATOR, '/'], ['', DIRECTORY_SEPARATOR], $path);
 
             $addFromString = null;
 
             if (in_array('--minify', Terminal::$parameters)) {
-                if (strstr($file, '.css')) $addFromString = Assets::cssMinify(file_get_contents($file));
-                if (strstr($file, '.js')) $addFromString  = Assets::jsMinify(file_get_contents($file));
+                if (strstr($file, '.css')) $addFromString = Assets::cssMinify(file_get_contents($path));
+                if (strstr($file, '.js')) $addFromString  = Assets::jsMinify(file_get_contents($path));
             }
 
-            $file = str_replace([BASE_PATH . DIRECTORY_SEPARATOR, '/'], ['', DIRECTORY_SEPARATOR], $file);
-            $add  = $addFromString ? $zip->addFromString($file, $addFromString) : $zip->addFile($file);
+            $add = $addFromString ? $zip->addFromString($file, $addFromString) : $zip->addFile($path, $file);
             if (!$add) throw new \Exception("$file cannot add to zip.");
         }
         $zip->close();
