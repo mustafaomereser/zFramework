@@ -63,7 +63,7 @@ class Release
             $file = str_replace([BASE_PATH . DIRECTORY_SEPARATOR, '/'], ['', DIRECTORY_SEPARATOR], $path);
 
             $addFromString = null;
-            if (in_array('--minify', Terminal::$parameters)) {
+            if (in_array('--minify', Terminal::$parameters) && !strstr($file, '.min.')) {
                 $ext = @end(explode('.', $file));
                 if (in_array($ext, ['css', 'js'])) {
                     $addFromString = Assets::{$ext . "Minify"}(file_get_contents($path));
