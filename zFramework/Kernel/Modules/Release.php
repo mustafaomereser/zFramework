@@ -29,6 +29,7 @@ class Release
      */
     public static function make()
     {
+        $start_time   = time();
         $release_name = Terminal::$parameters['--name'] ?? 'default';
 
         if (isset(Terminal::$parameters['--date'])) $release_date = strtotime(Terminal::$parameters['--date']);
@@ -74,9 +75,10 @@ class Release
             if (!$add) throw new \Exception("$file cannot add to zip.");
         }
         $zip->close();
-        Terminal::text("\r[color=green]Released: $release_name.[/color]\033[K");
 
+        Terminal::text("\r[color=green]Released: $release_name.[/color]\033[K");
         if (count($minified)) Terminal::text("\n[color=yellow]Minified: \n" . implode("\n", $minified) . "[/color]");
+        Terminal::text("[color=blue]Elapsed time: " . implode(", ", secondsToHours(time() - $start_time)) . "[/color]");
 
         file_put_contents2(self::$cache . "/$release_name.json", json_encode(['last' => time()], JSON_UNESCAPED_UNICODE));
     }
