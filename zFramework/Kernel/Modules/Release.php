@@ -55,23 +55,28 @@ class Release
         $zip = new ZipArchive();
         @mkdir(BASE_PATH . "/Releases/$release_name", 0777, true);
         if ($zip->open(BASE_PATH . "/Releases/$release_name/" . (!$release_date ? 'initial' : date('Y-m-d-H-i-s')) . ".zip", ZipArchive::CREATE) !== TRUE) die("Zip cannot open!");
+
+        $minified = [];
         foreach ($files as $key => $path) {
             Terminal::bar($count, $key + 1);
             $file = str_replace([BASE_PATH . DIRECTORY_SEPARATOR, '/'], ['', DIRECTORY_SEPARATOR], $path);
 
             $addFromString = null;
-
             if (in_array('--minify', Terminal::$parameters)) {
-                if (strstr($file, '.css')) $addFromString = Assets::cssMinify(file_get_contents($path));
-                if (strstr($file, '.js')) $addFromString  = Assets::jsMinify(file_get_contents($path));
+                $ext = @end(explode('.', $file));
+                if (in_array($ext, ['css', 'js'])) {
+                    $addFromString = Assets::{$ext . "Minify"}(file_get_contents($path));
+                    $minified[]    = $file;
+                }
             }
 
             $add = $addFromString ? $zip->addFromString($file, $addFromString) : $zip->addFile($path, $file);
             if (!$add) throw new \Exception("$file cannot add to zip.");
         }
         $zip->close();
-
         Terminal::text("\r[color=green]Released: $release_name.[/color]\033[K");
+
+        if (count($minified)) Terminal::text("\n[color=yellow]Minified: \n" . implode("\n", $minified) . "[/color]");
 
         file_put_contents2(self::$cache . "/$release_name.json", json_encode(['last' => time()], JSON_UNESCAPED_UNICODE));
     }
