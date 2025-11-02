@@ -87,10 +87,22 @@ class Terminal
         return self::readline();
     }
 
+    /**
+     * Clear terminal
+     */
     public static function clear()
     {
         echo str_repeat(PHP_EOL, 50);
         return new self();
+    }
+
+    public static function bar($total = 0, $current = 0)
+    {
+        $barLength = 50;
+        $percent = ($current / $total);
+        $filled  = floor($barLength * $percent);
+        $bar     = str_repeat('#', $filled) . str_repeat('.', $barLength - $filled);
+        printf("\r[%s] %d%%", $bar, $percent * 100);
     }
 
     /**

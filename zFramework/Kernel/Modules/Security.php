@@ -14,7 +14,6 @@ class Security
         self::{Terminal::$commands[1]}();
     }
 
-
     /**
      * Description: Create a crypt key.
      * @param --regen (optional)

@@ -1,8 +1,9 @@
 push.bat
 composer.lock
 error_logs
-zFramework/storage
+Releases
 public_html/uploads
+zFramework/storage
 zFramework/vendor
 zFramework/Caches
 config/crypt.php

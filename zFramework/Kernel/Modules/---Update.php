@@ -11,7 +11,7 @@ class Update
     {
         Terminal::text("[color=yellow]downloading...[/color]");
         $download = base_path() . "/update-zFramework-main.zip";
-        file_put_contents($download, file_get_contents("https://github.com/mustafaomereser/Z-Framework-php-mvc/archive/refs/heads/main.zip"));
+        file_put_contents($download, file_get_contents("https://github.com/mustafaomereser/zFramework/archive/refs/heads/main.zip"));
         Terminal::text("[color=green]downloaded.[/color]");
 
 
