@@ -41,7 +41,8 @@ class Release
 
         $files = [];
         foreach ((new RecursiveIteratorIterator(new RecursiveDirectoryIterator(BASE_PATH, FilesystemIterator::SKIP_DOTS))) as $file) {
-            $path = str_replace([BASE_PATH . DIRECTORY_SEPARATOR, '/'], ['', DIRECTORY_SEPARATOR], $file->getPathname());
+            if (!$file->isFile()) continue;
+            $path = $file->getPathname();
             if (self::isIgnored($path) || (($release_date == 0 ? false : $release_date > filemtime($path)))) continue;
             $files[] = $path;
         }
@@ -64,19 +65,20 @@ class Release
                 if (strstr($file, '.js')) $addFromString  = Assets::jsMinify(file_get_contents($file));
             }
 
-            $add = $addFromString ? $zip->addFromString($file, $addFromString) : $zip->addFile($file);
+            $file = str_replace([BASE_PATH . DIRECTORY_SEPARATOR, '/'], ['', DIRECTORY_SEPARATOR], $file);
+            $add  = $addFromString ? $zip->addFromString($file, $addFromString) : $zip->addFile($file);
             if (!$add) throw new \Exception("$file cannot add to zip.");
         }
+        $zip->close();
 
         Terminal::text("\r[color=green]Released: $release_name.[/color]\033[K");
-
-        $zip->close();
 
         file_put_contents2(self::$cache . "/$release_name.json", json_encode(['last' => time()], JSON_UNESCAPED_UNICODE));
     }
 
     private static function isIgnored($path)
     {
+        $path = str_replace([BASE_PATH . DIRECTORY_SEPARATOR, '/'], ['', DIRECTORY_SEPARATOR], $path);
         foreach (self::$ignored as $pattern) if (strstr($path, str_replace(['**', '/'], ['*', DIRECTORY_SEPARATOR], $pattern))) return true;
         return false;
     }
