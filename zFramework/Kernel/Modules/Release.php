@@ -78,7 +78,9 @@ class Release
 
         Terminal::text("\r[color=green]Released: $release_name.[/color]\033[K");
         if (count($minified)) Terminal::text("\n[color=yellow]Minified: \n" . implode("\n", $minified) . "[/color]");
-        Terminal::text("[color=blue]Elapsed time: " . implode(", ", secondsToHours(time() - $start_time)) . "[/color]");
+
+        $elapsed_time = array_filter(secondsToHours(time() - $start_time), fn($val) => $val > 0);
+        Terminal::text("[color=blue]Elapsed time: " . (!count($elapsed_time) ? "finished instantly" : implode(', ', array_map(fn($val, $key) => $val . $key, $elapsed_time, array_keys($elapsed_time)))) . "[/color]");
 
         file_put_contents2(self::$cache . "/$release_name.json", json_encode(['last' => time()], JSON_UNESCAPED_UNICODE));
     }
