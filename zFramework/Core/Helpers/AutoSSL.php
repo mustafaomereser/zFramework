@@ -310,10 +310,12 @@ class AutoSSL
         // download certificate
         $certGet = $this->httpRequest($certUrl, 'GET');
         if ($certGet['status'] !== 200) throw new \Exception("Failed to download certificate");
-        $certPem = $certGet['body'];
+        $certPem = explode('
 
-        file_put_contents($domainDir . '/certificate.pem', $certPem);
-        file_put_contents($domainDir . '/ca_bundle.pem', $certPem);
+', $certGet['body']);
+
+        file_put_contents($domainDir . '/certificate.key', $certPem[0]);
+        file_put_contents($domainDir . '/ca_bundle.key', $certPem[1]);
         copy($domainKey, $domainDir . '/private.key');
 
         return true;
