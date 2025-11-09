@@ -4,6 +4,7 @@ namespace zFramework\Core\Helpers;
 
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use zFramework\Core\Facades\Response;
 use ZipArchive;
 
 class AutoSSL
@@ -35,9 +36,11 @@ class AutoSSL
         if (!file_exists($this->accountKeyPath)) $this->generateAccountKey();
         $this->loadAccountKey();
         $this->loadDirectory();
+
         // load stored kid if exists
         $kidFile = $this->sslPath . '/account.kid';
         if (file_exists($kidFile)) $this->kid = trim(file_get_contents($kidFile));
+        else $this->kid = $this->ensureAccount();
     }
 
     private function httpRequest(string $url, string $method = 'GET', $body = null, array $headers = []): array
@@ -57,10 +60,10 @@ class AutoSSL
             curl_close($ch);
             throw new \Exception("cURL error: $err");
         }
-        $hsize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $hsize      = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $status     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $rawHeaders = substr($res, 0, $hsize);
-        $body = substr($res, $hsize);
+        $body       = substr($res, $hsize);
         curl_close($ch);
 
         $hdrs = [];
@@ -146,9 +149,9 @@ class AutoSSL
         return json_encode(['protected' => $protected64, 'payload' => $payload64, 'signature' => $sig64]);
     }
 
-    private function postAsJWS(string $url, $payload, ?string $kid = null): array
+    private function postAsJWS(string $url, $payload): array
     {
-        return $this->httpRequest($url, 'POST', $this->signJWS($url, $payload, $kid), ['Content-Type: application/jose+json']);
+        return $this->httpRequest($url, 'POST', $this->signJWS($url, $payload, $this->kid), ['Content-Type: application/jose+json']);
     }
 
     public function ensureAccount(): string
@@ -156,7 +159,7 @@ class AutoSSL
         if ($this->kid) return $this->kid;
         $url     = $this->dir['newAccount'];
         $payload = ['termsOfServiceAgreed' => true];
-        $resp    = $this->postAsJWS($url, $payload, null);
+        $resp    = $this->postAsJWS($url, $payload);
         if (!in_array($resp['status'], [200, 201])) throw new \Exception("Account creation failed: " . $resp['body']);
 
         $loc = $resp['headers']['Location'] ?? $resp['headers']['location'] ?? null;
@@ -210,73 +213,71 @@ class AutoSSL
         return ['filename' => "$domain.zip", 'filesize' => $filesize, 'raw' => $raw];
     }
 
-    public function issue(string $domain): bool
+    public function newOrder($domain)
     {
-        $domain = trim($domain);
-        if ($domain === '') throw new \Exception("Domain empty");
-        $domainDir = $this->sslPath . '/' . $domain;
-        if (!is_dir($domainDir)) mkdir($domainDir, 0777, true);
-
-        $kid = $this->ensureAccount();
-
-        // create order
-        $orderUrl = $this->dir['newOrder'];
-        $resp     = $this->postAsJWS($orderUrl, ['identifiers' => [['type' => 'dns', 'value' => $domain]]], $kid);
-        if (!in_array($resp['status'], [201, 200])) throw new \Exception("newOrder failed: " . $resp['body']);
-        $order = json_decode($resp['body'], true);
-        $orderLocation = $resp['headers']['Location'] ?? $resp['headers']['location'] ?? null;
-        if (!$orderLocation) throw new \Exception("No order location");
+        $res = $this->postAsJWS($this->dir['newOrder'], ['identifiers' => [['type' => 'dns', 'value' => $domain]]]);
+        if (!in_array($res['status'], [201, 200])) throw new \Exception("newOrder failed: " . $res['body']);
+        $order    = json_decode($res['body'], true);
+        $location = $res['headers']['Location'] ?? $res['headers']['location'] ?? null;
+        if (!$location) throw new \Exception("No order location");
 
         $authUrls = $order['authorizations'] ?? [];
         if (count($authUrls) === 0) throw new \Exception("No authorizations in order");
-        $authUrl = $authUrls[0];
+        $authURL = $authUrls[0];
 
         // GET authorization
-        $authResp      = $this->httpRequest($authUrl, 'GET');
-        $auth          = json_decode($authResp['body'], true);
-        $httpChallenge = null;
+        $authResp = $this->httpRequest($authURL, 'GET');
+        $body     = json_decode($authResp['body'], true);
+        return compact('body', 'authURL', 'order', 'location');
+    }
 
-        foreach ($auth['challenges'] as $c) if ($c['type'] === 'http-01') {
-            $httpChallenge = $c;
-            break;
+    public function challenge($challenges)
+    {
+        $getChallenge = (function () use ($challenges) {
+            foreach ($challenges as $challenge) if ($challenge['type'] === 'http-01') return $challenge;
+            return false;
+        })();
+        if (!$getChallenge) throw new \Exception("No http-01 challenge available");
+
+        $url   = $getChallenge['url'];
+        $token = $getChallenge['token'];
+        $key   = $token . '.' . $this->jwkThumbprint($this->getJWK());
+
+        return compact('key', 'url', 'token');
+    }
+
+    public function notifyChallenge($challenge)
+    {
+        $trigger = $this->postAsJWS($challenge['url'], new \stdClass);
+        if (!in_array($trigger['status'], [200, 202])) throw new \Exception("Notify challenge failed: " . $trigger['body']);
+        return $trigger['body'];
+    }
+
+    public function challengeAuth($order, $tries = 1)
+    {
+        $check    = $this->httpRequest($order['authURL'], 'GET');
+        $adata    = json_decode($check['body'], true);
+        $status   = $adata['status'] ?? null;
+        $response = ['message' => 'ok', 'status' => true, 'tries' => $tries];
+
+        if ($status === null) throw new \Exception("Authorization status is null");
+        // try again.
+        if ($status === 'pending') {
+            sleep(5);
+            return $this->challengeAuth($order, $tries + 1);
         }
 
-        if (!$httpChallenge) throw new \Exception("No http-01 challenge available");
-
-        $token   = $httpChallenge['token'];
-        $thumb   = $this->jwkThumbprint($this->getJWK());
-        $keyAuth = $token . '.' . $thumb;
-
-        // write challenge file
-        $challengeFile = $this->webChallengePath . '/' . $token;
-        if (file_put_contents($challengeFile, $keyAuth) === false) throw new \Exception("Cannot write challenge file");
-        chmod($challengeFile, 0644);
-
-        // notify ACME to validate the challenge
-        $trigger = $this->postAsJWS($httpChallenge['url'], new \stdClass(), $kid);
-        if (!in_array($trigger['status'], [200, 202])) throw new \Exception("Trigger challenge failed: " . $trigger['body']);
-
-        // poll authorization until valid
-        $tries = 0;
-        $valid = false;
-        while ($tries < 30) {
-            sleep(2);
-            $check  = $this->httpRequest($authUrl, 'GET');
-            $adata  = json_decode($check['body'], true);
-            $status = $adata['status'] ?? null;
-            if ($status === 'valid') {
-                $valid = true;
-                break;
-            }
-            if ($status === 'invalid') throw new \Exception("Authorization invalid: " . json_encode($adata, JSON_PRETTY_PRINT));
-            $tries++;
+        if ($status === 'invalid') {
+            $response['status']  = false;
+            $response['adata']   = $adata;
+            $response['message'] = 'Authorization invalid';
         }
-        if (!$valid) throw new \Exception("Authorization did not become valid in time");
 
-        // cleanup challenge file
-        @unlink($challengeFile);
+        return $response;
+    }
 
-        // prepare CSR
+    public function finalize($order, $domain, $domainDir)
+    {
         $domainKey = $domainDir . '/private.key';
         $csrPath   = $domainDir . '/domain.csr.pem';
         if (!file_exists($domainKey) || !file_exists($csrPath)) $this->generateDomainKeyAndCSR($domain, $domainKey, $csrPath);
@@ -285,27 +286,24 @@ class AutoSSL
         $csrDer = $this->pemToDer($csrPem);
         $csr64  = self::base64url($csrDer);
 
-        $finalize = $order['finalize'] ?? null;
+        $finalize = $order['order']['finalize'] ?? null;
         if (!$finalize) throw new \Exception("No finalize URL");
 
-        $finalizeResp = $this->postAsJWS($finalize, ['csr' => $csr64], $kid);
+        $finalizeResp = $this->postAsJWS($finalize, ['csr' => $csr64]);
         if (!in_array($finalizeResp['status'], [200, 202])) throw new \Exception("Finalize failed: " . $finalizeResp['body']);
 
-        // poll order until certificate URL
-        $tries   = 0;
-        $certUrl = null;
-        while ($tries < 30) {
-            sleep(2);
-            $ordCheck = $this->httpRequest($orderLocation, 'GET');
-            $odata = json_decode($ordCheck['body'], true);
-            if (isset($odata['certificate'])) {
-                $certUrl = $odata['certificate'];
-                break;
-            }
-            if (($odata['status'] ?? '') === 'invalid') throw new \Exception("Order invalid: " . json_encode($odata, JSON_PRETTY_PRINT));
-            $tries++;
-        }
-        if (!$certUrl) throw new \Exception("Certificate URL missing");
+        return compact('domainKey');
+    }
+
+    public function getCertificate($order, $domainKey, $tries = 1)
+    {
+        $ordCheck = $this->httpRequest($order['location'], 'GET');
+        $odata    = json_decode($ordCheck['body'], true);
+        if (isset($odata['certificate'])) $certUrl = $odata['certificate'];
+        if (($odata['status'] ?? '') === 'invalid') return ['status' => false, 'tries' => $tries, 'message' => 'can not get cert url.'];
+
+        // try again.
+        if (!isset($certUrl)) return $this->getCertificate($order, $domainKey, $tries + 1);
 
         // download certificate
         $certGet = $this->httpRequest($certUrl, 'GET');
@@ -314,11 +312,41 @@ class AutoSSL
 
 ', $certGet['body']);
 
-        file_put_contents($domainDir . '/certificate.key', $certPem[0]);
-        file_put_contents($domainDir . '/ca_bundle.key', $certPem[1]);
-        copy($domainKey, $domainDir . '/private.key');
+        return ['status' => true, 'getCertUrlTries' => $tries, 'certificate' => $certPem[0], 'ca_bundle' => $certPem[1], 'private' => file_get_contents($domainKey)];
+    }
 
-        return true;
+    public function issue(string $domain): array
+    {
+        $domain = trim($domain);
+        if ($domain === '') throw new \Exception("Domain empty");
+        $domainDir = $this->sslPath . '/' . $domain;
+        if (!is_dir($domainDir)) mkdir($domainDir, 0777, true);
+
+        #region order and challenge
+        $order     = $this->newOrder($domain);
+        $challenge = $this->challenge($order['body']['challenges']);
+
+        $challengeFile = $this->webChallengePath . '/' . $challenge['token'];
+        if (file_put_contents($challengeFile, $challenge['key']) === false) throw new \Exception("Cannot write challenge file");
+        chmod($challengeFile, 0644);
+
+        $this->notifyChallenge($challenge);
+        $challengeAuth = $this->challengeAuth($order);
+        // do notify and challengeAuth remove after challenge file.
+        @unlink($challengeFile);
+
+        if (!$challengeAuth['status']) die(Response::json($challengeAuth, JSON_PRETTY_PRINT));
+        #endregion
+
+        $finalize = $this->finalize($order, $domain, $domainDir);
+        $pollCert = $this->getCertificate($order, $finalize['domainKey']);
+        if (!$pollCert['status']) die(Response::json($pollCert, JSON_PRETTY_PRINT));
+
+        file_put_contents($domainDir . '/certificate.key', $pollCert['certificate']);
+        file_put_contents($domainDir . '/ca_bundle.key', $pollCert['ca_bundle']);
+        file_put_contents($domainDir . '/private.key', $pollCert['private']);
+
+        return ['details' => ['getCertUrlTries' => $pollCert['getCertUrlTries'], 'challengeAuthTries' => $challengeAuth['tries']], 'cert' => $pollCert['certificate'], 'ca_bundle' => $pollCert['ca_bundle'], 'private' => $pollCert['private']];
     }
 
     public function renewAll(): void

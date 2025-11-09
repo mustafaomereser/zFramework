@@ -4,13 +4,16 @@ namespace App\Controllers;
 
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
+use zFramework\Core\Helpers\AutoSSL;
 
 class HomeController extends Controller
 {
 
     public function __construct($method)
     {
-        //
+        $ssl = new AutoSSL(AutoSSL::STAGING, 'D:\xampp\apache\conf\openssl.cnf');
+        print_r($ssl->issue('crmotor.com.tr'));
+        exit;
     }
 
     /** Index page | GET: /
