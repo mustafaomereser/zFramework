@@ -11,9 +11,7 @@ class HomeController extends Controller
 
     public function __construct($method)
     {
-        $ssl = new AutoSSL(AutoSSL::STAGING, 'D:\xampp\apache\conf\openssl.cnf');
-        print_r($ssl->issue('crmotor.com.tr'));
-        exit;
+        //
     }
 
     /** Index page | GET: /

@@ -352,7 +352,7 @@ class AutoSSL
     public function renewAll(): void
     {
         foreach ($this->list() as $domain) {
-            $full   = "$domain/ca_bundle.pem";
+            $full   = "$domain/ca_bundle.key";
             $domain = basename($domain);
             $days   = file_exists($full) ? $this->getDaysLeftFromBundle($full) : $this->checkSSL($domain)['days_left'];
             if ($days < 20) {
