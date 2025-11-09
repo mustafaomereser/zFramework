@@ -13,7 +13,7 @@ class API
     /**
      * Request function
      */
-    public static function request(string $endpoint, array $params = []): ?array
+    public static function request(string $endpoint, array $params = [], array $post = []): ?array
     {
         $url = "https://" . self::$domain . ":2083/execute/" . $endpoint;
 
@@ -21,9 +21,15 @@ class API
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_SSL_VERIFYHOST => self::$verifySSL,
             CURLOPT_SSL_VERIFYPEER => self::$verifySSL,
             CURLOPT_HTTPHEADER     => ["Authorization: cpanel " . self::$username . ":" . self::$apiToken]
         ]);
+
+        if (count($post)) {
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+        }
 
         $response = curl_exec($ch);
         if (curl_errno($ch)) return ["error" => curl_error($ch)];

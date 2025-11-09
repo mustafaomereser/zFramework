@@ -213,6 +213,16 @@ class AutoSSL
         return ['filename' => "$domain.zip", 'filesize' => $filesize, 'raw' => $raw];
     }
 
+    public function prepareDomain($domain)
+    {
+        $domain = trim($domain);
+        if ($domain === '') throw new \Exception("Domain empty");
+        $dir = $this->sslPath . '/' . $domain;
+        if (!is_dir($dir)) mkdir($dir, 0777, true);
+
+        return compact('domain', 'dir');
+    }
+
     public function newOrder($domain)
     {
         $res = $this->postAsJWS($this->dir['newOrder'], ['identifiers' => [['type' => 'dns', 'value' => $domain]]]);
@@ -317,13 +327,11 @@ class AutoSSL
 
     public function issue(string $domain): array
     {
-        $domain = trim($domain);
-        if ($domain === '') throw new \Exception("Domain empty");
-        $domainDir = $this->sslPath . '/' . $domain;
-        if (!is_dir($domainDir)) mkdir($domainDir, 0777, true);
+        $domain    = $this->prepareDomain($domain);
+        $domainDir = $domain['dir'];
 
         #region order and challenge
-        $order     = $this->newOrder($domain);
+        $order     = $this->newOrder($domain['domain']);
         $challenge = $this->challenge($order['body']['challenges']);
 
         $challengeFile = $this->webChallengePath . '/' . $challenge['token'];
@@ -338,7 +346,7 @@ class AutoSSL
         if (!$challengeAuth['status']) die(Response::json($challengeAuth, JSON_PRETTY_PRINT));
         #endregion
 
-        $finalize = $this->finalize($order, $domain, $domainDir);
+        $finalize = $this->finalize($order, $domain['domain'], $domainDir);
         $pollCert = $this->getCertificate($order, $finalize['domainKey']);
         if (!$pollCert['status']) die(Response::json($pollCert, JSON_PRETTY_PRINT));
 
