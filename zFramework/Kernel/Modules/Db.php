@@ -139,7 +139,7 @@ class Db
             #
 
             if (!$fresh && strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
-                Terminal::text("\n[color=green]`" . self::$dbname . ".$table` already updated.[/color]");
+                Terminal::text("\n[color=green]`" . self::$dbname . ".$table` is up to date.[/color]");
                 continue;
             }
 
