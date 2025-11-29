@@ -758,14 +758,25 @@ class DB
     {
         $sql = $this->builder->build($type);
 
+        // if ($this->sqlDebug) {
+        //     $debug_sql = $sql;
+        //     foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->db()->quote($value), $debug_sql);
+        //     echo "#Begin SQL Query:\n";
+        //     var_dump($debug_sql);
+        //     echo "#End of SQL Query\n";
+        // }
+
         if ($this->sqlDebug) {
             $debug_sql = $sql;
             foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->db()->quote($value), $debug_sql);
-            echo "#Begin SQL Query:\n";
+            ob_start();
+            echo "#" . $this->dbname . " Begin SQL Query:\n";
             var_dump($debug_sql);
             echo "#End of SQL Query\n";
+            $debug = ob_get_clean();
+            file_put_contents2(base_path("/db-debug/" . time()), $debug, FILE_APPEND);
         }
-
+        
         return $sql;
     }
 
