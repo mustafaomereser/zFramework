@@ -19,7 +19,6 @@
         <?php endif ?>
     <?php endforeach ?>
 
-
     <li class="page-item <?= $current_page == $page_count ? 'disabled' : null ?>">
         <a href="<?= str_replace("change_page_$uniqueID", ($current_page + 1), $url) ?>" class="page-link"><i class="fa fa-angle-right"></i></a>
     </li>

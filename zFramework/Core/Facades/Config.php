@@ -17,9 +17,9 @@ class Config
 
     /**
      * @param string $config
-     * @return array
+     * @return array|bool
      */
-    private static function parseUrl(string $config): array
+    private static function parseUrl(string $config): array|bool
     {
         $config = explode(".", $config);
 
@@ -32,6 +32,8 @@ class Config
                 break;
             }
         }
+
+        if (!isset($config_name)) return false;
 
         $output['name'] = $config_name;
         $output['path'] = $config_path;
@@ -50,8 +52,7 @@ class Config
     public static function get(string $config)
     {
         $data = self::parseUrl($config);
-
-        if (!is_file($data['path'])) return;
+        if ($data === false) return $config;
 
         $cache = isset(self::$caches[$data['name']]);
         if (!$cache && function_exists('opcache_invalidate')) opcache_invalidate($data['path'], true);
