@@ -291,7 +291,7 @@ class DB
      */
     public function hashedKey(string $key): string
     {
-        return uniqid(str_replace(".", "_", $key) . "_");
+        return uniqid(str_replace([".", '(', ')', ',', '"', "'", '`', ' '], "_", $key) . "_");
     }
     #endregion
 
@@ -616,15 +616,14 @@ class DB
 
     /**
      * paginate
-     * @param int $per_count
-     * @param string $page_name
+     * @param int $per_page
+     * @param string $page_id
      * @return array
      */
     public function paginate(int $per_page = 20, string $page_id = 'page')
     {
-        $last_query       = $this->buildQuery;
-        $row_count        = $this->select("COUNT($this->table." . $this->getPrimary() . ") count")->first()['count'];
-        $this->buildQuery = $last_query;
+        $items            = $this->get();
+        $row_count        = count($items);
 
         $uniqueID         = uniqid();
         $current_page     = (request($page_id) ?? 1);
@@ -641,7 +640,7 @@ class DB
         $url = "?" . http_build_query($queryString);
 
         return [
-            'items'          => $row_count ? self::limit($start_count, $per_page)->get() : [],
+            'items'          => $row_count ? array_slice($items, $start_count, $per_page, true) : [],
             'item_count'     => $row_count,
             'shown'          => ($start_count + 1) . " / " . (($per_page * $current_page) >= $row_count ? $row_count : ($per_page * $current_page)),
             'start'          => ($start_count + 1),
@@ -667,6 +666,7 @@ class DB
             }
         ];
     }
+
 
     /**
      * Insert a row to database
@@ -776,7 +776,6 @@ class DB
             $debug = ob_get_clean();
             file_put_contents2(base_path("/db-debug/" . time()), $debug, FILE_APPEND);
         }
-        
         return $sql;
     }
 
