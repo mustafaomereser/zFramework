@@ -276,6 +276,28 @@ function scan_dir($dir)
     return array_values(array_diff(scandir($dir), ['.', '..']));
 }
 
+function rrmdir($dir)
+{
+    if (!is_dir($dir)) return;
+
+    $delete = 0;
+
+    $objects = scan_dir($dir);
+    foreach ($objects as $object) {
+        $path = $dir . DIRECTORY_SEPARATOR . $object;
+        if (is_dir($path)) {
+            $delete += rrmdir($path);
+        } else {
+            unlink($path);
+            $delete++;
+        }
+    }
+
+    rmdir($dir);
+
+    return $delete;
+}
+
 // seconds to hours.
 function secondsToHours($seconds)
 {

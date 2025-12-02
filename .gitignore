@@ -5,5 +5,4 @@ Releases
 public_html/uploads
 zFramework/storage
 zFramework/vendor
-zFramework/Caches
 config/crypt.php

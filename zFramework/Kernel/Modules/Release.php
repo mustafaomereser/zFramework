@@ -11,11 +11,14 @@ use ZipArchive;
 
 class Release
 {
-    static $cache   = FRAMEWORK_PATH . "/Caches/Releases";
+    static $cache;
     static $ignored = ['.git/', 'README.md', '.gitignore', '.gitkeep'];
 
     public static function begin($methods)
     {
+        global $storage_path;
+        self::$cache = $storage_path . "/releases";
+
         if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
         self::ignoreList();
         self::{Terminal::$commands[1]}();

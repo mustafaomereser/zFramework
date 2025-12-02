@@ -19,7 +19,7 @@ class DB
     private $builder;
     private $sqlDebug  = false;
     private $wherePrev = 'AND';
-    public $cache_dir  = FRAMEWORK_PATH . "/Caches/DB";
+    public $cache_dir;
 
     /**
      * Options parameters
@@ -38,6 +38,9 @@ class DB
      */
     public function __construct(?string $db = null)
     {
+        global $storage_path;
+        $this->cache_dir = $storage_path . "/db";
+
         if ($db && isset($GLOBALS['databases']['connections'][$db])) $this->db = $db;
         else $this->db = array_keys($GLOBALS['databases']['connections'])[0];
 

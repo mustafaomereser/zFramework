@@ -27,10 +27,9 @@ class Cache
 
         Terminal::text("[color=yellow]Processing...[/color]");
 
-        $dir = glob($storage_path . "/$option/*");
-        foreach ($dir as $unlink) unlink($unlink);
+        $count = rrmdir($storage_path . "/$option");
 
         Terminal::clear();
-        Terminal::text("[color=green]$option (" . count($list) . " qty) caches cleared![/color]");
+        Terminal::text("[color=green]$option ($count qty) caches cleared![/color]");
     }
 }

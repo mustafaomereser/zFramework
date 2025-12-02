@@ -23,9 +23,10 @@ class AutoSSL
 
     public function __construct(string $directoryUrl = self::STAGING, null|string $openSSLConfig = null)
     {
+        global $storage_path;
         if (!is_null($openSSLConfig)) $this->openSSLConfig['config'] = $openSSLConfig;
 
-        $this->sslPath          = FRAMEWORK_PATH . "/Caches/AutoSSL";
+        $this->sslPath          = $storage_path . "/AutoSSL";
         $this->directoryUrl     = $directoryUrl;
         $this->webChallengePath = public_dir('/.well-known/acme-challenge');
         $this->accountKeyPath   = $this->sslPath . '/account.key';

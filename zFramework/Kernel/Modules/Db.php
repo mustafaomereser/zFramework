@@ -116,6 +116,7 @@ class Db
 
             # connect to model's database
             self::connectDB($class::$db);
+
             $last_migrate  = json_decode(@file_get_contents(self::$db->cache_dir . "/" . self::$dbname . "/last-migrate.json") ?? '[]', true);
             $columns       = $class::columns();
             $storageEngine = $class::$storageEngine ?? 'InnoDB';
