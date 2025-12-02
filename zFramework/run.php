@@ -61,6 +61,7 @@ class Run
 
     public static function begin()
     {
+        global $storage_path;
         ob_start();
         try {
             # includes
@@ -72,7 +73,7 @@ class Run
 
             # set view options
             \zFramework\Core\View::setSettings([
-                'caches'  => FRAMEWORK_PATH . '/storage/views',
+                'caches'  => "$storage_path/views",
                 'dir'     => BASE_PATH . '/resource/views',
                 'suffix'  => ''
             ] + Config::get('view'));
