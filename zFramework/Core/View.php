@@ -8,10 +8,11 @@ class View
     static $binds  = [];
     static $config = [];
     static $view;
+    static $view_name;
     static $data;
     static $sections;
     static $directives = [];
-
+    static $mergeChildVars = false;
     /**
      * Prepare config.
      */
@@ -27,6 +28,7 @@ class View
     private static function reset(): void
     {
         self::$view       = null;
+        self::$view_name  = null;
         self::$data       = null;
         self::$sections   = [];
     }
@@ -40,6 +42,7 @@ class View
     public static function view(string $view_name, array $data = [])
     {
         if (isset(self::$binds[$view_name])) $data = self::$binds[$view_name]() + $data;
+        self::$view_name = $view_name;
 
         // search view path: start
         $view_path = self::$config['dir'] . '/' . self::parseViewName($view_name);
@@ -121,7 +124,7 @@ class View
         self::parseVariables();
         self::parseForEach();
         self::parseSections();
-        self::mergeChildVars();
+        if (!self::$mergeChildVars) self::mergeMainVars();
         self::parseExtends();
         self::parseYields();
         self::customDirectives();
@@ -144,16 +147,21 @@ class View
         self::$view = preg_replace_callback('/@php(.*?)@endphp/s', fn($code) => '<?php ' . $code[1] . ' ?>', self::$view);
     }
 
-    private static function mergeChildVars(): void
+    private static function mergeMainVars(): void
     {
         preg_match_all('/<\?php(.*?)\?>/s', self::$view, $GLOBALS['VIEW_MERGE_CHILD_VARS']['matches']);
         try {
-            foreach ($GLOBALS['VIEW_MERGE_CHILD_VARS']['matches'][1] as $mergeChildVarsCode) eval("$mergeChildVarsCode ?>");
+            foreach ($GLOBALS['VIEW_MERGE_CHILD_VARS']['matches'][1] as $mergeMainVarsCode) {
+                extract(self::$data);
+                eval($mergeMainVarsCode);
+            }
             $GLOBALS['VIEW_MERGE_CHILD_VARS']['data'] = get_defined_vars();
-            unset($GLOBALS['VIEW_MERGE_CHILD_VARS']['data']['mergeChildVarsCode']);
-            self::$data = array_merge(self::$data, $GLOBALS['VIEW_MERGE_CHILD_VARS']['data']);
+            unset($GLOBALS['VIEW_MERGE_CHILD_VARS']['data']['mergeMainVarsCode']);
+            self::$data = array_merge($GLOBALS['VIEW_MERGE_CHILD_VARS']['data'], self::$data);
         } catch (\Throwable $e) {
         }
+
+        self::$mergeChildVars = true;
     }
 
     /**
