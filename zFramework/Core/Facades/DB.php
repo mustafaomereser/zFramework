@@ -623,10 +623,24 @@ class DB
      * @param string $page_id
      * @return array
      */
-    public function paginate(int $per_page = 20, string $page_id = 'page')
+    public function paginate(int $per_page = 20, string $page_id = 'page', null|string $cache_count_id = null)
     {
-        $items            = $this->get();
-        $row_count        = count($items);
+        if (!$cache_count_id) {
+            Session::callback(function () {
+                unset($_SESSION[$this->db][$this->dbname]['paginate']['cache']);
+            });
+
+            $cache = Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_count_id] ?? false);
+            if ($cache) $row_count = $cache;
+        }
+
+        if (!isset($row_count)) {
+            $last_query       = $this->buildQuery;
+            // $row_count        = $this->select("COUNT($this->table." . $this->getPrimary() . ") count")->first()['count'];
+            $row_count        = $this->count();
+            $this->buildQuery = $last_query;
+            if ($cache_count_id) Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_count_id] = $row_count);
+        }
 
         $uniqueID         = uniqid();
         $current_page     = (request($page_id) ?? 1);
@@ -643,7 +657,7 @@ class DB
         $url = "?" . http_build_query($queryString);
 
         return [
-            'items'          => $row_count ? array_slice($items, $start_count, $per_page, true) : [],
+            'items'          => $row_count ?  self::limit($start_count, $per_page)->get() : [],
             'item_count'     => $row_count,
             'shown'          => ($start_count + 1) . " / " . (($per_page * $current_page) >= $row_count ? $row_count : ($per_page * $current_page)),
             'start'          => ($start_count + 1),

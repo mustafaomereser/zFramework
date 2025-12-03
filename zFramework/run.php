@@ -67,9 +67,6 @@ class Run
             # includes
             self::includer(BASE_PATH . '/zFramework/modules', false);
             self::includer(BASE_PATH . '/zFramework/modules/error_handlers/handle.php');
-            self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
-            self::initProviders()::findModules(base_path('/modules'))::loadModules();
-            self::includer(BASE_PATH . '/route');
 
             # set view options
             \zFramework\Core\View::setSettings([
@@ -77,6 +74,11 @@ class Run
                 'dir'     => BASE_PATH . '/resource/views',
                 'suffix'  => ''
             ] + Config::get('view'));
+            #
+
+            self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
+            self::initProviders()::findModules(base_path('/modules'))::loadModules();
+            self::includer(BASE_PATH . '/route');
 
             \zFramework\Core\Route::run();
             \zFramework\Core\Facades\Alerts::unset(); # forgot alerts
