@@ -145,6 +145,10 @@ class Mail
         self::$mail->clearReplyTos();
         self::$mail->clearAttachments();
 
+        self::clearCc();
+        self::clearBcc();
+        self::clearTo();
+
         return $status;
     }
 }
