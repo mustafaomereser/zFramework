@@ -41,10 +41,10 @@ class DB
         global $storage_path;
         $this->cache_dir = $storage_path . "/db";
 
-        if ($db && isset($GLOBALS['databases']['connections'][$db])) $this->db = $db;
-        else $this->db = array_keys($GLOBALS['databases']['connections'])[0];
+        if (!$db) $db = array_keys($GLOBALS['databases']['connections'])[0] ?? null;
+        if (isset($GLOBALS['databases']['connections'][$db])) $this->db = $db;
 
-        $this->db();
+        $this->connection();
         $this->reset();
     }
 
@@ -52,10 +52,10 @@ class DB
      * Create database connection or return already current connection.
      * @return object
      */
-    public function db()
+    public function connection()
     {
         if ($this->connection !== null) return $this->connection;
-        if (!isset($GLOBALS['databases']['connections'][$this->db])) die('Böyle bir veritabanı yok!');
+        if (!isset($GLOBALS['databases']['connections'][$this->db])) throw new \Exception("$this->table's database is doesn't exists!");
         if (!isset($GLOBALS['databases']['connected'][$this->db])) {
             try {
                 $parameters = $GLOBALS['databases']['connections'][$this->db];
@@ -87,7 +87,7 @@ class DB
      */
     public function prepare(string $sql, array $data = [])
     {
-        $e = $this->db()->prepare($sql);
+        $e = $this->connection()->prepare($sql);
         $e->execute(count($data) ? $data : $this->buildQuery['data'] ?? []);
         $this->reset();
         return $e;
@@ -540,6 +540,11 @@ class DB
         return compact('key', 'operator', 'value', 'prev');
     }
 
+    public function having($column, $operator, $value, $prev)
+    {
+        $this->buildQuery['having'][] = [];
+    }
+
     /**
      * Set Order By
      * @param array $data
@@ -706,7 +711,7 @@ class DB
         $this->buildQuery['sets'] = " (" . implode(', ', array_keys($sets)) . ") VALUES (:" . implode(', :', $hashed_keys) . ") ";
         $insert = $this->run(__FUNCTION__)->rowCount();
         if ($insert && $primary = $this->getPrimary()) {
-            $inserted_row = $this->resetBuild()->where($primary, $this->db()->lastInsertId())->first() ?? [];
+            $inserted_row = $this->resetBuild()->where($primary, $this->connection()->lastInsertId())->first() ?? [];
             $this->trigger('inserted', $inserted_row);
         }
 
@@ -777,7 +782,7 @@ class DB
 
         // if ($this->sqlDebug) {
         //     $debug_sql = $sql;
-        //     foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->db()->quote($value), $debug_sql);
+        //     foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->connection()->quote($value), $debug_sql);
         //     echo "#Begin SQL Query:\n";
         //     var_dump($debug_sql);
         //     echo "#End of SQL Query\n";
@@ -785,7 +790,7 @@ class DB
 
         if ($this->sqlDebug) {
             $debug_sql = $sql;
-            foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->db()->quote($value), $debug_sql);
+            foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->connection()->quote($value), $debug_sql);
             ob_start();
             echo "#" . $this->dbname . " Begin SQL Query:\n";
             var_dump($debug_sql);
@@ -826,7 +831,7 @@ class DB
     public function beginTransaction()
     {
         $this->checkisInnoDB();
-        $this->db()->beginTransaction();
+        $this->connection()->beginTransaction();
         return $this;
     }
 
@@ -835,7 +840,7 @@ class DB
      */
     public function rollback()
     {
-        $this->db()->rollBack();
+        $this->connection()->rollBack();
         return $this;
     }
 
@@ -844,7 +849,7 @@ class DB
      */
     public function commit()
     {
-        $this->db()->commit();
+        $this->connection()->commit();
         return $this;
     }
     #endregion

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Observers\UserObserver;
 use zFramework\Core\Abstracts\Model;
 use zFramework\Core\Traits\DB\softDelete;
 
@@ -10,7 +9,7 @@ class User extends Model
 {
     use softDelete;
 
-    // public $observe      = UserObserver::class;
+    // public $observe      = App\Observers\UserObserver::class;
 
     public $table      = "users";
     public $_not_found = 'User is not found.';
@@ -26,4 +25,10 @@ class User extends Model
     {
         return $this->hasMany(Posts::class, $data['id'], 'user_id');
     }
+
+    # you can use special parameters and closures parameters go to end line.
+    # public function posts(string $special_parameters = "hello", array $data)
+    # {
+    #     return $this->hasMany(Posts::class, $data['id'], 'user_id');
+    # }
 }
