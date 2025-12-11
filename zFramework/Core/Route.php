@@ -215,7 +215,7 @@ class Route
                 if ($column == $row) $match++;
             }
 
-            if (empty($URL[$key]) && count($URL) != 1) unset($URL[$key]);
+            if (!strlen($URL[$key]) && count($URL) != 1) unset($URL[$key]);
         }
 
         $URI = array_values($URI);
