@@ -794,10 +794,13 @@ class DB
             ob_start();
             echo "#" . $this->dbname . " Begin SQL Query:\n";
             var_dump($debug_sql);
+            echo "\nAnalyze query: ";
+            var_dump($this->connection()->query("EXPLAIN ANALYZE $debug_sql")->fetchAll(\PDO::FETCH_ASSOC));
             echo "#End of SQL Query\n";
             $debug = ob_get_clean();
             file_put_contents2(base_path("/db-debug/" . time()), $debug, FILE_APPEND);
         }
+
         return $sql;
     }
 
