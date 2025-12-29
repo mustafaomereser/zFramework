@@ -63,6 +63,7 @@ class Auth
         self::$user = null;
         (self::getMode())::delete('auth-stay-in');
         (self::getMode())::delete('auth-token');
+        (self::getMode())::delete('auth-password');
         return true;
     }
 
@@ -98,7 +99,7 @@ class Auth
     {
         if (self::check()) return false;
 
-        $user = (new User)->select(['id', 'api_token', 'password']);
+        $user = (new User)->select('id, api_token, password');
         foreach ($fields as $key => $val) $user->where($key, ($key != 'password' ? $val : Crypter::encode($val)));
         $user = $user->first();
 
@@ -115,8 +116,8 @@ class Auth
      * Get Current logged in user's id
      * @return integer
      */
-    public static function id(): int
+    public static function id(): int|null
     {
-        return self::user()['id'];
+        return self::user()['id'] ?? null;
     }
 }
