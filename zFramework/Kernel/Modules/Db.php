@@ -56,7 +56,8 @@ class Db
      * @param --all (optional) (for all migrations do migrate)
      * @param --db (optional) (ifnull = Get first DB KEY)
      * @param --path (optional)
-     * @param --fresh (optional)
+     * @param --force (optional) (for migration forcefully)
+     * @param --fresh (optional) (delete everything and again migration)
      * @param --seed (optional)
      */
     public static function migrate()
@@ -66,6 +67,7 @@ class Db
         $path               = Terminal::$parameters['--path'] ?? null;
         $migrations_path    = 'migrations' . ($path ? "/$path" : null);
         $migrate_fresh      = in_array('--fresh', Terminal::$parameters) ?? false;
+        $migrate_force      = in_array('--force', Terminal::$parameters) ?? false;
         $init_column_name   = "table_initilazing";
 
         $scans = [BASE_PATH . "/database/$migrations_path"];
@@ -99,6 +101,7 @@ class Db
         foreach ($migrations as $migration) {
             $last_modify     = filemtime($migration);
             $drop_columns    = [];
+            $cleared_indexes = [];
             $class           = str_replace(['.php', BASE_PATH, '/'], ['', '', '\\'], $migration);
 
             // control
@@ -139,7 +142,7 @@ class Db
             }
             #
 
-            if (!$fresh && strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
+            if (!($fresh || $migrate_force) && strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
                 Terminal::text("\n[color=green]`" . self::$dbname . ".$table` is up to date.[/color]");
                 continue;
             }
@@ -295,22 +298,26 @@ class Db
                     }
                 }
 
-                $column_need_update = !isset($last_migrate['tables'][$table]['columns'][$column]['data']) || $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
-                $column_indexes     = $indexes[$column] ?? [];
+                if ($fresh || $migrate_force) {
+                    $column_need_update = true;
+                } else {
+                    $column_need_update = !isset($last_migrate['tables'][$table]['columns'][$column]['data']) || $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
+                }
+
                 if ($column_need_update) {
+                    $column_indexes = $indexes[$column] ?? [];
                     foreach ($column_indexes as $index) {
                         try {
                             self::$db->prepare("ALTER TABLE $table DROP INDEX $index");
-                            Terminal::text("[color=yellow]-> `$index`[/color] [color=dark-gray]cleared index key[/color]");
+                            $cleared_indexes[] = $index;
                         } catch (\Throwable $e) {
                             Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
                         }
                     }
-                    if (count($column_indexes)) Terminal::text('[color=black]' . str_repeat('.', 30) . '[/color]');
                 }
 
                 $result = ['loop' => true, 'status' => 0];
-                if ($fresh || $column_need_update) {
+                if ($column_need_update) {
                     $buildSQL = str_replace(['  ', ' ;'], [' ', ';'], ("ALTER TABLE $table ADD $column " . (@$data['type'] . @$data['charset'] . @$data['nullstatus'] . @$data['default'] . @$data['index']) . ($last_column ? " AFTER $last_column " : ' FIRST ') . (isset($data['extras']) ? ", " . implode(', ', $data['extras']) : null) . ";"));
                     while ($result['loop'] == true) {
                         try {
@@ -351,6 +358,12 @@ class Db
                 $last_column = $column;
             }
             #
+
+            if (count($cleared_indexes)) {
+                Terminal::text("[color=dark-gray]" . str_repeat('.', 40) . "[/color]");
+                foreach ($cleared_indexes as $index) Terminal::text("[color=yellow]-> `$index`[/color] [color=dark-gray]cleared index key[/color]");
+                Terminal::text("[color=dark-gray]" . str_repeat('.', 40) . "[/color]");
+            }
 
             foreach (array_unique($drop_columns) as $drop) {
                 try {
