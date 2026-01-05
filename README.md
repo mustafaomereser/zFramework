@@ -1007,7 +1007,10 @@ Run project.
 
 
     // Default error log dir in; zFramework/bootstrap.php
-    'error_log' => true|false,
+    'error' => [
+        'logging'  => true|false,
+        'callback' => \Closure
+    ],    
     // 
     
     // Redirect https if come with http.

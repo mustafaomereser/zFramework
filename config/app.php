@@ -2,7 +2,11 @@
 
 return [
     'debug'       => true, # turn false on production.
-    'error_log'   => true,
+
+    'error'       => [
+        'logging' => true,
+        'callback' => function ($log) {}
+    ],
 
     'force-https' => false, # force redirect https.
 

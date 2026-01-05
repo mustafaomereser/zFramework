@@ -1205,9 +1205,9 @@ function errorHandler($data)
 
 <?php
     $error_log = ob_get_clean();
-    if (Config::get('app.error_log')) {
+    if (Config::get('app.error.logging')) {
         file_put_contents2(ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '.html', $error_log);
-        error_log_callback($error_log);
+        Config::get('app.error.callback')($error_log);
     }
 
     if (!Config::get('app.debug')) {
