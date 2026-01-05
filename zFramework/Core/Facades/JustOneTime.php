@@ -5,7 +5,6 @@ namespace zFramework\Core\Facades;
 class JustOneTime
 {
     static private $session_name = 'just-one-time';
-    static $used = false;
 
     /**
      * Set just one time data.
@@ -15,7 +14,6 @@ class JustOneTime
      */
     public static function set(string $name, mixed $value): self
     {
-        self::$used = true;
         return Session::callback(function () use ($name, $value) {
             $_SESSION[self::$session_name][$name] = $value;
             return new self();
@@ -38,6 +36,6 @@ class JustOneTime
      */
     public static function unset(): void
     {
-        if (self::$used) Session::delete(self::$session_name);
+        Session::delete(self::$session_name);
     }
 }
