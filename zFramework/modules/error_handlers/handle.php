@@ -1071,14 +1071,14 @@ function errorHandler($data)
 
                             // Error line'ı görünür alana kaydır
                             const errorLine = codeSnippets[i].querySelector('.error-line');
-                            if (errorLine) {
-                                setTimeout(function() {
-                                    errorLine.scrollIntoView({
-                                        behavior: 'smooth',
-                                        block: 'center'
-                                    });
-                                }, 100);
-                            }
+                            // if (errorLine) {
+                            //     setTimeout(function() {
+                            //         errorLine.scrollIntoView({
+                            //             behavior: 'smooth',
+                            //             block: 'center'
+                            //         });
+                            //     }, 100);
+                            // }
                         }
                     };
                 }
@@ -1108,14 +1108,14 @@ function errorHandler($data)
 
                     // Error line'ı görünür alana kaydır
                     const errorLine = codeSnippets[activeIndex].querySelector('.error-line');
-                    if (errorLine) {
-                        setTimeout(function() {
-                            errorLine.scrollIntoView({
-                                behavior: 'smooth',
-                                block: 'center'
-                            });
-                        }, 500);
-                    }
+                    // if (errorLine) {
+                    //     setTimeout(function() {
+                    //         errorLine.scrollIntoView({
+                    //             behavior: 'smooth',
+                    //             block: 'center'
+                    //         });
+                    //     }, 500);
+                    // }
                 }
 
                 // Syntax highlighting JavaScript tarafında kaldırıldı
