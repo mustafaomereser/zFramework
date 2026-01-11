@@ -217,7 +217,7 @@ class DB
      */
     private function closures()
     {
-        if (isset($GLOBALS['model-closures'][$this->db][$this->table])) return $this;
+        if (!$this->table || isset($GLOBALS['model-closures'][$this->db][$this->table])) return $this;
 
         $closures = [];
         foreach ((new ReflectionClass($this))->getMethods() as $closure) if (strstr($closure->class, 'Models') && !in_array($closure->name, $this->not_closures)) $closures[] = $closure->name;
