@@ -1216,6 +1216,7 @@ function errorHandler($data)
     }
 
     echo $error_log;
+    return $error_log;
 }
 
 set_exception_handler('errorHandler');

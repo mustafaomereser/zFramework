@@ -33,9 +33,9 @@ class Config
             }
         }
 
-        if (!isset($config_name)) return false;
+        // if (!isset($config_name)) return false;
 
-        $output['name'] = $config_name;
+        $output['name'] = $config_name ?? false;
         $output['path'] = $config_path;
 
         $output['args'] = implode('.', array_filter($config, fn($var) => strlen((string) $var)));
@@ -49,10 +49,10 @@ class Config
      * @param string $config
      * @return string|array|object
      */
-    public static function get(string $config)
+    public static function get(string $config, bool $returnbool = true)
     {
         $data = self::parseUrl($config);
-        if ($data === false) return $config;
+        if ($data === false) return $returnbool ? false : $config;
 
         $cache = isset(self::$caches[$data['name']]);
         if (!$cache && function_exists('opcache_invalidate')) opcache_invalidate($data['path'], true);

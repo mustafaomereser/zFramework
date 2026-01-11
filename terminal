@@ -1,6 +1,6 @@
 <?php
-// error_reporting(0);
 define('BASE_PATH', __DIR__);
 include('zFramework/bootstrap.php');
 zFramework\Run::includer(BASE_PATH . '/zFramework/modules', false);
+zFramework\Run::includer(BASE_PATH . '/zFramework/modules/error_handlers/handle.php');
 zFramework\Kernel\Terminal::begin($argv);
