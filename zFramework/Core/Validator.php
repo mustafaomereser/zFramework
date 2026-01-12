@@ -20,7 +20,7 @@ class Validator
      * @param \Closure $callback
      * @return string|array
      */
-    public static function validate(array $data = null, array $validate = [], array $attributeNames = [], \Closure $callback = null)
+    public static function validate(?array $data = null, array $validate = [], array $attributeNames = [], ?\Closure $callback = null)
     {
         if (!$data) $data = $_REQUEST;
 
