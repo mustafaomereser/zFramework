@@ -56,17 +56,22 @@ class View
         self::$data = $data;
         self::parse();
 
+        $cache = null;
         if (self::$config['caching']) {
             # crate views folder.
             $cache = self::$config['caches'] . '/' . $view_name . '.stored.php';
             file_put_contents2($cache, self::$view);
         }
 
-        ob_start();
-        extract($data);
-        if (self::$config['caching']) include($cache);
-        else echo eval('?>' . self::$view);
-        $output = ob_get_clean();
+        // closure for extract safe
+        $output = function () use ($data, $cache) {
+            ob_start();
+            extract($data);
+            if (self::$config['caching']) include($cache);
+            else echo eval('?>' . self::$view);
+            return ob_get_clean();
+        };
+        $output = $output();
 
         self::reset();
 

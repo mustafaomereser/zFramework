@@ -60,7 +60,7 @@ function asset($file)
 // file_put_content force make dirs.
 function file_put_contents2($file_name, $content, $flags = 0)
 {
-    @mkdir(dirname($file_name), 0777, true);
+    @mkdir(dirname($file_name), 0775, true);
     return file_put_contents($file_name, $content, $flags);
 }
 
@@ -242,8 +242,7 @@ function getBrowser()
 
     // finally get the correct version number
     $known   = array('Version', $ub, 'other');
-    $pattern = '#(?<browser>' . join('|', $known) .
-        ')[/ ]+(?<version>[0-9.|a-zA-Z.]*)#';
+    $pattern = '#(?<browser>' . join('|', $known) . ')[/ ]+(?<version>[0-9.|a-zA-Z.]*)#';
     preg_match_all($pattern, $u_agent, $matches);
 
     $i = count($matches['browser']);
