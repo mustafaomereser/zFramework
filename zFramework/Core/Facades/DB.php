@@ -56,7 +56,7 @@ class DB
     public function connection()
     {
         if ($this->connection !== null) return $this->connection;
-        if (!isset($GLOBALS['databases']['connections'][$this->db])) throw new \Exception("$this->table's database is doesn't exists!");
+        if ($this->table && !isset($GLOBALS['databases']['connections'][$this->db])) throw new \Exception("$this->table's database is doesn't exists!");
         if (!isset($GLOBALS['databases']['connected'][$this->db])) {
             try {
                 $parameters = $GLOBALS['databases']['connections'][$this->db];
