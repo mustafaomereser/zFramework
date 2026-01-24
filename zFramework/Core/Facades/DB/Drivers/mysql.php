@@ -91,7 +91,7 @@ class mysql
             'type'     => 'row',
             'queries'  => [
                 [
-                    'key'      => $this->parent->deleted_at,
+                    'key'      => $this->parent->table . '.' . $this->parent->deleted_at,
                     'prev'     => "AND"
                 ] + [
                     'date' => ['operator' => 'IS NULL', 'value' => null],
