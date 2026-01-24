@@ -137,7 +137,7 @@ class Validator
 
     public static function exists($data, $parameters)
     {
-        $exists = (new DB(@$parameters['db']))->table($data['equivalent'])->whereRaw(($parameters['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
+        $exists = (new $data['equivalent'])->whereRaw(($parameters['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
         if ($ex = @$parameters['ex']) $exists->where('id', '!=', $ex);
         if ($exists->count()) return true;
         return false;
@@ -145,7 +145,7 @@ class Validator
 
     public static function unique($data, $parameters)
     {
-        $unique = (new DB(@$parameters['db']))->table($data['equivalent'])->whereRaw(($parameters['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
+        $unique = (new $data['equivalent'])->whereRaw(($parameters['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
         if ($ex = @$parameters['ex']) $unique->where('id', '!=', $ex);
         if ($unique->count()) return false;
         return true;

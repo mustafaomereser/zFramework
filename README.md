@@ -912,12 +912,12 @@ Run project.
     // Current: type, required, max, min, same, email, unique, exists.
     
     // Unique ussage: 
-    # unique:table_name;key:column_name;db=database // key and db parameters is optional, if you not add key parameter get request key name, if you not add db parameter get first in array connection.
+    # unique:table_name;key:column_name // key is optional, if you not add key parameter get request key name.
 
-    # exists:table_name;key:column_name;db=database // key and db parameters is optional, if you not add key parameter get request key name, if you not add db parameter get first in array connection.
+    # exists:table_name;key:column_name // key is optional, if you not add key parameter get request key name.
     
-    // Unique Example: 'email' => ["unique:users;key:email;db:local"]
-    // Exists Example: 'email' => ["exists:users;key:email;db:local"]
+    // Unique Example: 'email' => ["unique:" . Users::class . ";key:email"]
+    // Exists Example: 'email' => ["exists:" . Users::class . ";key:email"]
 
     Validator::validate($_REQUEST, [
         'test1' => ['type:string', 'required', 'max:10', 'min:5', 'same:test2'],
