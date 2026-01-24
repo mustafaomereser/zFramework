@@ -3,6 +3,7 @@
 namespace zFramework\Core\Facades;
 
 use ReflectionClass;
+use zFramework\Core\Helpers\Date;
 use zFramework\Core\Traits\DB\OrMethods;
 use zFramework\Core\Traits\DB\RelationShips;
 
@@ -749,10 +750,14 @@ class DB
     public function delete()
     {
         $this->trigger('delete');
-        if (!isset($this->softDelete)) $delete = $this->run(__FUNCTION__)->rowCount();
-        else $delete = $this->update([$this->deleted_at => date('Y-m-d H:i:s')]);
-        $this->trigger('deleted');
 
+        if (!isset($this->softDelete)) $delete = $this->run(__FUNCTION__)->rowCount();
+        else $delete = $this->update([$this->deleted_at => [
+            'date' => Date::timestamp(),
+            'bool' => 1
+        ][config('model.deleted_at_type')]]);
+
+        $this->trigger('deleted');
         return $delete;
     }
     #endregion

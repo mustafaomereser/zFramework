@@ -176,7 +176,10 @@ class Db
 
             if (strlen($key = array_search('softDelete', $columns))) {
                 unset($columns[$key]);
-                $columns = ($columns + [$consts['deleted_at'] => ['nullable', 'datetime', 'default']]);
+                $columns = ($columns + [$consts['deleted_at'] => [
+                    'date' => ['nullable', 'datetime', 'default'],
+                    'bool' => ['bool', 'default:00']
+                ][config('model.deleted_at_type')]]);
             }
             #
             //
