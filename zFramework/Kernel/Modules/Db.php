@@ -178,7 +178,7 @@ class Db
                 unset($columns[$key]);
                 $columns = ($columns + [$consts['deleted_at'] => [
                     'date' => ['nullable', 'datetime', 'default'],
-                    'bool' => ['bool', 'default:00', 'required']
+                    'bool' => ['bool', 'default:1', 'required']
                 ][config('model.deleted_at_type')]]);
             }
             #

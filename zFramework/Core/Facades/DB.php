@@ -754,7 +754,7 @@ class DB
         if (!isset($this->softDelete)) $delete = $this->run(__FUNCTION__)->rowCount();
         else $delete = $this->update([$this->deleted_at => [
             'date' => Date::timestamp(),
-            'bool' => 1
+            'bool' => 0
         ][config('model.deleted_at_type')]]);
 
         $this->trigger('deleted');
