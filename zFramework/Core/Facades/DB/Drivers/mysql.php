@@ -92,10 +92,11 @@ class mysql
             'queries'  => [
                 [
                     'key'      => $this->parent->deleted_at,
-                    'operator' => 'IS NULL',
-                    'value'    => null,
                     'prev'     => "AND"
-                ]
+                ] + [
+                    'date' => ['operator' => 'IS NULL', 'value' => null],
+                    'bool' => ['operator' => '=', 'value' => 0]
+                ][config('model.deleted_at_type')]
             ]
         ];
 

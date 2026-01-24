@@ -7,5 +7,5 @@ return [
         'deleted_at' => 'deleted_at'
     ],
 
-    'deleted_at_type' => ['date', 'bool'][0]
+    'deleted_at_type' => ['date', 'bool'][1]
 ];
