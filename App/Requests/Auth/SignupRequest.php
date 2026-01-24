@@ -2,6 +2,7 @@
 
 namespace App\Requests\Auth;
 
+use App\Models\User;
 use zFramework\Core\Abstracts\Request;
 
 class SignupRequest extends Request
@@ -18,9 +19,9 @@ class SignupRequest extends Request
     {
         return [
             // uses parameters for example
-            // 'username'  => ['required', "exists:users ex:$parameter1"],
-            'username'  => ['required', 'unique:users'],
-            'email'     => ['required', 'email', 'unique:users'],
+            // 'username'  => ['required', "exists:' . User::class. ';ex:$parameter1"],
+            'username'  => ['required', 'unique:' . User::class],
+            'email'     => ['required', 'email', 'unique:' . User::class],
             'password'  => ['type:string', 'required', 'min:8', 'same:re-password'],
             'terms'     => ['required']
         ];

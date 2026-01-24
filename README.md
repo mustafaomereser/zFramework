@@ -916,8 +916,8 @@ Run project.
 
     # exists:table_name;key:column_name // key is optional, if you not add key parameter get request key name.
     
-    // Unique Example: 'email' => ["unique:" . Users::class . ";key:email"]
-    // Exists Example: 'email' => ["exists:" . Users::class . ";key:email"]
+    // Unique Example: 'email' => ["unique:" . User::class . ";key:email"]
+    // Exists Example: 'email' => ["exists:" . User::class . ";key:email"]
 
     Validator::validate($_REQUEST, [
         'test1' => ['type:string', 'required', 'max:10', 'min:5', 'same:test2'],
