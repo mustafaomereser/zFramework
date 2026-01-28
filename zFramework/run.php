@@ -3,6 +3,7 @@
 namespace zFramework;
 
 use zFramework\Core\Facades\Config;
+use zFramework\Core\Route;
 
 class Run
 {
@@ -78,7 +79,13 @@ class Run
 
             self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
             self::initProviders()::findModules(base_path('/modules'))::loadModules();
+
+            // if (!file_exists("$storage_path/routes.cache.php")) {
             self::includer(BASE_PATH . '/route');
+            //     if (\zFramework\Core\Route::$caching) file_put_contents("$storage_path/routes.cache.php", "<?php return " . var_export(Route::$routes, true) . ";");
+            // } else {
+            //     Route::$routes = include("$storage_path/routes.cache.php");
+            // }
 
             \zFramework\Core\Route::run();
             \zFramework\Core\Facades\Alerts::unset(); # forgot alerts
