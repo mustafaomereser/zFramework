@@ -8,10 +8,12 @@ date_default_timezone_set('Europe/Istanbul');
 
 // Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
-$sessions_path = "$storage_path/sessions";
-@mkdir($sessions_path, 0777, true);
-session_save_path($sessions_path);
-ini_set('session.gc_probability', 1);
+if (!isset($cron_mode)) {
+    $sessions_path = "$storage_path/sessions";
+    @mkdir($sessions_path, 0777, true);
+    session_save_path($sessions_path);
+    ini_set('session.gc_probability', 1);
+}
 // Session settings: End
 
 // Error log: start
@@ -23,7 +25,7 @@ $GLOBALS['databases'] = [
     'connections' => include(BASE_PATH . '/database/connections.php') #db connections strings
 ];
 
-if (((include(BASE_PATH . "/config/app.php"))['force-https'] ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off")) die(header('Location: https://' . ($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'])));
+if (!isset($cron_mode) && ((include(BASE_PATH . "/config/app.php"))['force-https'] ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off")) die(header('Location: https://' . ($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'])));
 
 include(BASE_PATH . '/zFramework/vendor/autoload.php');
 include(BASE_PATH . '/zFramework/run.php');
