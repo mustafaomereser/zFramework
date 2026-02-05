@@ -36,7 +36,7 @@ class Route
 
         if ($route_is_exists) {
             $url = self::$routes[$name]['url'];
-            foreach ($data as $key => $val) $url = str_replace(["{" . $key . "}", "{?" . $key . "}"], $val, $url);
+            foreach ($data as $key => $val) @$url = str_replace(["{" . $key . "}", "{?" . $key . "}"], $val, $url);
             while (strstr($url, '//')) $url = str_replace(['//'], ['/'], $url);
             $return = (host() . script_name()) . rtrim($url, '/');
         }
