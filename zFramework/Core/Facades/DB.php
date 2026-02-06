@@ -658,7 +658,7 @@ class DB
         $start_count = ($per_page * ($current_page - 1));
         if (!$row_count) $start_count = -1;
 
-        parse_str(@$_SERVER['QUERY_STRING'], $queryString);
+        @parse_str(@$_SERVER['QUERY_STRING'], $queryString);
         $queryString[$page_id] = "change_page_$uniqueID";
         $url = "?" . http_build_query($queryString);
 
