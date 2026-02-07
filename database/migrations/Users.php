@@ -16,9 +16,9 @@ class Users
     {
         return [
             'id'        => ['primary'],
-            'username'  => ['varchar:51', 'unique'],
+            'username'  => ['varchar:51', 'unique:user'],
             'password'  => ['varchar:50'],
-            'email'     => ['varchar:50', 'unique'],
+            'email'     => ['varchar:50', 'unique:user'],
             'api_token' => ['varchar:60', 'required'],
             
             'timestamps',

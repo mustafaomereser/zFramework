@@ -73,12 +73,8 @@ class Terminal
     {
         self::clear();
 
-        try {
-            $module = "\zFramework\Kernel\Modules\\" . ($method = ucfirst(strtolower(self::$commands[0])));
-            $module::begin(array_column(Module::$list[strtolower($method)]['methods'] ?? [], 'name'));
-        } catch (\Throwable $e) {
-            self::text("[color=yellow]" . $e->getMessage() . "[/color]");
-        }
+        $module = "\zFramework\Kernel\Modules\\" . ($method = ucfirst(strtolower(self::$commands[0])));
+        $module::begin(array_column(Module::$list[strtolower($method)]['methods'] ?? [], 'name'));
 
         if (count(self::$textlist)) echo json_encode(self::$textlist, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         if (self::$terminate) return null;

@@ -5,7 +5,9 @@ return [
 
     'error'       => [
         'logging'  => true,
-        'callback' => function ($log) {}
+        'callback' => function ($log_path, $log) {
+            if (PHP_SAPI === 'cli') die(zFramework\Kernel\Terminal::text("[color=red]-> unexcepted terminal error[/color][color=green] $log_path [/color]"));
+        }
     ],
 
     'force-https' => false, # force redirect https.

@@ -126,7 +126,7 @@ class Db
             $charset       = $class::$charset ?? null;
             $table         = $class::$table;
 
-            # Reset Table.
+            #region: Reset Table.
             $fresh = $migrate_fresh;
             if (!$fresh && !self::table_exists($table)) $fresh = true;
             if ($fresh) {
@@ -140,31 +140,31 @@ class Db
 
                 $drop_columns[] = $init_column_name;
             }
-            #
+            #endregion
 
             if (!($fresh || $migrate_force) && strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
                 Terminal::text("\n[color=green]`" . self::$dbname . ".$table` is up to date.[/color]");
                 continue;
             }
 
-            # detect indexes
+            #region: detect indexes
             $indexes = [];
             try {
-                foreach (self::$db->prepare("SHOW INDEX FROM $table")->fetchAll(\PDO::FETCH_ASSOC) as $index) if ($index['Key_name'] != 'PRIMARY') $indexes[$index['Column_name']][] = $index['Key_name'];
+                foreach (self::$db->prepare("SHOW INDEX FROM $table")->fetchAll(\PDO::FETCH_ASSOC) as $index) if ($index['Key_name'] != 'PRIMARY') $indexes[$index['Key_name']] = $index['Key_name'];
             } catch (\PDOException $e) {
                 Terminal::text("\n[color=yellow]`" . self::$dbname . ".$table` cannot access indexes.[/color]");
             }
-            #
+            #endregion
 
-            # setting prefix.
+            #region: setting prefix.
             if (isset($class::$prefix)) foreach ($columns as $name => $val) {
                 unset($columns[$name]);
                 $name = ($class::$prefix ? $class::$prefix . "_" : null) . $name;
                 $columns[$name] = $val;
             }
-            #
+            #endregion
 
-            # Setting consts
+            #region: Setting consts
             $consts = config('model.consts');
             if (strlen($key = array_search('timestamps', $columns))) {
                 unset($columns[$key]);
@@ -181,7 +181,7 @@ class Db
                     'bool' => ['bool', 'default:1', 'required']
                 ][config('model.deleted_at_type')]]);
             }
-            #
+            #endregion
             //
 
             Terminal::text("\n[color=green]`" . self::$dbname . ".$table` migrating:[/color]");
@@ -193,7 +193,7 @@ class Db
 
             $queue_index_list = [];
 
-            # Migrate stuff
+            #region: Migrate stuff
             $last_column = null;
             foreach ($columns as $column => $parameters) {
                 $data = ['type' => 'INT'];
@@ -214,7 +214,7 @@ class Db
                             break;
 
                         case 'unique':
-                            $data['extras'][] = " ADD CONSTRAINT `" . $column . "_unique` UNIQUE (`$column`) ";
+                            $queue_index_list["unique_" . (isset($switch[1]) ? $switch[1] : $column)][] = $column;
                             break;
 
                         case 'index':
@@ -306,23 +306,8 @@ class Db
                     }
                 }
 
-                if ($fresh || $migrate_force) {
-                    $column_need_update = true;
-                } else {
-                    $column_need_update = !isset($last_migrate['tables'][$table]['columns'][$column]['data']) || $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
-                }
-
-                if ($column_need_update) {
-                    $column_indexes = $indexes[$column] ?? [];
-                    foreach ($column_indexes as $index) {
-                        try {
-                            self::$db->prepare("ALTER TABLE $table DROP INDEX $index");
-                            $cleared_indexes[] = $index;
-                        } catch (\Throwable $e) {
-                            Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
-                        }
-                    }
-                }
+                if ($fresh || $migrate_force) $column_need_update = true;
+                else $column_need_update = !isset($last_migrate['tables'][$table]['columns'][$column]['data']) || $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
 
                 $result = ['loop' => true, 'status' => 0];
                 if ($column_need_update) {
@@ -365,7 +350,15 @@ class Db
                 $last_migrate['tables'][$table]['columns'][$column] = ['result' => ['status' => $result['status'], 'message' => $types[$result['status']][0]], 'data' => $data];
                 $last_column = $column;
             }
-            #
+            #endregion
+
+            #region: index management
+            foreach ($indexes as $index) try {
+                self::$db->prepare("ALTER TABLE $table DROP INDEX $index");
+                $cleared_indexes[] = $index;
+            } catch (\Throwable $e) {
+                Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
+            }
 
             if (count($cleared_indexes)) {
                 Terminal::text("[color=dark-gray]" . str_repeat('.', 40) . "[/color]");
@@ -373,28 +366,29 @@ class Db
                 Terminal::text("[color=dark-gray]" . str_repeat('.', 40) . "[/color]");
             }
 
-            foreach (array_unique($drop_columns) as $drop) {
-                try {
-                    self::$db->prepare("ALTER TABLE $table DROP COLUMN $drop");
-                    Terminal::text("[color=yellow]Dropped column: $drop" . "[/color]");
-                } catch (\PDOException $e) {
-                    Terminal::text("[color=red]Error: Column is can not drop: $drop" . "[/color]");
-                }
-            }
-
             foreach ($queue_index_list as $index_key => $index_columns) try {
-                self::$db->prepare("CREATE INDEX $index_key ON $table(" . implode(', ', $index_columns) . ");");
+                self::$db->prepare("CREATE " . (str_starts_with($index_key, 'unique_') ? 'UNIQUE' : '') . " INDEX " . substr($index_key, 0, 60) . " ON $table(" . implode(', ', $index_columns) . ");");
                 Terminal::text("[color=green]-> added index key `$index_key`[/color][color=dark-gray](" . implode(', ', $index_columns) . ")[/color]");
             } catch (\Throwable $e) {
                 Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
             }
+            #endregion
 
-            # update storage engine.
+            #region: drop columns
+            foreach (array_unique($drop_columns) as $drop) try {
+                self::$db->prepare("ALTER TABLE $table DROP COLUMN $drop");
+                Terminal::text("[color=yellow]Dropped column: $drop" . "[/color]");
+            } catch (\PDOException $e) {
+                Terminal::text("[color=red]Error: Column is can not drop: $drop" . "[/color]");
+            }
+            #endregion
+
+            #region: update storage engine.
             self::$db->prepare("ALTER TABLE $table ENGINE = '$storageEngine'");
             Terminal::text("[color=yellow]`" . self::$dbname . ".$table` storage engine is[/color] [color=blue]`$storageEngine`[/color]");
+            #endregion
 
             Terminal::text("[color=green]`" . self::$dbname . ".$table` migrate complete.[/color]");
-
             if ($fresh && in_array('oncreateSeeder', get_class_methods($class))) {
                 Terminal::text("\n[color=green]`" . self::$dbname . ".$table` Oncreate seeder.[/color]");
                 Terminal::text("-> [color=green]Seeding.[/color]", true);
@@ -433,15 +427,13 @@ class Db
      */
     public static function backup()
     {
-        $title = date('Y-m-d H-i-s');
-
-        $backup = (new MySQLBackup(self::$db->db(), [
+        $title = date('Y-m-d~H-i-s');
+        (new MySQLBackup(self::$db, [
             'dir'      => base_path('/database/backups/' . self::$db->db),
             'save_as'  => $title,
-            'compress' => in_array('--compress', Terminal::$parameters)
+            'compress' => in_array('--compress', Terminal::$parameters),
+            'separate' => in_array('--separate', Terminal::$parameters)
         ]))->backup();
-        if ($backup) Terminal::text("[color=green](" . self::$dbname . ") " . self::$db->db . " backup ($title).[/color]");
-        else Terminal::text("[color=red]Backup fail.[/color] [color=yellow]Check your database status. (if your database empty can not get backup)[/color]");
         return true;
     }
 

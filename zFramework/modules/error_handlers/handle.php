@@ -149,7 +149,7 @@ function getErrorDetails($message, $file, $line)
 
 function errorHandler($data)
 {
-    ob_end_clean();
+    @ob_end_clean();
 
     ob_start();
     $data = array_values((array) $data);
@@ -1204,10 +1204,11 @@ function errorHandler($data)
     </html>
 
 <?php
-    $error_log = ob_get_clean();
+    @$error_log = ob_get_clean();
     if (Config::get('app.error.logging')) {
-        file_put_contents2(ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '.html', $error_log);
-        Config::get('app.error.callback')($error_log);
+        $error_log_file_name = ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '.html';
+        file_put_contents2($error_log_file_name, $error_log);
+        Config::get('app.error.callback')($error_log_file_name, $error_log);
     }
 
     if (!Config::get('app.debug')) {
