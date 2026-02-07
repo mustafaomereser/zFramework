@@ -483,7 +483,8 @@ ALSO you can normal query like /1?test=true
     // can use parameters:
     [
         'primary',
-        'unique', 
+        'unique',
+        'index', 'index:group_name', // you can index for per column and you can against index with group. 
         'text',
         'bigint', 
         'int', 

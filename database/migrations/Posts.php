@@ -12,9 +12,9 @@ class Posts
     {
         return [
             'id'      => ['primary'],
-            'title'   => ['varchar'],
-            'user_id' => ['int'],
-            'content' => ['text'],
+            'title'   => ['varchar', 'index:find_user'],
+            'user_id' => ['int', 'index:find_user'],
+            'content' => ['text', 'index'],
 
             'timestamps',
             'softDelete'

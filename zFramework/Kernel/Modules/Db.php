@@ -191,6 +191,8 @@ class Db
             foreach ($tableColumns as $column) if (!isset($columns[$column])) $drop_columns[] = $column;
             #
 
+            $queue_index_list = [];
+
             # Migrate stuff
             $last_column = null;
             foreach ($columns as $column => $parameters) {
@@ -213,6 +215,10 @@ class Db
 
                         case 'unique':
                             $data['extras'][] = " ADD CONSTRAINT `" . $column . "_unique` UNIQUE (`$column`) ";
+                            break;
+
+                        case 'index':
+                            $queue_index_list["idx_" . (isset($switch[1]) ? $switch[1] : $column)][] = $column;
                             break;
 
                         # String: start
@@ -374,6 +380,13 @@ class Db
                 } catch (\PDOException $e) {
                     Terminal::text("[color=red]Error: Column is can not drop: $drop" . "[/color]");
                 }
+            }
+
+            foreach ($queue_index_list as $index_key => $index_columns) try {
+                self::$db->prepare("CREATE INDEX $index_key ON $table(" . implode(', ', $index_columns) . ");");
+                Terminal::text("[color=green]-> added index key `$index_key`[/color][color=dark-gray](" . implode(', ', $index_columns) . ")[/color]");
+            } catch (\Throwable $e) {
+                Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
             }
 
             # update storage engine.
