@@ -45,7 +45,8 @@ class DB
 
         if (!$db) $db = array_keys($GLOBALS['databases']['connections'])[0] ?? null;
         if (isset($GLOBALS['databases']['connections'][$db])) $this->db = $db;
-
+        
+        $this->connection();
         $this->reset();
     }
 
@@ -56,7 +57,7 @@ class DB
     public function connection()
     {
         if ($this->connection !== null) return $this->connection;
-        if ($this->table && !isset($GLOBALS['databases']['connections'][$this->db])) throw new \Exception("$this->table's database is doesn't exists!");
+        if ($this->table && !isset($GLOBALS['databases']['connections'][$this->db])) return false;
         if (!isset($GLOBALS['databases']['connected'][$this->db])) {
             try {
                 $parameters = $GLOBALS['databases']['connections'][$this->db];
@@ -795,7 +796,6 @@ class DB
      */
     public function buildSQL(string $type = 'select'): string
     {
-        $this->connection();
         $sql = $this->builder->build($type);
 
         if ($this->sqlDebug) {
