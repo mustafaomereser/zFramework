@@ -755,7 +755,7 @@ class DB
         else $delete = $this->update([$this->deleted_at => [
             'date' => Date::timestamp(),
             'bool' => 0
-        ][config('model.deleted_at_type')]]);
+        ][$this->deleted_at_type]]);
 
         $this->trigger('deleted');
         return $delete;

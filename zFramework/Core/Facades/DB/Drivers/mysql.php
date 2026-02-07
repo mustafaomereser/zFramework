@@ -96,7 +96,7 @@ class mysql
                 ] + [
                     'date' => ['operator' => 'IS NULL', 'value' => null],
                     'bool' => ['operator' => '=', 'value' => 1]
-                ][config('model.deleted_at_type')]
+                ][$this->parent->deleted_at_type]
             ]
         ];
 

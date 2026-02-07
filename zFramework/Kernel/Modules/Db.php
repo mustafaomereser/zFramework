@@ -186,7 +186,6 @@ class Db
 
             Terminal::text("\n[color=green]`" . self::$dbname . ".$table` migrating:[/color]");
 
-
             # detect dropped columns
             $tableColumns = self::$db->prepare("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN);
             foreach ($tableColumns as $column) if (!isset($columns[$column])) $drop_columns[] = $column;

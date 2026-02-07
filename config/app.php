@@ -4,7 +4,7 @@ return [
     'debug'       => true, # turn false on production.
 
     'error'       => [
-        'logging' => true,
+        'logging'  => true,
         'callback' => function ($log) {}
     ],
 

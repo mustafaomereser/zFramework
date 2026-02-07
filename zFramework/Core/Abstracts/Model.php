@@ -16,6 +16,7 @@ abstract class Model extends DB
     public $created_at;
     public $updated_at;
     public $deleted_at;
+    public $deleted_at_type;
     public $not_closures  = ['beginQuery'];
     public $_not_found    = 'Not found.';
 
@@ -24,10 +25,8 @@ abstract class Model extends DB
      */
     public function __construct()
     {
-        // $this->created_at = 'created_at';
-        // $this->updated_at = 'updated_at';
-        // $this->deleted_at = 'deleted_at';
         foreach (config('model.consts') as $key => $val) $this->{$key} = $val;
+        $this->deleted_at_type = config('model.deleted_at_type');
 
         parent::__construct(@$this->db);
         parent::table($this->table);
