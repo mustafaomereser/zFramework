@@ -85,6 +85,7 @@ class MySQLBackup
             if (!$this->config['compress']) {
                 $write = file_put_contents2($save_path, $sql);
             } else {
+                @mkdir(dirname($save_path), 0777, true);
                 $write = gzopen($save_path, "a9");
                 gzwrite($write, $sql);
                 gzclose($write);

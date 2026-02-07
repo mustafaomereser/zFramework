@@ -450,10 +450,10 @@ class Db
         Terminal::text("\n[color=yellow]*[/color] [color=blue]Backup list for `" . self::$dbname . "` database[/color]");
         $list = [];
         foreach ($backups as $key => $name) {
-            Terminal::text("[color=yellow]" . ($key + 1) . "[/color]. [color=green]" . @end(explode('/', $name)) . "[/color]");
+            Terminal::text("[color=yellow]" . ($key + 1) . "[/color]. [color=green]" . basename($name) . "[/color]");
             $list[$key] = glob("$name/*");
             if (!count($list[$key])) Terminal::text(" -> [color=dark-gray]this backup is empty[/color]");
-            else foreach ($list[$key] as $file) Terminal::text(" -> [color=yellow]" . @end(explode('/', $file)) . "[/color]");
+            else foreach ($list[$key] as $file) Terminal::text(" -> [color=yellow]" . basename($file) . "[/color]");
             Terminal::text("");
         }
         Terminal::text("\n[color=yellow]*[/color] [color=blue]Select a backup[/color]");
@@ -468,15 +468,27 @@ class Db
         $clear = self::$db->prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = :DB_NAME", ['DB_NAME' => self::$dbname])->fetchAll(\PDO::FETCH_ASSOC);
         if (count($clear)) self::$db->prepare(implode(';', array_map(fn($table_name) => "DROP TABLE IF EXISTS $table_name", array_column($clear, 'table_name'))));
 
-        Terminal::text("[color=green]Tables cleared...[/color]", true);
+        Terminal::text("[color=green]Tables dropped...[/color]", true);
         Terminal::text("[color=yellow]Backup restoring...[/color]", true);
 
-        // gz sıkıştırma için formül eklenecek.
-
         foreach ($backup as $file) {
-            $data     = file_get_contents($file);
-            $rowCount = self::$db->prepare($data)->rowCount();
-            Terminal::text("[color=green]" . @end(explode('/', $file)) . " backup restored... ($rowCount rows affected)[/color]", true);
+            $data = file_get_contents($file);
+            if (str_ends_with($file, '.sql.gz')) $data = gzdecode($data);
+            // self::$db->connection()->exec($data);
+            // Terminal::text("[color=green]" . basename($file) . " backup restored... (" . substr_count($data, ';') . " queries executed)[/color]", true);
+            $queries   = explode(";", $data);
+            $totalRows = 0;
+            foreach ($queries as $sql) {
+                if (trim($sql) === '') continue;
+
+                try {
+                    $totalRows += self::$db->connection()->exec($sql);
+                } catch (\Throwable $e) {
+                    Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
+                }
+            }
+
+            Terminal::text("[color=green]" . basename($file) . " restored... (" . count($queries) . " queries, ~$totalRows rows affected)[/color]", true);
         }
 
         return true;
