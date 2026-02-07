@@ -30,7 +30,7 @@ class Auth
     public static function init()
     {
         if ($columns = (new User)->special_columns) self::$columns = $columns;
-        if (!self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
+        if (isset($GLOBALS['databases']['connections'][(new User)->db]) && !self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
     }
 
     /**

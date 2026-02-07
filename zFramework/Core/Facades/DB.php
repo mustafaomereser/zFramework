@@ -3,6 +3,7 @@
 namespace zFramework\Core\Facades;
 
 use ReflectionClass;
+use zFramework\Core\Facades\Analyzer\DbCollector;
 use zFramework\Core\Helpers\Date;
 use zFramework\Core\Traits\DB\OrMethods;
 use zFramework\Core\Traits\DB\RelationShips;
@@ -88,8 +89,11 @@ class DB
      */
     public function prepare(string $sql, array $data = [])
     {
+        $query_time = microtime(true);
         $e = $this->connection()->prepare($sql);
         $e->execute(count($data) ? $data : $this->buildQuery['data'] ?? []);
+        $query_time = microtime(true) - $query_time;
+        if (config('app.analyze')) DbCollector::collect($this->table, $sql, $this->buildQuery['sql-identity'], $query_time);
         $this->reset();
         return $e;
     }
@@ -199,15 +203,16 @@ class DB
     {
         $this->cache['buildQuery'] = $this->buildQuery;
         $this->buildQuery = [
-            'select'    => [],
-            'join'      => [],
-            'where'     => [],
-            'orderBy'   => [],
-            'groupBy'   => [],
-            'limit'     => [],
-            'having'    => [],
-            'sets'      => "",
-            'fetchType' => \PDO::FETCH_ASSOC
+            'sql-identity' => uniqid('SQL-IDENTITY-'),
+            'select'       => [],
+            'join'         => [],
+            'where'        => [],
+            'orderBy'      => [],
+            'groupBy'      => [],
+            'limit'        => [],
+            'having'       => [],
+            'sets'         => "",
+            'fetchType'    => \PDO::FETCH_ASSOC
         ];
         return $this;
     }
@@ -793,23 +798,21 @@ class DB
     {
         $sql = $this->builder->build($type);
 
-        // if ($this->sqlDebug) {
-        //     $debug_sql = $sql;
-        //     foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->connection()->quote($value), $debug_sql);
-        //     echo "#Begin SQL Query:\n";
-        //     var_dump($debug_sql);
-        //     echo "#End of SQL Query\n";
-        // }
-
         if ($this->sqlDebug) {
+            $sql_id    = $this->buildQuery['sql-identity'];
             $debug_sql = $sql;
             foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->connection()->quote($value), $debug_sql);
             ob_start();
-            echo "#" . $this->dbname . " Begin SQL Query:\n";
+            echo "# $sql_id " . $this->dbname . " Begin SQL Query:\n";
             var_dump($debug_sql);
             echo "\nAnalyze query: ";
-            var_dump($this->connection()->query("EXPLAIN ANALYZE $debug_sql")->fetchAll(\PDO::FETCH_ASSOC));
-            echo "#End of SQL Query\n";
+            try {
+                var_dump($this->connection()->query("EXPLAIN ANALYZE $debug_sql")->fetchAll(\PDO::FETCH_ASSOC));
+            } catch (\Throwable $e) {
+                echo "*UNSUPPORTED EXPLAIN ANALYZE*";
+            }
+
+            echo "\n#End of SQL Query\n";
             $debug = ob_get_clean();
             file_put_contents2(base_path("/db-debug/" . time()), $debug, FILE_APPEND);
         }

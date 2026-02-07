@@ -2,6 +2,8 @@ push.bat
 composer.lock
 error_logs
 Releases
+db-debug
+db-analyzes
 database/backups
 public_html/uploads
 zFramework/storage

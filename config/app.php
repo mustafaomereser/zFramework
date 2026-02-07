@@ -2,7 +2,7 @@
 
 return [
     'debug'       => true, # turn false on production.
-
+    'analyze'     => true,
     'error'       => [
         'logging'  => true,
         'callback' => function ($log_path, $log) {
