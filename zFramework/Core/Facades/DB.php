@@ -46,7 +46,6 @@ class DB
         if (!$db) $db = array_keys($GLOBALS['databases']['connections'])[0] ?? null;
         if (isset($GLOBALS['databases']['connections'][$db])) $this->db = $db;
 
-        $this->connection();
         $this->reset();
     }
 
@@ -93,7 +92,7 @@ class DB
         $e = $this->connection()->prepare($sql);
         $e->execute(count($data) ? $data : $this->buildQuery['data'] ?? []);
         $query_time = microtime(true) - $query_time;
-        if (config('app.analyze')) DbCollector::collect($this->table, $sql, $this->buildQuery['sql-identity'], $query_time);
+        if (config('app.analyze')) DbCollector::collect(($this->table ?? 'none-table'), $sql, ($this->buildQuery['sql-identity'] ?? 'none-sql-identity'), $query_time);
         $this->reset();
         return $e;
     }
@@ -796,6 +795,7 @@ class DB
      */
     public function buildSQL(string $type = 'select'): string
     {
+        $this->connection();
         $sql = $this->builder->build($type);
 
         if ($this->sqlDebug) {

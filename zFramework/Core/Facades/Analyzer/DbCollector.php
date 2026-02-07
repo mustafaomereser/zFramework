@@ -11,6 +11,7 @@ class DbCollector
         echo str_repeat('-', 50) . "\n";
         print_r($usage);
         print_r(func_get_args());
+        print_r(($query_time * 1000) . 'ms');
         echo "\n" . str_repeat('-', 50) . "\n";
         $analyze = ob_get_clean();
         file_put_contents2(base_path("/db-analyzes/" . Analyze::$process_id), $analyze, FILE_APPEND);
