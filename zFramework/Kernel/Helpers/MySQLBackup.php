@@ -57,20 +57,9 @@ class MySQLBackup
             if (count($rows) > 0) {
                 $columns = $this->getAll('SHOW COLUMNS FROM %s', [$tableName]);
                 $columns = array_map(fn($column) => $column['Field'], $columns);
-                foreach ($rows as $row) $this->sql[$tableName] .= 'INSERT INTO `' . $tableName . '` (`' . implode('`,`', $columns) . '`) VALUES  (' . implode(',', array_map(fn($item) => @$this->db->connection()->quote($item), $row)) . ');' . PHP_EOL;
+                foreach ($rows as $row) $this->sql[$tableName] .= 'INSERT INTO `' . $tableName . '` (`' . implode('`,`', $columns) . '`) VALUES (' . implode(',', array_map(fn($item) => !is_null($item) ? @$this->db->connection()->quote($item) : 'NULL', $row)) . ');' . PHP_EOL;
             }
         }
-
-        // Triggerlar için metod
-        $this->dumpTriggers();
-
-        // Fonksiyonlar için metod
-        $this->dumpFunctions();
-
-        // Procedure için metod
-        $this->dumpProcedures();
-
-        if (!count($this->sql)) return false;
 
         return $this->save();
     }
@@ -80,6 +69,13 @@ class MySQLBackup
         $output = [];
         foreach ($this->sql as $table_name => $sql) @$output[$this->config['separate'] ? $this->dbname . "." . $table_name : $this->dbname] .= $sql;
 
+        if (!count($output)) return Terminal::text("[color=dark-gray]-> $this->dbname is empty.[/color]");
+
+        $this->dumpTriggers();
+        $this->dumpFunctions();
+        $this->dumpProcedures();
+
+        $write = false;
         foreach ($output as $key => $sql) {
             $save_path = $this->config['dir'] . "/" . $this->dbname . "/" . $this->config['save_as'] . "/" . $key;
             $ext       = ($this->config['compress'] ? '.sql.gz' : '.sql');
@@ -94,7 +90,7 @@ class MySQLBackup
                 gzclose($write);
             }
 
-            if ($write) Terminal::text("[color=green](" . $this->dbname . ") " . $key . " backup ($save_path).[/color]");
+            if ($write) Terminal::text("[color=green]-> `$key` backup `$save_path`[/color]");
             else Terminal::text("[color=red]-> $key Backup fail.[/color] [color=yellow]Check your database status.[/color]");
         }
 

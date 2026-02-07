@@ -429,7 +429,7 @@ class Db
     {
         $title = date('Y-m-d~H-i-s');
         (new MySQLBackup(self::$db, [
-            'dir'      => base_path('/database/backups/' . self::$db->db),
+            'dir'      => base_path('/database/backups'),
             'save_as'  => $title,
             'compress' => in_array('--compress', Terminal::$parameters),
             'separate' => in_array('--separate', Terminal::$parameters)
