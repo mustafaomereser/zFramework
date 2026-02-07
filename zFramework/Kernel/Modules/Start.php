@@ -17,6 +17,6 @@ class Start
 [/color]");
         Terminal::text('Do you need help? Type just "help".');
         echo PHP_EOL;
-        Terminal::text('e.g. use module: db migration --fresh --seed');
+        Terminal::text('e.g. use module: db migrate --fresh --seed');
     }
 }

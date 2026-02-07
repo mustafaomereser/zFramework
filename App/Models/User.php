@@ -11,11 +11,19 @@ class User extends Model
 
     // public $observe      = App\Observers\UserObserver::class;
 
-    public $table      = "users";
-    public $_not_found = 'User is not found.';
+    public $table       = "users";
+    public $_not_found  = 'User is not found.';
     // public $guard    = ['password', 'api_token'];
 
-    # every reset after begin query.
+    # custom columns for Auth::class
+    public $special_columns = [
+        'email'          => 'email',
+        'password'       => 'password',
+        'passwordencode' => 'crypter' # crypter | md5
+    ];
+
+
+    # every re set after begin query.
     public function beginQuery()
     {
         // return $this->where('id', 1);
