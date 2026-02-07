@@ -443,31 +443,41 @@ class Db
      */
     public static function restore()
     {
-        $backups = glob(base_path('database/backups/' . self::$db->db . '/*'));
+        $backups = glob(base_path('database/backups/' . self::$dbname . '/*'));
 
         if (!count($backups)) return Terminal::text("[color=yellow](" . self::$dbname . ") " . self::$db->db . " haven't any backup.[/color]");
 
-        Terminal::text("\n[color=yellow]*[/color] [color=blue]Backup list for `(" . self::$dbname . ") " . self::$db->db . "` database[/color]");
-        foreach ($backups as $key => $name) Terminal::text("[color=yellow]" . ($key + 1) . "[/color]. [color=green]" . $name . "[/color]");
+        Terminal::text("\n[color=yellow]*[/color] [color=blue]Backup list for `" . self::$dbname . "` database[/color]");
+        $list = [];
+        foreach ($backups as $key => $name) {
+            Terminal::text("[color=yellow]" . ($key + 1) . "[/color]. [color=green]" . @end(explode('/', $name)) . "[/color]");
+            $list[$key] = glob("$name/*");
+            if (!count($list[$key])) Terminal::text(" -> [color=dark-gray]this backup is empty[/color]");
+            else foreach ($list[$key] as $file) Terminal::text(" -> [color=yellow]" . @end(explode('/', $file)) . "[/color]");
+            Terminal::text("");
+        }
         Terminal::text("\n[color=yellow]*[/color] [color=blue]Select a backup[/color]");
         $backup = (int) readline('> ');
 
         if (!is_int($backup) || !isset($backups[$backup - 1])) return Terminal::clear()::text('[color=red]Selection is not acceptable.[/color]');
 
-        Terminal::clear()::text("[color=yellow]Clearing...[/color]");
+        $backup = $list[$backup - 1];
+        if (!count($backup)) return Terminal::text("[color=dark-gray]this backup is empty[/color]", true);
+
+        Terminal::clear()::text("[color=yellow]Database's tables is dropping...[/color]", true);
         $clear = self::$db->prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = :DB_NAME", ['DB_NAME' => self::$dbname])->fetchAll(\PDO::FETCH_ASSOC);
         if (count($clear)) self::$db->prepare(implode(';', array_map(fn($table_name) => "DROP TABLE IF EXISTS $table_name", array_column($clear, 'table_name'))));
 
-        Terminal::clear()::text("[color=green]Cleared...[/color]");
-        Terminal::text("[color=yellow]Restoring...[/color]");
-
-        $backup = $backups[$backup - 1];
+        Terminal::text("[color=green]Tables cleared...[/color]", true);
+        Terminal::text("[color=yellow]Backup restoring...[/color]", true);
 
         // gz sıkıştırma için formül eklenecek.
 
-        $data   = file_get_contents($backup);
-        self::$db->prepare($data);
-        Terminal::clear()::text("[color=green]Backup restored...[/color]");
+        foreach ($backup as $file) {
+            $data     = file_get_contents($file);
+            $rowCount = self::$db->prepare($data)->rowCount();
+            Terminal::text("[color=green]" . @end(explode('/', $file)) . " backup restored... ($rowCount rows affected)[/color]", true);
+        }
 
         return true;
     }
