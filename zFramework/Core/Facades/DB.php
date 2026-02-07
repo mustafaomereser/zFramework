@@ -624,6 +624,16 @@ class DB
     }
 
     /**
+     * Find or fail row by primary key
+     * @param string $value
+     * @return array 
+     */
+    public function findOrFail(string $value)
+    {
+        return $this->where($this->getPrimary(), $value)->firstOrFail();
+    }
+
+    /**
      * paginate
      * @param int $per_page
      * @param string $page_id
@@ -676,14 +686,12 @@ class DB
                 if (!$view) $view = config('app.pagination.default-view');
 
                 $pages = [];
-                for ($x = 1; $x <= $page_count; $x++) {
-                    $pages[$x] = [
-                        'type'    => 'page',
-                        'page'    => $x,
-                        'current' => $x == $current_page,
-                        'url'     => str_replace("change_page_$uniqueID", $x, $url)
-                    ];
-                }
+                for ($x = 1; $x <= $page_count; $x++) $pages[$x] = [
+                    'type'    => 'page',
+                    'page'    => $x,
+                    'current' => $x == $current_page,
+                    'url'     => str_replace("change_page_$uniqueID", $x, $url)
+                ];
 
                 return view($view, compact('pages', 'page_count', 'current_page', 'url', 'uniqueID'));
             }

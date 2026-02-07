@@ -10,7 +10,6 @@ abstract class Model extends DB
      * Usual Parameters for organize.
      */
     public $primary      = null;
-    public $as           = "";
     public $guard        = [];
     public $closures     = [];
     public $created_at;

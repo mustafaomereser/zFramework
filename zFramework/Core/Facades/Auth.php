@@ -20,7 +20,7 @@ class Auth
     /**
      * Columns for match
      */
-    static private $columns;
+    static private $columns = ['email' => 'email', 'password' => 'password', 'passwordencode' => 'crypter'];
 
     private static function getMode()
     {
@@ -29,7 +29,7 @@ class Auth
 
     public static function init()
     {
-        self::$columns = (new User)->special_columns ?? ['email' => 'email', 'password' => 'password', 'passwordencode' => 'crypter'];
+        if ($columns = (new User)->special_columns) self::$columns = $columns;
         if (!self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
     }
 
@@ -105,9 +105,7 @@ class Auth
         if (self::check()) return false;
 
         $user = (new User)->select('id, api_token, ' . self::$columns['password']);
-
         if (isset($fields[self::$columns['password']])) $fields[self::$columns['password']] = ['crypter' => fn() => Crypter::encode($fields[self::$columns['password']]), 'md5' => fn() => md5($fields[self::$columns['password']])][self::$columns['passwordencode']]();
-
         foreach ($fields as $key => $value) $user->where($key, $value);
         $user = $user->first();
 
