@@ -45,7 +45,7 @@ class DB
 
         if (!$db) $db = array_keys($GLOBALS['databases']['connections'])[0] ?? null;
         if (isset($GLOBALS['databases']['connections'][$db])) $this->db = $db;
-        
+
         $this->connection();
         $this->reset();
     }

@@ -344,7 +344,9 @@ ALSO you can normal query like /1?test=true
     ]);
 
     $user->where('id', 1)->first()['delete']();
-    
+
+    #raw SQL usage with soft delete.
+    (new DB)->prepare('SELECT * FROM users WHERE id = 1 AND deleted_at IS NULL')->first();
 ```
 
 ### 2.1. User
@@ -483,8 +485,8 @@ ALSO you can normal query like /1?test=true
     // can use parameters:
     [
         'primary',
-        'unique',
-        'index', 'index:group_name', // you can index for per column and you can against index with group. 
+        'unique', 'unique:group_name' // you can unique for per column and you can against unique with group; its called competite.
+        'index', 'index:group_name', // you can index for per column and you can against index with group; its called competite.
         'text',
         'bigint', 
         'int', 
