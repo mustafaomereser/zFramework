@@ -14,7 +14,7 @@ class GlobalCache
      */
     public static function cache(string $name, \Closure $callback, int $timeout = 5)
     {
-        if (!function_exists('apcu_fetch')) return Cache::cache($name, $callback, $timeout);
+        if (!function_exists('apcu_fetch')) $callback();
 
         $data = apcu_fetch($name, $success);
         if (!$success) {
@@ -33,8 +33,9 @@ class GlobalCache
      */
     public static function remove(string $name): bool
     {
-        if (!function_exists('apcu_delete')) return Cache::remove($name);
-        return apcu_delete($name);
+        if (!function_exists('apcu_delete')) return false;
+        apcu_delete($name);
+        return true;
     }
 
     /**
@@ -42,7 +43,8 @@ class GlobalCache
      */
     public static function clear(): bool
     {
-        if (!function_exists('apcu_clear_cache')) return Cache::clear();
-        return apcu_clear_cache();
+        if (!function_exists('apcu_clear_cache')) return false;
+        apcu_clear_cache();
+        return true;
     }
 }
