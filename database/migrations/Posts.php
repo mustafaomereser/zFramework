@@ -14,7 +14,7 @@ class Posts
             'id'      => ['primary'],
             'title'   => ['varchar', 'index:find_user'],
             'user_id' => ['int', 'index:find_user'],
-            'content' => ['text', 'index'],
+            'content' => ['text'],
 
             'timestamps',
             'softDelete'
