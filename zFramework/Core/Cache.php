@@ -39,4 +39,17 @@ class Cache
             return true;
         });
     }
+
+    /**
+     * Clear all
+     * 
+     * @return bool
+     */
+    public static function clear(): bool
+    {
+        return Session::callback(function () {
+            unset($_SESSION['caching']);
+            return true;
+        });
+    }
 }
