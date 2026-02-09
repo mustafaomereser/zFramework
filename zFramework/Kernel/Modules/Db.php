@@ -367,7 +367,7 @@ class Db
             }
 
             foreach ($queue_index_list as $index_key => $index_columns) try {
-                self::$db->prepare("CREATE " . (str_starts_with($index_key, 'unique_') ? 'UNIQUE' : '') . " INDEX " . substr($index_key, 0, 60) . " ON $table(" . implode(', ', $index_columns) . ");");
+                self::$db->prepare("ALTER TABLE `$table` ADD " . (str_starts_with($index_key, 'unique_') ? 'UNIQUE' : '') . " INDEX `" . substr($index_key, 0, 60) . "` (`" . implode('`, `', $index_columns) . "`) ALGORITHM=INPLACE, LOCK=NONE;");
                 Terminal::text("[color=green]-> added index key `$index_key`[/color][color=dark-gray](" . implode(', ', $index_columns) . ")[/color]");
             } catch (\Throwable $e) {
                 Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
