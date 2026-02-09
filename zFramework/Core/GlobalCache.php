@@ -14,7 +14,7 @@ class GlobalCache
      */
     public static function cache(string $name, \Closure $callback, int $timeout = 5)
     {
-        if (!function_exists('apcu_fetch')) $callback();
+        if (!function_exists('apcu_fetch')) return $callback();
 
         $data = apcu_fetch($name, $success);
         if (!$success) {
