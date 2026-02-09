@@ -346,7 +346,7 @@ ALSO you can normal query like /1?test=true
     $user->where('id', 1)->first()['delete']();
 
     #raw SQL usage with soft delete.
-    (new DB)->prepare('SELECT * FROM users WHERE id = 1 AND deleted_at IS NULL')->first();
+    (new DB)->prepare('SELECT * FROM users WHERE id = 1 AND deleted_at IS NULL')->fetch(\PDO::FETCH_ASSOC);
 ```
 
 ### 2.1. User
