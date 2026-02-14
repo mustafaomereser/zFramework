@@ -21,6 +21,7 @@ class DB
     private $builder;
     private $sqlDebug  = false;
     private $wherePrev = 'AND';
+    public $ignoreAnalyze = false;
     public $cache_dir;
 
     /**
@@ -93,7 +94,7 @@ class DB
         $e = $this->connection()->prepare($sql);
         $e->execute($data);
         $queryTime = microtime(true) - $queryTime;
-        if (config('app.analyze')) DbCollector::analyze($this, $sql, $data, $queryTime);
+        if (!$this->ignoreAnalyze && config('app.analyze')) DbCollector::analyze($this, $sql, $data, $queryTime);
         $this->reset();
         return $e;
     }

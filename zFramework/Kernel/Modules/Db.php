@@ -25,8 +25,9 @@ class Db
 
     private static function connectDB($db)
     {
-        self::$db     = new FacadesDB($db);
-        self::$dbname = self::$db->prepare('SELECT database() AS dbname')->fetch(\PDO::FETCH_ASSOC)['dbname'];
+        self::$db                = new FacadesDB($db);
+        self::$db->ignoreAnalyze = true;
+        self::$dbname            = self::$db->prepare('SELECT database() AS dbname')->fetch(\PDO::FETCH_ASSOC)['dbname'];
     }
 
     private static function table_exists($table = null)

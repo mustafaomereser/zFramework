@@ -81,12 +81,7 @@ class DbCollector
             }
 
             (new SystemDbCollector)->insert($analysis, true);
-            // $path      = base_path("/db-analyzes/" . Analyze::$process_id);
-            // $outputs   = json_decode(@file_get_contents($path) ?? '[]', true);
-            // $outputs[] = $analysis;
-            // file_put_contents2($path, json_encode($outputs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        } catch (\Throwable $err) {
-            // echo $err->getMessage();
+        } catch (\Throwable) {
         }
     }
 
