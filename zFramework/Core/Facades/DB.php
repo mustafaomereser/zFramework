@@ -875,7 +875,7 @@ class DB
     {
         $data      = count($data) ? $data : $this->buildQuery['data'] ?? [];
         $debug_sql = $sql;
-        foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->connection()->quote($value), $debug_sql);
+        foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", !$value ? 'null' : $this->connection()->quote($value), $debug_sql);
         return $debug_sql;
     }
 
