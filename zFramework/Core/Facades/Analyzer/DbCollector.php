@@ -2,6 +2,7 @@
 
 namespace zFramework\Core\Facades\Analyzer;
 
+use App\Models\SystemDbCollector;
 use zFramework\Core\Facades\DB;
 
 class DbCollector
@@ -14,8 +15,8 @@ class DbCollector
 
             $analysis = [
                 'fingerprint'          => self::fingerprint($sql),
-                'sql'                  => $sql,
-                'executed_sql'         => $executed,
+                'query'                => $sql,
+                'executed'             => $executed,
                 'query_time_ms'        => round($queryTime * 1000, 2),
                 'tables'               => [],
                 'used_indexes'         => [],
@@ -79,11 +80,13 @@ class DbCollector
                 }
             }
 
-            $path      = base_path("/db-analyzes/" . Analyze::$process_id);
-            $outputs   = json_decode(@file_get_contents($path) ?? '[]', true);
-            $outputs[] = $analysis;
-            file_put_contents2($path, json_encode($outputs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        } catch (\Throwable) {
+            (new SystemDbCollector)->insert($analysis, true);
+            // $path      = base_path("/db-analyzes/" . Analyze::$process_id);
+            // $outputs   = json_decode(@file_get_contents($path) ?? '[]', true);
+            // $outputs[] = $analysis;
+            // file_put_contents2($path, json_encode($outputs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        } catch (\Throwable $err) {
+            // echo $err->getMessage();
         }
     }
 
