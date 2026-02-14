@@ -56,8 +56,8 @@ class mysql
     {
         $output = "";
         foreach ($this->parent->buildQuery['join'] as $join) {
-            $model = new $join[1]();
-            $output .= " " . $join[0] . " JOIN $model->table ON " . $join[2] . " ";
+            $table = class_exists($join[1]) ? (new $join[1])->table : $join[1];
+            $output .= " " . $join[0] . " JOIN $table ON " . $join[2] . " ";
         }
         return $output;
     }

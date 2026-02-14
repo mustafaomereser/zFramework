@@ -60,7 +60,7 @@ function asset($file)
 // file_put_content force make dirs.
 function file_put_contents2($file_name, $content, $flags = 0)
 {
-    @mkdir(dirname($file_name), 0775, true);
+    @mkdir(dirname($file_name), 0777, true);
     return file_put_contents($file_name, $content, $flags);
 }
 

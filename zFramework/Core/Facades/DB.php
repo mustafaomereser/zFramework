@@ -89,11 +89,12 @@ class DB
      */
     public function prepare(string $sql, array $data = [])
     {
-        $query_time = microtime(true);
+        $data = count($data) ? $data : $this->buildQuery['data'] ?? [];
+        $queryTime = microtime(true);
         $e = $this->connection()->prepare($sql);
-        $e->execute(count($data) ? $data : $this->buildQuery['data'] ?? []);
-        $query_time = microtime(true) - $query_time;
-        if (config('app.analyze')) DbCollector::collect(($this->table ?? 'none-table'), $sql, ($this->buildQuery['sql-identity'] ?? 'none-sql-identity'), $query_time);
+        $e->execute($data);
+        $queryTime = microtime(true) - $queryTime;
+        if (config('app.analyze')) DbCollector::analyze($this, $sql, $data, $queryTime);
         $this->reset();
         return $e;
     }
@@ -203,7 +204,6 @@ class DB
     {
         $this->cache['buildQuery'] = $this->buildQuery;
         $this->buildQuery = [
-            'sql-identity' => uniqid('SQL-IDENTITY-'),
             'select'       => [],
             'join'         => [],
             'where'        => [],
@@ -296,11 +296,14 @@ class DB
      * Emre UZUN was here.
      * Added hash for unique key.
      * @param string $key
+     * @param null|int $level
      * @return string
      */
-    public function hashedKey(string $key): string
+    public function hashedKey(string $key, null|int $level = null): string
     {
-        return uniqid(str_replace([".", '(', ')', ',', '"', "'", '`', ' '], "_", $key) . "_");
+        $key = str_replace([".", '(', ')', ',', '"', "'", '`', ' '], "_", $key) . ($level ?: null);
+        if (isset($this->buildQuery['data'][$key])) return $this->hashedKey($key, $level + 1);
+        return $key;
     }
     #endregion
 
@@ -656,10 +659,17 @@ class DB
         }
 
         if (!isset($row_count)) {
-            $last_query       = $this->buildQuery;
-            // $row_count        = $this->select("COUNT($this->table." . $this->getPrimary() . ") count")->first()['count'];
-            $row_count        = $this->count();
-            $this->buildQuery = $last_query;
+            $snapshot = $this->buildQuery;
+
+            # get row count
+            $this->buildQuery['orderBy'] = [];
+            $this->buildQuery['groupBy'] = [];
+            if (!empty($this->buildQuery['join'])) $row_count = $this->select("COUNT(DISTINCT {$this->table}.{$this->getPrimary()}) as count");
+            else $row_count = $this->select("COUNT(*) as count");
+            $row_count = $row_count->first()['count'];
+            #
+
+            $this->buildQuery = $snapshot;
             if ($cache_count_id) Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_count_id] = $row_count);
         }
 
@@ -788,6 +798,14 @@ class DB
         return $this;
     }
 
+    public function debugSQL(string $sql, array $data = [])
+    {
+        $data      = count($data) ? $data : $this->buildQuery['data'] ?? [];
+        $debug_sql = $sql;
+        foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->connection()->quote($value), $debug_sql);
+        return $debug_sql;
+    }
+
     /**
      * Build a sql query for execute.
      * @param string $type
@@ -799,11 +817,10 @@ class DB
         $sql = $this->builder->build($type);
 
         if ($this->sqlDebug) {
-            $sql_id    = $this->buildQuery['sql-identity'];
-            $debug_sql = $sql;
-            foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", $this->connection()->quote($value), $debug_sql);
+            $debug_sql   = $this->debugSQL($sql);
+            $fingerprint = DbCollector::fingerprint($debug_sql);
             ob_start();
-            echo "# $sql_id " . $this->dbname . " Begin SQL Query:\n";
+            echo "# $fingerprint " . $this->dbname . " Begin SQL Query:\n";
             var_dump($debug_sql);
             echo "\nAnalyze query: ";
             try {
