@@ -10,20 +10,21 @@ class DbCollector
     {
         try {
             $executed = $db->debugSQL($sql, $data);
-            $pdo = $db->connection();
+            $pdo      = $db->connection();
 
             $analysis = [
-                'fingerprint' => self::fingerprint($sql),
-                'sql' => $sql,
-                'executed_sql' => $executed,
-                'query_time_ms' => round($queryTime * 1000, 2),
-                'tables' => [],
-                'used_indexes' => [],
-                'used_columns' => [],
-                'warnings' => [],
-                'index_suggestions' => [],
-                'metrics' => ['estimated_rows' => null, 'actual_rows' => null, 'actual_time_ms' => null],
-                'row_stats' => ['scanned' => 0, 'returned' => 0, 'mode' => null]
+                'fingerprint'          => self::fingerprint($sql),
+                'sql'                  => $sql,
+                'executed_sql'         => $executed,
+                'query_time_ms'        => round($queryTime * 1000, 2),
+                'tables'               => [],
+                'used_indexes'         => [],
+                'used_columns'         => [],
+                'warnings'             => [],
+                'index_suggestions'    => [],
+                'metrics'              => [],
+                'row_stats'            => [],
+                'estimated_total_cost' => []
             ];
 
             $row = $pdo->query("EXPLAIN FORMAT=JSON $executed")->fetch(\PDO::FETCH_ASSOC);
@@ -40,44 +41,48 @@ class DbCollector
                 self::walkAnalyze($root, $analysis);
             }
 
-            $analysis['tables'] = array_values(array_unique($analysis['tables']));
+            $analysis['tables']       = array_values(array_unique($analysis['tables']));
             $analysis['used_indexes'] = array_values(array_unique($analysis['used_indexes']));
             $analysis['used_columns'] = array_values(array_unique($analysis['used_columns']));
-            $analysis['warnings'] = array_values(array_unique($analysis['warnings']));
-
-            $analysis['row_stats']['scanned'] = $analysis['metrics']['actual_rows'] ?? 0;
-            $analysis['row_stats']['returned'] = self::extractLimit($sql) ?? ($analysis['metrics']['actual_rows'] ?? 0);
-            $analysis['row_stats']['mode'] = in_array('FULL_SCAN', $analysis['warnings']) ? 'FULL_SCAN' : 'INDEX';
+            foreach ($analysis['warnings'] as $key => $warnings) $analysis['warnings'][$key] = array_values(array_unique($warnings));
 
             foreach ($analysis['tables'] as $table) {
+                $analysis['row_stats'][$table]['scanned']  = $analysis['metrics'][$table]['actual_rows'] ?? 0;
+                $analysis['row_stats'][$table]['returned'] = self::extractLimit($sql) ?? ($analysis['metrics'][$table]['actual_rows'] ?? 0);
+                $analysis['row_stats'][$table]['mode']     = !isset($analysis['warnings'][$table]) || in_array('FULL_SCAN', $analysis['warnings'][$table]) ? 'FULL_SCAN' : 'INDEX';
+
                 $size = self::approxTableRows($pdo, $table);
-                $analysis['metrics']['estimated_rows'] = $size;
+                $analysis['metrics'][$table]['estimated_rows'] = $size;
                 if ($size !== null) {
-                    if (($analysis['metrics']['actual_rows'] ?? 0) > $size * 1.5) $analysis['warnings'][] = "BAD_ESTIMATION_STATS:$table";
-                    if ($size < 5000) $analysis['warnings'][] = "SMALL_TABLE:$table(~$size rows)";
-                    if ($size >= 5000 && in_array('FULL_SCAN', $analysis['warnings'])) $analysis['warnings'][] = "LARGE_TABLE_FULL_SCAN:$table(~$size rows)";
+                    if (($analysis['metrics'][$table]['actual_rows'] ?? 0) > $size * 1) $analysis['warnings'][$table][] = "BAD_ESTIMATION_STATS (" . ($analysis['metrics'][$table]['actual_rows'] - $size) . " rows diff)";
+                    if ($size < 5000) $analysis['warnings'][$table][] = "SMALL_TABLE:$table(~$size rows)";
+                    if ($size >= 5000 && $analysis['row_stats'][$table]['mode'] == 'FULL_SCAN') $analysis['warnings'][$table][] = "LARGE_TABLE_FULL_SCAN (~$size rows)";
                 }
             }
 
-            if (in_array('FULL_SCAN', $analysis['warnings']) && empty($analysis['used_indexes'])) {
-                $cols = self::extractIndexableColumns($sql);
-                if (!empty($cols) && !empty($analysis['tables']))
-                    $analysis['index_suggestions'][] = "CREATE INDEX idx_" . time() . rand() . " ON " . $analysis['tables'][0] . " (" . implode(', ', $cols) . ")";
-            }
+            $used  = $analysis['used_columns'];
+            $size  = $analysis['metrics']['estimated_rows'] ?? 0;
 
-            $table = $analysis['tables'][0] ?? null;
-            $used = $analysis['used_columns'];
-            $size = $analysis['metrics']['estimated_rows'] ?? 0;
-
-            if ($table && !in_array('COVERING_INDEX', $analysis['warnings'])) {
-                if (count($used) > 0 && count($used) <= 6 && $size > 10000) {
-                    $analysis['warnings'][] = 'COVERING_POSSIBLE';
-                    $analysis['index_suggestions'][] = "OPTIONAL COVERING INDEX: CREATE INDEX idx_cover_" . time() . rand() . " ON $table (" . implode(', ', $used) . ")";
+            foreach ($analysis['tables'] as $table) {
+                if (!isset($analysis['warnings'][$table])) continue;
+                if ($analysis['row_stats'][$table]['mode'] == 'FULL_SCAN' && empty($analysis['used_indexes'])) {
+                    $cols = self::extractIndexableColumns($sql);
+                    if (!empty($cols) && !empty($analysis['tables'])) $analysis['index_suggestions'][$table]['stable'][] = "CREATE INDEX idx_" . time() . rand() . " ON " . $analysis['tables'][0] . " (" . implode(', ', $cols) . ")";
                 }
-                if (count($used) > 6) $analysis['warnings'][] = 'COVERING_SKIPPED_TOO_MANY_COLUMNS';
+
+                if ($table && !in_array('COVERING_INDEX', $analysis['warnings'][$table])) {
+                    if (count($used) > 0 && count($used) <= 6 && $size > 10000) {
+                        $analysis['warnings'][$table][] = "COVERING_POSSIBLE";
+                        $analysis['index_suggestions'][$table]['covering'][] = "CREATE INDEX idx_cover_" . time() . rand() . " ON $table (" . implode(', ', $used) . ")";
+                    }
+                    if (count($used) > 6) $analysis['warnings'][$table][] = "COVERING_SKIPPED_TOO_MANY_COLUMNS";
+                }
             }
 
-            print_r($analysis);
+            $path      = base_path("/db-analyzes/" . Analyze::$process_id);
+            $outputs   = json_decode(@file_get_contents($path) ?? '[]', true);
+            $outputs[] = $analysis;
+            file_put_contents2($path, json_encode($outputs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         } catch (\Throwable) {
         }
     }
@@ -87,19 +92,23 @@ class DbCollector
         if (isset($node['table_name'])) $a['tables'][] = $node['table_name'];
         if (isset($node['key']) && $node['key']) $a['used_indexes'][] = $node['key'];
         if (!empty($node['used_key_parts'])) $a['used_columns'] = array_merge($a['used_columns'], $node['used_key_parts']);
-        if (($node['access_type'] ?? null) === 'ALL') $a['warnings'][] = 'FULL_SCAN';
+        if (($node['access_type'] ?? null) === 'ALL') $a['warnings'][$node['table_name']][] = 'FULL_SCAN';
         foreach ($node as $child) if (is_array($child)) self::walkExplain($child, $a);
     }
 
     private static function walkAnalyze(array $node, array &$a): void
     {
-        if (!empty($node['table_name'])) $a['tables'][] = $node['table_name'];
+        $table = null;
+        if (!empty($node['table_name'])) $table = $a['tables'][] = $node['table_name'];
         if (!empty($node['index_name'])) $a['used_indexes'][] = $node['index_name'];
         if (!empty($node['used_columns']) && is_array($node['used_columns'])) $a['used_columns'] = array_merge($a['used_columns'], $node['used_columns']);
-        if (($node['access_type'] ?? null) === 'table') $a['warnings'][] = 'FULL_SCAN';
-        if (!empty($node['covering'])) $a['warnings'][] = 'COVERING_INDEX';
-        if (isset($node['actual_rows'])) $a['metrics']['actual_rows'] = $node['actual_rows'];
-        if (isset($node['actual_last_row_ms'])) $a['metrics']['actual_time_ms'] = $node['actual_last_row_ms'];
+        if (($node['access_type'] ?? null) === 'table') $a['warnings'][$table][] = 'FULL_SCAN';
+        if ($table) {
+            if (!empty($node['covering'])) $a['warnings'][$table][] = 'COVERING_INDEX';
+            if (!empty($node['estimated_total_cost'])) $a['estimated_total_cost'][$table] = $node['estimated_total_cost'];
+            if (isset($node['actual_rows'])) $a['metrics'][$table]['actual_rows'] = $node['actual_rows'];
+            if (isset($node['actual_last_row_ms'])) $a['metrics'][$table]['actual_time_ms'] = $node['actual_last_row_ms'];
+        }
         if (!empty($node['inputs']) && is_array($node['inputs'])) foreach ($node['inputs'] as $child) self::walkAnalyze($child, $a);
         foreach ($node as $child) if (is_array($child)) self::walkAnalyze($child, $a);
     }

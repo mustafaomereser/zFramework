@@ -4,7 +4,6 @@ namespace App\Controllers;
 
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
-use zFramework\Core\Facades\DB;
 
 class HomeController extends Controller
 {

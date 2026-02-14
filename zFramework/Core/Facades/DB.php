@@ -642,19 +642,61 @@ class DB
     }
 
     /**
+     * Seek
+     * @param array $lastrow
+     */
+    protected function seek(?array $lastrow = null)
+    {
+        if (!$lastrow) return false;
+
+        $orderBy = count($this->buildQuery['orderBy'])
+            ? $this->buildQuery['orderBy']
+            : [$this->getPrimary() => 'ASC'];
+
+        $conditions  = [];
+        $data        = [];
+        $prevColumns = [];
+
+        foreach ($orderBy as $column => $dir) {
+            $hashed_key = $this->hashedKey($column);
+            $param      = strtoupper($dir) === 'DESC' ? '<' : '>';
+
+            // Lexicographical
+            $lexConditions = [];
+            foreach ($prevColumns as $prev) {
+                $lexConditions[] = "$prev = :$prev";
+                $data[$prev]     = $lastrow[$prev];
+            }
+
+            $lexConditions[]   = "$column $param :$hashed_key";
+            $data[$hashed_key] = $lastrow[$column];
+
+            $conditions[]  = '(' . implode(' AND ', $lexConditions) . ')';
+            $prevColumns[] = $hashed_key;
+        }
+
+        $seekWhere = implode(' OR ', $conditions);
+
+        $this->whereRaw($seekWhere, $data);
+
+        return true;
+    }
+
+
+    /**
      * paginate
      * @param int $per_page
      * @param string $page_id
      * @return array
      */
-    public function paginate(int $per_page = 20, string $page_id = 'page', null|string $cache_count_id = null)
+    public function paginate(int $per_page = 20, string $page_id = 'page', null|string $cache_id = null)
     {
-        if (!$cache_count_id) {
+        if (!$cache_id) {
             Session::callback(function () {
                 unset($_SESSION[$this->db][$this->dbname]['paginate']['cache']);
             });
 
-            $cache = Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_count_id] ?? false);
+            $cache = Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_id] ?? false);
             if ($cache) $row_count = $cache;
         }
 
@@ -664,13 +706,11 @@ class DB
             # get row count
             $this->buildQuery['orderBy'] = [];
             $this->buildQuery['groupBy'] = [];
-            if (!empty($this->buildQuery['join'])) $row_count = $this->select("COUNT(DISTINCT {$this->table}.{$this->getPrimary()}) as count");
-            else $row_count = $this->select("COUNT(*) as count");
-            $row_count = $row_count->first()['count'];
+            $row_count = $this->select("COUNT(" . (!empty($this->buildQuery['join']) ? 'DISTINCT ' : NULL) . "{$this->table}.{$this->getPrimary()}) as count")->first()['count'];
             #
 
             $this->buildQuery = $snapshot;
-            if ($cache_count_id) Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_count_id] = $row_count);
+            if ($cache_id) Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_id] = $row_count);
         }
 
         $uniqueID         = uniqid();
@@ -687,8 +727,14 @@ class DB
         $queryString[$page_id] = "change_page_$uniqueID";
         $url = "?" . http_build_query($queryString);
 
+        # seek test.
+        // $items = !$this->seek(Session::get('last-item-test')) ? self::limit($start_count, $per_page)->get() : self::limit($per_page)->get();
+        // Session::set('last-item-test', @end(json_decode(json_encode($items, JSON_UNESCAPED_UNICODE), true)));
+        #
+
+        $items = self::limit($start_count, $per_page)->get();
         return [
-            'items'          => $row_count ?  self::limit($start_count, $per_page)->get() : [],
+            'items'          => $row_count ? $items : [],
             'item_count'     => $row_count,
             'shown'          => ($start_count + 1) . " / " . (($per_page * $current_page) >= $row_count ? $row_count : ($per_page * $current_page)),
             'start'          => ($start_count + 1),
@@ -712,7 +758,6 @@ class DB
             }
         ];
     }
-
 
     /**
      * Insert a row to database
