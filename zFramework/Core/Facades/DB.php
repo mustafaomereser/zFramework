@@ -754,7 +754,7 @@ class DB
         // Session::set('last-item-test', @end(json_decode(json_encode($items, JSON_UNESCAPED_UNICODE), true)));
         #
 
-        $items = self::limit($start_count, $per_page)->get();
+        $items = self::limit(!($start_count < 0) ? $start_count : 0, $per_page)->get();
         return [
             'items'          => $row_count ? $items : [],
             'item_count'     => $row_count,
