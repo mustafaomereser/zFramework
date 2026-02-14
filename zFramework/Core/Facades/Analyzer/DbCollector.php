@@ -14,6 +14,7 @@ class DbCollector
             $pdo      = $db->connection();
 
             $analysis = [
+                'analyze_id'           => Analyze::$process_id,
                 'fingerprint'          => self::fingerprint($sql),
                 'query'                => $sql,
                 'executed'             => $executed,

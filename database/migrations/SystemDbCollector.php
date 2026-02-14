@@ -15,6 +15,7 @@ class SystemDbCollector
     {
         return [
             'id'                   => ['primary'],
+            'analyze_id'           => ['varchar'],
             'fingerprint'          => ['varchar'],
             'query'                => ['text'],
             'executed'             => ['text'],
