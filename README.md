@@ -284,7 +284,7 @@ ALSO you can normal query like /1?test=true
         "count"       => $user->count(),
         "first"       => $user->where('id', 1)->first(),
         "firstOrFail" => $user->where('id', '=', 1)->firstOrFail(), // If can not find a row abort 404
-        "paginate"    => $user->paginate(20, 'page_request_name'),
+        "paginate"    => $user->paginate(20, 'page_request_name', 'cache_id'), // cache_id for get row count for once.
         "insert"      => $user->insert(['username' => 'username', 'password' => 'password','email' => 'email@mail.com']),
         "update"      => $user->where('id', 1)->update(['email' => 'test@mail.com']),
         "delete"      => $user->where('id', '>', 2)->delete()
@@ -320,11 +320,16 @@ ALSO you can normal query like /1?test=true
     // Limit example args: 10(startCount), 10(rowCount)
     $user->limit(5, 10)->get();
 
-    // paginate example               for return class or array
-    $user->paginate(20, 'request_id', true|false);
+    // Limit example args: 10(rowCount)
+    $user->limit(10)->get();
 
-    // Joins example
+    // paginate example
+    if($page == 1 || @!$_SESSION[$table . "_paginate_cache_id"]) $_SESSION[$table . "_paginate_cache_id"] = uniqid();
+    $user->paginate(20, 'request_id', $_SESSION[$table . "_paginate_cache_id"]);
+
+    // Joins examples
     $user->join('LEFT|RIGHT|OUTER|FULL|NULL', App\Models\User::class, 'table_name.id = this_table.id')->get();
+    $user->join('LEFT|RIGHT|OUTER|FULL|NULL', 'users', 'table_name.id = this_table.id')->get();
 
     // Debug Example
     $user->sqlDebug(true)->select('id, username')->where('id', 1)->update([
