@@ -11,7 +11,7 @@ class DatabaseUser
 
     public static function create(string $name, string $password): ?array
     {
-        return API::request("Mysql/add_user", compact('name', 'password'));
+        return API::request("Mysql/create_user", compact('name', 'password'));
     }
 
     public static function rename(string $oldname, string $newname): ?array
