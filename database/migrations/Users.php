@@ -20,15 +20,18 @@ class Users
             'password'  => ['varchar:50'],
             'email'     => ['varchar:50', 'unique:user'],
             'api_token' => ['varchar:60', 'required'],
-            
+
             'timestamps',
             'softDelete',
         ];
     }
 
-    public static function oncreateSeeder()
+    /**
+     * @param string|null $db
+     */
+    public static function oncreateSeeder(?string $db = null)
     {
-        (new User)->insert([
+        (new User($db))->insert([
             'username'  => 'admin',
             'password'  => Crypter::encode('admin'),
             'email'     => 'admin@localhost.com',

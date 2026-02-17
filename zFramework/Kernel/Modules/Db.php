@@ -55,7 +55,7 @@ class Db
      * Description: Migrate Database
      * @param --module={module_name} (optional)
      * @param --all (optional) (for all migrations do migrate)
-     * @param --db (optional) (ifnull = Get first DB KEY)
+     * @param --db (optional) (overwrite migrations $db parameter)
      * @param --path (optional)
      * @param --force (optional) (for migration forcefully)
      * @param --fresh (optional) (delete everything and again migration)
@@ -113,6 +113,8 @@ class Db
 
             $class = new $class;
 
+            if (isset(Terminal::$parameters['--db'])) $class::$db = Terminal::$parameters['--db'];
+
             if (!isset($GLOBALS['databases']['connections'][$class::$db])) {
                 Terminal::text("[color=red]" . $class::$db . " database is not exists.[/color]");
                 continue;
@@ -132,13 +134,9 @@ class Db
             if (!$fresh && !self::table_exists($table)) $fresh = true;
             if ($fresh) {
                 Terminal::text('[color=blue]Info: Migrate forcing.[/color]');
-                try {
-                    self::$db->prepare("DROP TABLE $table");
-                } catch (\PDOException $e) {
-                    // Terminal::text($e->getMessage());
-                }
+                self::$db->prepare("DROP TABLE IF EXISTS $table");
+                readline('test wait');
                 self::$db->prepare("CREATE TABLE $table ($init_column_name int DEFAULT 1 NOT NULL)" . ($charset ? " CHARACTER SET " . strtok($charset, '_') . " COLLATE $charset" : null));
-
                 $drop_columns[] = $init_column_name;
             }
             #endregion
@@ -393,7 +391,7 @@ class Db
             if ($fresh && in_array('oncreateSeeder', get_class_methods($class))) {
                 Terminal::text("\n[color=green]`" . self::$dbname . ".$table` Oncreate seeder.[/color]");
                 Terminal::text("-> [color=green]Seeding.[/color]", true);
-                $class::oncreateSeeder();
+                $class::oncreateSeeder($class::$db);
                 Terminal::text("-> [color=green]Seeded.[/color]", true);
             }
 

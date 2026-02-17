@@ -38,7 +38,7 @@ class File
      * Remove public_dir string
      * @return string
      */
-    private static function removePublic(string $name): string
+    public static function removePublic(string $name): string
     {
         return str_replace(public_dir(), '', $name);
     }

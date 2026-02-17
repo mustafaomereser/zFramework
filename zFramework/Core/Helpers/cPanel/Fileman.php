@@ -4,7 +4,7 @@ namespace zFramework\Core\Helpers\cPanel;
 
 use CURLFile;
 
-class File
+class Fileman
 {
     public static function list(string $path = "/"): ?array
     {

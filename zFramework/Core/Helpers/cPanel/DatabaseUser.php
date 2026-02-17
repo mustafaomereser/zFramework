@@ -34,16 +34,16 @@ class DatabaseUser
         return API::request("Mysql/get_privileges_on_database", compact('user', 'database'));
     }
 
+    public static function grantPrivileges(string $user, string $database, null|array $privileges = null): ?array
+    {
+        return API::request("Mysql/set_privileges_on_database", compact('user', 'database') + ["privileges" => ($privileges ? implode(',', $privileges) : "ALL PRIVILEGES")]);
+    }
+
     public static function routines(null|string $user = null): ?array
     {
         $options = [];
         if ($user) $options['database_user'] = $user;
         return API::request("Mysql/list_routines", $options);
-    }
-
-    public static function grantPrivileges(string $user, string $database, null|array $privileges = null): ?array
-    {
-        return API::request("Mysql/set_privileges_on_database", compact('user', 'database') + ["privileges" => ($privileges ? implode(',', $privileges) : "ALL PRIVILEGES")]);
     }
 
     public static function revokePrivileges(string $user, string $database): ?array

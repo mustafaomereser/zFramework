@@ -8,9 +8,4 @@ use zFramework\Core\Abstracts\Model;
 class SystemDbCollector extends Model
 {
     public $table = "system_db_collector";
-
-    public function beginQuery() 
-    {
-        // return $this->where();
-    }
 }

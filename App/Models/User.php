@@ -22,6 +22,18 @@ class User extends Model
         'passwordencode' => 'crypter' # crypter | md5
     ];
 
+    /**
+     * Optionally model construct.
+     * 
+     * Allows passing custom parameters when initializing the model.
+     *
+     * @param string|null $db
+     */
+    public function __construct(?string $db = null)
+    {
+        if ($db !== null) $this->db = $db;
+        parent::__construct(); # <-- Ensure base model initialization runs properly.
+    }
 
     # every re set after begin query.
     public function beginQuery()

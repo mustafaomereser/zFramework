@@ -8,6 +8,5 @@ use zFramework\Core\Traits\DB\softDelete;
 class Posts extends Model
 {
     use softDelete;
-
     public $table = "posts";
 }
