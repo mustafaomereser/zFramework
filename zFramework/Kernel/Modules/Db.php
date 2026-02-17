@@ -135,7 +135,6 @@ class Db
             if ($fresh) {
                 Terminal::text('[color=blue]Info: Migrate forcing.[/color]');
                 self::$db->prepare("DROP TABLE IF EXISTS $table");
-                readline('test wait');
                 self::$db->prepare("CREATE TABLE $table ($init_column_name int DEFAULT 1 NOT NULL)" . ($charset ? " CHARACTER SET " . strtok($charset, '_') . " COLLATE $charset" : null));
                 $drop_columns[] = $init_column_name;
             }
