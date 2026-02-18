@@ -6,11 +6,11 @@
 return [
     'status'            => true,
     'name'              => 'Hookshot',
-    'description'       => '',
+    'description'       => 'Test end points.',
     'author'            => 'Mustafa-MacBook-Pro.local',
     'created_at'        => '2026-02-18 05:38:45',
     'framework_version' => '2.8.0',
-    'sort'              => 2,
+    'sort'              => 0,
     'callback'          => function () {
         $GLOBALS['menu']['hookshot'] = [
             'icon'  => 'fad fa-campfire',
