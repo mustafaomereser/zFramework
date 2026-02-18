@@ -436,11 +436,11 @@
         $(document).on('click', '.testRouteBtn', function() {
             const httpMethod = $(this).data('method'); // POST or GET (actual HTTP)
             realMethod = $(this).data('real-method'); // PUT, DELETE, PATCH etc.
-            mustMethod = httpMethod;
+            mustMethod = realMethod !== 'ANY' ? realMethod : 'GET';
             needsMethodField = $(this).data('needs-method-field') === 1 || $(this).data('needs-method-field') === '1';
             const url = $(this).data('url');
 
-            $('#method').val(realMethod !== 'ANY' ? realMethod : 'GET');
+            $('#method').val(realMethod);
             setMethodColor(realMethod !== 'ANY' ? realMethod : 'any');
 
             rawUrlTemplate = url;
