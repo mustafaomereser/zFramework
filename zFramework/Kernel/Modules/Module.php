@@ -7,7 +7,7 @@ use zFramework\Kernel\Terminal;
 
 class Module
 {
-    static $assets_path = FRAMEWORK_PATH . "\Kernel\Includes\module\\";
+    static $assets_path = FRAMEWORK_PATH . "/Kernel/Includes/module/";
     static $assets;
 
     public static function begin($methods)

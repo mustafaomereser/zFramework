@@ -92,7 +92,7 @@ class Db
             }
         }
 
-        foreach ($scans as $scan) $migrations = array_merge($migrations, self::recursiveScanMigrations($scan));
+        foreach ($scans as $scan) if (is_dir($scan)) $migrations = array_merge($migrations, self::recursiveScanMigrations($scan));
 
         if (!count($migrations)) {
             Terminal::text("[color=red]You haven't a migration in `" . implode(', ', $scans) . "`.[/color]");

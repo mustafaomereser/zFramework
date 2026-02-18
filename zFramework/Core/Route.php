@@ -191,17 +191,15 @@ class Route
         $URI    = explode('/', substr(strtok($_SERVER['REQUEST_URI'], '?'), 1));
         $URL    = explode('/', substr($args[0], 1));
 
-        self::$routes[] = [
-            'url'    => $args[0],
-            'method' => $method
-        ];
-
-        $match      = 0;
-        $parameters = [];
+        $match          = 0;
+        $parameters     = [];
+        $parameter_keys = [];
         foreach ($URL as $key => $row) {
             @$column = $URI[$key];
 
             if (strstr($row, '{') && strstr($row, '}')) {
+                $parameter_keys[] = $row;
+
                 if (!strlen($column ?? '')) {
                     if (strstr($row, '{?')) $match++;
                     continue;
@@ -219,6 +217,13 @@ class Route
 
         $URI = array_values($URI);
         $URL = array_values($URL);
+
+        self::$routes[] = [
+            'url'        => $args[0],
+            'method'     => $method,
+            'parameters' => $parameter_keys,
+            'groups'     => self::$groups
+        ];
 
         $match = ((empty($method) || $method == method()) && $URI == $URL ? 1 : 0); #($match > 0 && (count($URL) - count($URI) == 0))) ? 1 : 0;
         return compact('match', 'parameters', 'URI', 'URL');

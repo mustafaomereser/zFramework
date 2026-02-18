@@ -1,0 +1,1083 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap');
+
+:root {
+    --bg-deep: #0d0f14;
+    --bg-panel: #13161e;
+    --bg-card: #1a1e28;
+    --bg-input: #1e2230;
+    --border: #2a2f40;
+    --border-hi: #3d4460;
+    --accent: #4f8ef7;
+    --accent-dim: #2a4a8a;
+    --success: #22c55e;
+    --danger: #f43f5e;
+    --warning: #f59e0b;
+    --text-1: #e8ecf4;
+    --text-2: #8890a8;
+    --text-3: #555d78;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+    --get: #22c55e;
+    --post: #4f8ef7;
+    --put: #f59e0b;
+    --patch: #a78bfa;
+    --delete: #f43f5e;
+    --any: #8890a8;
+}
+
+/* ═══════════════════════════════════════════
+   OFFCANVAS SHELL
+═══════════════════════════════════════════ */
+#hookshot {
+    background: var(--bg-panel) !important;
+    border-left: 1px solid var(--border) !important;
+    box-shadow: -24px 0 80px rgba(0, 0, 0, .65) !important;
+    font-family: var(--mono);
+    color: var(--text-1);
+}
+
+#hookshot * {
+    box-sizing: border-box;
+}
+
+/* ── HEADER ── */
+#hookshot .offcanvas-header {
+    background: var(--bg-deep);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 24px;
+}
+
+#hookshot .offcanvas-header h5 {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-1);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#hookshot .offcanvas-header h5::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: hs-pulse 2s infinite;
+}
+
+@keyframes hs-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: .4;
+    }
+}
+
+#hookshot .btn-close {
+    filter: invert(1) opacity(.4);
+    transition: opacity .2s;
+}
+
+#hookshot .btn-close:hover {
+    opacity: .9;
+}
+
+#hookshot .offcanvas-body {
+    padding: 20px 24px;
+    background: var(--bg-panel);
+    overflow-y: auto;
+}
+
+/* ═══════════════════════════════════════════
+   METHOD SELECT
+═══════════════════════════════════════════ */
+#hookshot #method {
+    background-color: var(--bg-input) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--accent) !important;
+    font-family: var(--mono) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    letter-spacing: .05em;
+    border-radius: 8px !important;
+    height: 40px;
+    transition: border-color .2s, color .2s;
+}
+
+#hookshot #method:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(79, 142, 247, .15) !important;
+    outline: none;
+}
+
+#hookshot #method.method-get {
+    color: var(--get) !important;
+    border-color: rgba(34, 197, 94, .5) !important;
+}
+
+#hookshot #method.method-post {
+    color: var(--post) !important;
+    border-color: rgba(79, 142, 247, .5) !important;
+}
+
+#hookshot #method.method-put {
+    color: var(--put) !important;
+    border-color: rgba(245, 158, 11, .5) !important;
+}
+
+#hookshot #method.method-patch {
+    color: var(--patch) !important;
+    border-color: rgba(167, 139, 250, .5) !important;
+}
+
+#hookshot #method.method-delete {
+    color: var(--delete) !important;
+    border-color: rgba(244, 63, 94, .5) !important;
+}
+
+#hookshot #method.method-any {
+    color: var(--any) !important;
+}
+
+/* ═══════════════════════════════════════════
+   URL BAR
+═══════════════════════════════════════════ */
+#hookshot #urlWrapper {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    min-height: 40px !important;
+    padding: 6px 12px !important;
+    font-family: var(--mono) !important;
+    font-size: 12px;
+    color: var(--text-1);
+    transition: border-color .2s;
+}
+
+#hookshot #urlWrapper:focus-within {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(79, 142, 247, .12) !important;
+}
+
+/* param buttons inside url bar */
+#hookshot #urlWrapper .btn {
+    background: rgba(79, 142, 247, .12) !important;
+    border: 1px solid rgba(79, 142, 247, .3) !important;
+    color: var(--accent) !important;
+    font-size: 11px !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+}
+
+#hookshot #urlWrapper .btn:hover {
+    background: rgba(79, 142, 247, .22) !important;
+}
+
+/* ═══════════════════════════════════════════
+   SEND BUTTON
+═══════════════════════════════════════════ */
+#hookshot #sendBtn {
+    background: var(--accent) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-family: var(--sans) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    letter-spacing: .04em;
+    height: 40px;
+    color: #fff !important;
+    transition: all .2s;
+    box-shadow: 0 4px 18px rgba(79, 142, 247, .35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+}
+
+#hookshot #sendBtn:hover:not(:disabled) {
+    background: #6fa3f9 !important;
+    box-shadow: 0 6px 24px rgba(79, 142, 247, .5);
+    transform: translateY(-1px);
+}
+
+#hookshot #sendBtn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+#hookshot #sendBtn:disabled {
+    opacity: .7 !important;
+    cursor: not-allowed;
+}
+
+.hs-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, .3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: hs-spin .6s linear infinite;
+    display: none;
+}
+
+@keyframes hs-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+#hookshot #sendBtn.loading .hs-spinner {
+    display: block;
+}
+
+#hookshot #sendBtn.loading .hs-label {
+    display: none;
+}
+
+/* ═══════════════════════════════════════════
+   SHORTCUT HINT
+═══════════════════════════════════════════ */
+#hookshot #shortcutHint {
+    font-size: 10px;
+    color: var(--text-3);
+    letter-spacing: .04em;
+}
+
+#hookshot #shortcutHint kbd {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-2);
+}
+
+/* ═══════════════════════════════════════════
+   NAV PILLS
+═══════════════════════════════════════════ */
+#hookshot .nav-pills {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+}
+
+#hookshot .nav-pills .nav-item {
+    margin: 0;
+}
+
+#hookshot .nav-pills .nav-link {
+    color: var(--text-2) !important;
+    font-family: var(--mono) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    border-radius: 7px !important;
+    padding: 6px 14px !important;
+    border: none;
+    transition: all .18s;
+    background: transparent !important;
+}
+
+#hookshot .nav-pills .nav-link:hover:not(.active) {
+    background: var(--bg-card) !important;
+    color: var(--text-1) !important;
+}
+
+#hookshot .nav-pills .nav-link.active {
+    background: var(--bg-card) !important;
+    color: var(--accent) !important;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, .4);
+}
+
+/* tab count badge */
+#hookshot .tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    margin-left: 5px;
+    line-height: 1.2;
+}
+
+/* ═══════════════════════════════════════════
+   CARDS
+═══════════════════════════════════════════ */
+#hookshot .card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+}
+
+#hookshot .card-body {
+    padding: 16px !important;
+}
+
+/* ═══════════════════════════════════════════
+   ALL FORM CONTROLS inside hookshot
+═══════════════════════════════════════════ */
+#hookshot input[type="text"],
+#hookshot input[type="password"],
+#hookshot textarea,
+#hookshot select {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 7px !important;
+    color: var(--text-1) !important;
+    font-family: var(--mono) !important;
+    font-size: 12px !important;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+#hookshot input[type="text"]:focus,
+#hookshot input[type="password"]:focus,
+#hookshot textarea:focus,
+#hookshot select:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px rgba(79, 142, 247, .12) !important;
+    outline: none !important;
+}
+
+#hookshot input::placeholder,
+#hookshot textarea::placeholder {
+    color: var(--text-3) !important;
+}
+
+/* override #method's select style since it has its own rules above */
+#hookshot select:not(#method) {
+    height: 36px;
+}
+
+#hookshot textarea {
+    height: auto !important;
+    resize: vertical;
+}
+
+/* body type select label */
+#hookshot #bodyType,
+#hookshot #authType {
+    margin-bottom: 12px;
+}
+
+/* ── section labels inside auth/body ── */
+#hookshot .card-body label,
+#hookshot .card-body strong {
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+}
+
+/* body type indicator chip */
+#hookshot .body-type-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 10px;
+    color: var(--text-3);
+    margin-bottom: 10px;
+}
+
+#hookshot .body-type-chip.active {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+}
+
+/* ═══════════════════════════════════════════
+   ADD BUTTONS
+═══════════════════════════════════════════ */
+#hookshot .btn-light,
+#hookshot .js-add-kv {
+    background: var(--bg-input) !important;
+    border: 1px dashed var(--border-hi) !important;
+    color: var(--text-2) !important;
+    font-family: var(--mono) !important;
+    font-size: 11px !important;
+    border-radius: 6px !important;
+    transition: all .18s;
+}
+
+#hookshot .btn-light:hover,
+#hookshot .js-add-kv:hover {
+    background: var(--bg-card) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+/* key-value remove btn */
+#hookshot .js-remove-kv {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--danger) !important;
+    border-radius: 6px !important;
+    font-size: 11px;
+    transition: all .15s;
+}
+
+#hookshot .js-remove-kv:hover {
+    background: rgba(244, 63, 94, .12) !important;
+    border-color: var(--danger) !important;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSE INFO BAR
+═══════════════════════════════════════════ */
+#hookshot #responseInfoBar {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 11px;
+    color: var(--text-2);
+    font-family: var(--mono);
+    letter-spacing: .04em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+#hookshot .response-meta {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+#hookshot #statusBadge {
+    font-family: var(--mono) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: .06em;
+    padding: 3px 8px !important;
+    border-radius: 4px !important;
+}
+
+#hookshot #responseTime {
+    color: var(--warning);
+    font-weight: 600;
+}
+
+#hookshot #responseSize {
+    color: var(--text-3);
+    font-size: 10px;
+}
+
+/* ── view toggle ── */
+#hookshot .response-view-toggle {
+    display: flex;
+    gap: 3px;
+}
+
+#hookshot .response-view-toggle button {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: all .15s;
+}
+
+#hookshot .response-view-toggle button.active,
+#hookshot .response-view-toggle button:hover {
+    background: var(--bg-card);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ── copy btn ── */
+#hookshot #copyBtn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-2);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all .18s;
+}
+
+#hookshot #copyBtn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+#hookshot #copyBtn.copied {
+    color: var(--success);
+    border-color: var(--success);
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSE OUTPUT
+═══════════════════════════════════════════ */
+#hookshot .hs-response-wrap {
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    overflow: hidden;
+    height: 300px;
+}
+
+#hookshot #jsonOutput {
+    background: var(--bg-deep) !important;
+    font-family: var(--mono) !important;
+    font-size: 12px !important;
+    line-height: 1.8;
+    color: var(--text-2) !important;
+    white-space: pre-wrap;
+    word-break: break-all;
+    height: 100%;
+    overflow: auto;
+    margin: 0;
+    padding: 16px !important;
+}
+
+/* JSON colors */
+#hookshot .json-key {
+    color: #7dd3fc;
+}
+
+#hookshot .json-string {
+    color: #86efac;
+}
+
+#hookshot .json-number {
+    color: #fbbf24;
+}
+
+#hookshot .json-bool {
+    color: #f472b6;
+}
+
+#hookshot .json-null {
+    color: #94a3b8;
+}
+
+/* ═══════════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════════ */
+#hookshot .col-3>h6 {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 10px;
+}
+
+#hookshot .col-3 {
+    border-left: 1px solid var(--border);
+    padding-left: 20px;
+}
+
+#hookshot #historyList {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#hookshot #historyList .list-group-item {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 7px !important;
+    color: var(--text-2) !important;
+    font-family: var(--mono) !important;
+    font-size: 11px !important;
+    padding: 8px 12px !important;
+    transition: all .18s;
+    cursor: pointer;
+}
+
+#hookshot #historyList .list-group-item:hover {
+    background: var(--bg-input) !important;
+    border-color: var(--border-hi) !important;
+    color: var(--text-1) !important;
+}
+
+/* method badge */
+#hookshot .method-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 2px;
+}
+
+#hookshot .method-badge.get {
+    background: rgba(34, 197, 94, .15);
+    color: var(--get);
+}
+
+#hookshot .method-badge.post {
+    background: rgba(79, 142, 247, .15);
+    color: var(--post);
+}
+
+#hookshot .method-badge.put {
+    background: rgba(245, 158, 11, .15);
+    color: var(--put);
+}
+
+#hookshot .method-badge.patch {
+    background: rgba(167, 139, 250, .15);
+    color: var(--patch);
+}
+
+#hookshot .method-badge.delete {
+    background: rgba(244, 63, 94, .15);
+    color: var(--delete);
+}
+
+#hookshot .method-badge.any {
+    background: rgba(136, 144, 168, .15);
+    color: var(--any);
+}
+
+/* ═══════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════ */
+#hookshot ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+#hookshot ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#hookshot ::-webkit-scrollbar-thumb {
+    background: var(--border-hi);
+    border-radius: 4px;
+}
+
+#hookshot ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-dim);
+}
+
+/* ═══════════════════════════════════════════
+   FILE UPLOAD ROW
+═══════════════════════════════════════════ */
+#hookshot .hs-file-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-input);
+    border: 1px dashed var(--border-hi);
+    border-radius: 7px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all .18s;
+    width: 100%;
+    min-height: 32px;
+}
+
+#hookshot .hs-file-label:hover {
+    border-color: var(--accent);
+    background: var(--bg-card);
+}
+
+#hookshot .hs-file-label::before {
+    content: '📎';
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+#hookshot .hs-file-label-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#hookshot .hs-file-label:hover .hs-file-label-text {
+    color: var(--accent);
+}
+
+#hookshot .hs-file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-left: 4px;
+}
+
+#hookshot .hs-file-chip {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(79, 142, 247, .12);
+    border: 1px solid rgba(79, 142, 247, .25);
+    border-radius: 4px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ═══════════════════════════════════════════
+   TAB BADGE (auth / body type label)
+═══════════════════════════════════════════ */
+#hookshot .tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(79, 142, 247, .18);
+    color: var(--accent);
+    border: 1px solid rgba(79, 142, 247, .3);
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    padding: 1px 5px;
+    margin-left: 5px;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+/* ═══════════════════════════════════════════
+   CONSTANTS TAB
+═══════════════════════════════════════════ */
+#hookshot .hs-constants-info {
+    font-size: 11px;
+    color: var(--text-3);
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    line-height: 1.6;
+}
+
+#hookshot .hs-constants-info code {
+    background: var(--bg-input);
+    border: 1px solid var(--border-hi);
+    border-radius: 3px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 5px;
+}
+
+#hookshot .hs-const-brace {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    opacity: .5;
+    white-space: nowrap;
+}
+
+#hookshot .const-key {
+    color: var(--accent) !important;
+    font-weight: 600 !important;
+}
+
+#hookshot .const-val {
+    color: #86efac !important;
+}
+
+/* ═══════════════════════════════════════════
+   ENVIRONMENTS PANEL
+═══════════════════════════════════════════ */
+#hookshot .hs-sidebar-title {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+}
+
+#hookshot .hs-env-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+#hookshot .hs-env-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+#hookshot .hs-env-add-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text-2);
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all .15s;
+    padding: 0;
+}
+
+#hookshot .hs-env-add-btn:hover {
+    background: var(--bg-card);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* env tab strip */
+#hookshot .hs-env-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+#hookshot .hs-env-tab {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    padding: 3px 9px;
+    cursor: pointer;
+    transition: all .15s;
+    user-select: none;
+}
+
+#hookshot .hs-env-tab:hover {
+    border-color: var(--border-hi);
+    color: var(--text-2);
+}
+
+#hookshot .hs-env-tab.active {
+    background: rgba(79, 142, 247, .15);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* rename input */
+#hookshot .hs-env-rename-input {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--accent) !important;
+    border-radius: 5px !important;
+    color: var(--accent) !important;
+    font-family: var(--mono) !important;
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+    height: 24px;
+    width: 90px;
+    outline: none !important;
+}
+
+/* env var rows */
+#hookshot .env-var-row .env-var-key {
+    color: var(--accent) !important;
+    font-weight: 600 !important;
+    font-size: 11px !important;
+}
+
+#hookshot .env-var-row .env-var-val {
+    color: #86efac !important;
+    font-size: 11px !important;
+}
+
+/* eye / lock button */
+#hookshot .hs-eye-btn {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 11px;
+    cursor: pointer;
+    opacity: .5;
+    transition: opacity .15s;
+    line-height: 1;
+}
+
+#hookshot .hs-eye-btn:hover {
+    opacity: 1;
+}
+
+/* hint */
+#hookshot .hs-env-hint {
+    font-size: 10px;
+    color: var(--text-3);
+    line-height: 1.5;
+}
+
+#hookshot .hs-env-hint code {
+    background: var(--bg-input);
+    border: 1px solid var(--border-hi);
+    border-radius: 3px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 1px 4px;
+}
+
+/* ═══════════════════════════════════════════
+   ACTIVE ENV STRIP
+═══════════════════════════════════════════ */
+#hookshot .hs-env-active-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(79, 142, 247, .08);
+    border: 1px solid rgba(79, 142, 247, .2);
+    border-radius: 6px;
+    padding: 5px 10px;
+}
+
+#hookshot .hs-env-active-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+    flex-shrink: 0;
+    animation: hs-pulse 2s infinite;
+}
+
+#hookshot .hs-env-active-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    flex: 1;
+}
+
+#hookshot .hs-env-active-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+}
+
+/* ═══════════════════════════════════════════
+   SMART INPUT
+═══════════════════════════════════════════ */
+#hookshot .hs-si {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+    min-height: 32px;
+    padding: 4px 8px !important;
+    cursor: text;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+}
+
+/* placeholder */
+#hookshot .hs-si:empty::before,
+#hookshot .hs-si:not(:has(.hs-si-chip)):not(:has(.hs-si-inline-edit)):not(:has(span:not(.hs-si-cursor)))::before {
+    content: attr(data-placeholder);
+    color: var(--text-3);
+    font-size: 11px;
+    pointer-events: none;
+}
+
+/* plain text nodes rendered via cursor */
+#hookshot .hs-si-cursor {
+    display: inline;
+    font-size: 12px;
+    color: var(--text-1);
+}
+
+/* chip */
+#hookshot .hs-si-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+    line-height: 1.5;
+}
+
+#hookshot .hs-si-chip.known {
+    background: rgba(79, 142, 247, .18);
+    border: 1px solid rgba(79, 142, 247, .35);
+    color: var(--accent);
+}
+
+#hookshot .hs-si-chip.known:hover {
+    background: rgba(79, 142, 247, .3);
+    border-color: var(--accent);
+}
+
+#hookshot .hs-si-chip.unknown {
+    background: rgba(244, 63, 94, .12);
+    border: 1px dashed rgba(244, 63, 94, .4);
+    color: var(--danger);
+}
+
+#hookshot .hs-si-chip.unknown:hover {
+    background: rgba(244, 63, 94, .2);
+}
+
+/* inline edit inside smart input */
+#hookshot .hs-si-inline-edit {
+    background: var(--bg-deep) !important;
+    border: 1px solid var(--accent) !important;
+    border-radius: 4px !important;
+    color: var(--accent) !important;
+    font-family: var(--mono) !important;
+    font-size: 11px !important;
+    height: 22px !important;
+    padding: 1px 6px !important;
+    min-width: 60px;
+    max-width: 200px;
+    outline: none !important;
+    box-shadow: none !important;
+}
