@@ -43,7 +43,9 @@ class Run
     {
         if (!is_dir($path)) return new self();
         foreach (scan_dir($path) as $module) {
-            $info = include("$path/$module/info.php");
+            $info_path = "$path/$module/info.php";
+            if (!is_file($info_path)) continue;
+            $info = include($info_path);
             if ($info['status']) self::$modules[$info['sort']] = (['module' => $module, 'path' => "$path/$module"] + $info);
         }
         ksort(self::$modules);
