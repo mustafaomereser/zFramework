@@ -71,7 +71,7 @@ class Lang
         unset($name[0]);
 
         foreach ($name as $val) $lang = $lang[$val] ?? null;
-        foreach ($data as $key => $val) $lang = str_replace("{" . $key . "}", $val, $lang);
+        foreach ($data as $key => $val) $lang = str_replace("{" . $key . "}", $val ?? '', $lang);
 
         return $lang;
     }
