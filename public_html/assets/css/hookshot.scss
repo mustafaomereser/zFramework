@@ -117,10 +117,12 @@ $border-top-color_1: #fff;
     --any: #8890a8;
 }
 
-#hookshot {
+.hookshot {
     background: var(--bg-panel) !important;
     border-left: 1px solid var(--border) !important;
-    box-shadow: -24px 0 80px rgba(0, 0, 0, .65) !important;
+    // box-shadow: -24px 0 80px rgba(0, 0, 0, .65) !important;
+    // border-radius: 15px;
+    padding: 10px;
     font-family: $font-family_1;
     color: $color_1;
 
