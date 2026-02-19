@@ -30,106 +30,141 @@
         </div>
     </div>
 
-    <!-- ACCORDION — grouped by prefix -->
+    <!-- ACCORDION — nested prefix tree -->
     <div id="routeAccordion">
         <?php
-        // Group routes by prefix
-        $grouped = [];
-        foreach (\zFramework\Core\Route::$routes as $key => $route) {
-            $prefix = @$route['groups']['pre'] ?? '';
-            $grouped[$prefix][] = ['key' => $key, 'route' => $route];
+        // Build a prefix tree
+        // Each route's prefix is split by '/' to create nesting
+        // Structure: tree[segment][segment]... = ['__routes' => [...]]
+        function buildPrefixTree(array $routes): array
+        {
+            $tree = [];
+            foreach ($routes as $key => $route) {
+                $prefix = trim(@$route['groups']['pre'] ?? '', '/');
+                $segments = $prefix !== '' ? explode('/', $prefix) : [];
+                $node = &$tree;
+                foreach ($segments as $seg) {
+                    if (!isset($node[$seg])) $node[$seg] = [];
+                    $node = &$node[$seg];
+                }
+                $node['__routes'][] = ['key' => $key, 'route' => $route];
+                unset($node);
+            }
+            return $tree;
         }
-        ksort($grouped);
-        $totalRoutes = count(\zFramework\Core\Route::$routes);
+
+        function renderPrefixTree(array $tree, int $depth = 0, string $pathSoFar = ''): void
+        {
+            if (!empty($tree['__routes'])) {
+                foreach ($tree['__routes'] as $entry) {
+                    renderRouteItem($entry['key'], $entry['route']);
+                }
+            }
+            foreach ($tree as $segment => $subtree) {
+                if ($segment === '__routes') continue;
+                $fullPath   = $pathSoFar !== '' ? $pathSoFar . '/' . $segment : $segment;
+                $routeCount = countRoutesInTree($subtree);
+                // Start open by default
+                echo '<div class="ra-folder ra-folder-open" data-path="' . htmlspecialchars($fullPath) . '">';
+                echo '<div class="ra-folder-header">';
+                echo   '<i class="fas fa-chevron-right ra-folder-chevron" style="transform:rotate(90deg)"></i>';
+                echo   '<i class="fas fa-folder ra-folder-icon-closed" style="display:none"></i>';
+                echo   '<i class="fas fa-folder-open ra-folder-icon-open"></i>';
+                echo   '<span class="ra-folder-name">' . htmlspecialchars($segment) . '</span>';
+                echo   '<span class="ra-folder-path">/' . htmlspecialchars($fullPath) . '</span>';
+                echo   '<kbd class="ra-folder-count">' . $routeCount . '</kbd>';
+                echo '</div>';
+                echo '<div class="ra-folder-body">';
+                renderPrefixTree($subtree, $depth + 1, $fullPath);
+                echo '</div>';
+                echo '</div>';
+            }
+        }
+
+        function countRoutesInTree(array $tree): int
+        {
+            $count = count($tree['__routes'] ?? []);
+            foreach ($tree as $k => $v) {
+                if ($k !== '__routes' && is_array($v)) $count += countRoutesInTree($v);
+            }
+            return $count;
+        }
+
+        function renderRouteItem(string $key, array $route): void
+        {
+            $method      = strtoupper($route['method'] ?: 'ANY');
+            $url         = $route['url'] ? "/" . ltrim(rtrim($route['url'], '/'), '/') : '#';
+            $methodClass = 'm-' . strtolower($method);
+            $csrfNeeded  = ($method !== 'GET' && !@$route['groups']['no-csrf']) ? 'Yes' : 'No';
+            $prefix_val  = @$route['groups']['pre'] ?? 'None';
+            $params      = json_encode($route['parameters'] ?? [], JSON_PRETTY_PRINT);
+            $middlewares = json_encode(array_column($route['groups']['middlewares'] ?? [], 0), JSON_PRETTY_PRINT);
+            $httpMethod  = in_array($method, ['GET', 'POST', 'ANY']) ? $method : 'POST';
+            $needsMethodField = !in_array($method, ['GET', 'POST', 'ANY']);
         ?>
+            <div class="ra-item"
+                data-method="<?= htmlspecialchars($method) ?>"
+                data-search="<?= htmlspecialchars(strtolower($url . ' ' . $key)) ?>"><?php // no depth needed 
+                                                                                        ?>
 
-        <?php foreach ($grouped as $prefix => $routes): ?>
-
-            <?php if (count($grouped) > 1): ?>
-                <div class="ra-group" data-prefix="<?= htmlspecialchars($prefix) ?>">
-                    <div class="ra-group-header">
-                        <i class="fas fa-folder ra-group-icon"></i>
-                        <span class="ra-group-label"><?= $prefix !== '' ? htmlspecialchars($prefix) : '/' ?></span>
-                        <kbd class="ra-group-count"><?= count($routes) ?></kbd>
-                    </div>
-                <?php endif ?>
-
-                <?php foreach ($routes as $entry):
-                    $key         = $entry['key'];
-                    $route       = $entry['route'];
-                    $method      = strtoupper($route['method'] ?: 'ANY');
-                    $url         = $route['url'] ? "/" . ltrim(rtrim($route['url'], '/'), '/') : '#';
-                    $methodClass = 'm-' . strtolower($method);
-                    $csrfNeeded  = ($method !== 'GET' && !@$route['groups']['no-csrf']) ? 'Yes' : 'No';
-                    $prefix_val  = @$route['groups']['pre'] ?? 'None';
-                    $params      = json_encode($route['parameters'] ?? [], JSON_PRETTY_PRINT);
-                    $middlewares = json_encode(array_column($route['groups']['middlewares'] ?? [], 0), JSON_PRETTY_PRINT);
-                    // For non-GET/POST methods, actual HTTP method will be POST + _method field
-                    $httpMethod  = in_array($method, ['GET', 'POST', 'ANY']) ? $method : 'POST';
-                    $needsMethodField = !in_array($method, ['GET', 'POST', 'ANY']);
-                ?>
-
-                    <div class="ra-item"
-                        data-method="<?= htmlspecialchars($method) ?>"
-                        data-search="<?= htmlspecialchars(strtolower($url . ' ' . $key)) ?>">
-
-                        <div class="ra-header">
-                            <button class="ra-toggle" type="button">
-                                <i class="fas fa-chevron-right ra-chevron"></i>
-                                <span class="ra-method <?= $methodClass ?>"><?= $method ?></span>
-                                <div class="ra-url-wrap">
-                                    <span class="ra-url"><?= htmlspecialchars($url) ?></span>
-                                    <span class="ra-key"><?= htmlspecialchars($key) ?></span>
-                                </div>
-                            </button>
-                            <div class="ra-header-actions">
-                                <button class="ra-copy-btn" type="button" data-url-copy="<?= htmlspecialchars($url) ?>">
-                                    <i class="fas fa-copy"></i> Copy
-                                </button>
-                                <button class="ra-try-btn testRouteBtn" type="button"
-                                    data-method="<?= htmlspecialchars($httpMethod) ?>"
-                                    data-real-method="<?= htmlspecialchars($method) ?>"
-                                    data-needs-method-field="<?= $needsMethodField ? '1' : '0' ?>"
-                                    data-url="<?= htmlspecialchars($url) ?>">
-                                    <i class="fas fa-terminal"></i> Try it
-                                </button>
-                            </div>
+                <div class="ra-header">
+                    <button class="ra-toggle" type="button">
+                        <i class="fas fa-chevron-right ra-chevron"></i>
+                        <span class="ra-method <?= $methodClass ?>"><?= $method ?></span>
+                        <div class="ra-url-wrap">
+                            <span class="ra-url"><?= htmlspecialchars($url) ?></span>
+                            <span class="ra-key"><?= htmlspecialchars($key) ?></span>
                         </div>
-
-                        <div class="ra-body">
-                            <div class="ra-body-grid">
-                                <div class="ra-field">
-                                    <div class="ra-field-label">CSRF Token</div>
-                                    <div class="ra-field-val <?= $csrfNeeded === 'Yes' ? 'csrf-yes' : 'csrf-no' ?>"><?= $csrfNeeded ?></div>
-                                </div>
-                                <div class="ra-field">
-                                    <div class="ra-field-label">Prefix</div>
-                                    <div class="ra-field-val highlight"><?= htmlspecialchars($prefix_val) ?></div>
-                                </div>
-                                <div class="ra-field">
-                                    <div class="ra-field-label">Parameters</div>
-                                    <pre class="ra-field-val"><?= htmlspecialchars($params) ?></pre>
-                                </div>
-                                <div class="ra-field">
-                                    <div class="ra-field-label">Middlewares</div>
-                                    <pre class="ra-field-val"><?= htmlspecialchars($middlewares) ?></pre>
-                                </div>
-                                <?php if ($needsMethodField): ?>
-                                    <div class="ra-field ra-field--info">
-                                        <div class="ra-field-label">HTTP Spoofing</div>
-                                        <div class="ra-field-val">POST + <code>_method=<?= $method ?></code></div>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        </div>
+                    </button>
+                    <div class="ra-header-actions">
+                        <button class="ra-copy-btn" type="button" data-url-copy="<?= htmlspecialchars($url) ?>">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                        <button class="ra-try-btn testRouteBtn" type="button"
+                            data-method="<?= htmlspecialchars($httpMethod) ?>"
+                            data-real-method="<?= htmlspecialchars($method) ?>"
+                            data-needs-method-field="<?= $needsMethodField ? '1' : '0' ?>"
+                            data-url="<?= htmlspecialchars($url) ?>">
+                            <i class="fas fa-terminal"></i> Try it
+                        </button>
                     </div>
-                <?php endforeach ?>
+                </div>
 
-                <?php if (count($grouped) > 1): ?>
-                </div><!-- /.ra-group -->
-            <?php endif ?>
+                <div class="ra-body">
+                    <div class="ra-body-grid">
+                        <div class="ra-field">
+                            <div class="ra-field-label">CSRF Token</div>
+                            <div class="ra-field-val <?= $csrfNeeded === 'Yes' ? 'csrf-yes' : 'csrf-no' ?>"><?= $csrfNeeded ?></div>
+                        </div>
+                        <div class="ra-field">
+                            <div class="ra-field-label">Prefix</div>
+                            <div class="ra-field-val highlight"><?= htmlspecialchars($prefix_val) ?></div>
+                        </div>
+                        <div class="ra-field">
+                            <div class="ra-field-label">Parameters</div>
+                            <pre class="ra-field-val"><?= htmlspecialchars($params) ?></pre>
+                        </div>
+                        <div class="ra-field">
+                            <div class="ra-field-label">Middlewares</div>
+                            <pre class="ra-field-val"><?= htmlspecialchars($middlewares) ?></pre>
+                        </div>
+                        <?php if ($needsMethodField): ?>
+                            <div class="ra-field ra-field--info">
+                                <div class="ra-field-label">HTTP Spoofing</div>
+                                <div class="ra-field-val">POST + <code>_method=<?= $method ?></code></div>
+                            </div>
+                        <?php endif ?>
+                    </div>
+                </div>
+            </div>
+        <?php
+        }
 
-        <?php endforeach ?>
+        $tree = buildPrefixTree(\zFramework\Core\Route::$routes);
+        $totalRoutes = count(\zFramework\Core\Route::$routes);
+
+        renderPrefixTree($tree);
+        ?>
     </div>
 
     <div class="ra-empty" id="raEmpty">
@@ -255,23 +290,26 @@
                         </div>
                     </div>
                 </div>
-                <div id="responseInfoBar">
-                    <div class="response-meta">
-                        <span>Status: <span id="statusBadge" class="badge bg-secondary">-</span></span>
-                        <span id="responseTime">- ms</span>
-                        <span id="responseSize"></span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="response-view-toggle">
-                            <button id="viewPretty" class="active">Pretty</button>
-                            <button id="viewRaw">Raw</button>
+                <div response-content>
+                    <div id="responseInfoBar">
+                        <div class="response-meta">
+                            <span>Status: <span id="statusBadge" class="badge bg-secondary">-</span></span>
+                            <span id="responseTime">- ms</span>
+                            <span id="responseSize"></span>
                         </div>
-                        <button id="copyBtn" style="display:none">⎘ Copy</button>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="response-view-toggle">
+                                <button id="viewPretty" class="active">Pretty</button>
+                                <button id="viewRaw">Raw</button>
+                            </div>
+                            <button id="copyBtn" style="display: none">⎘ Copy</button>
+                            <button id="resultFullscreenBtn" class="btn" style="display: none">⤢</button>
+                        </div>
                     </div>
-                </div>
-                <div class="hs-response-wrap">
-                    <iframe id="htmlFrame" style="width:100%;height:100%;border:none;display:none;"></iframe>
-                    <pre id="jsonOutput" style="display:none;"></pre>
+                    <div class="hs-response-wrap">
+                        <iframe id="htmlFrame" style="width:100%;height:100%;border:none;display:none;"></iframe>
+                        <pre id="jsonOutput" style="display:none;"></pre>
+                    </div>
                 </div>
             </div>
             <div class="col-4">
@@ -289,7 +327,7 @@
                         </div>
                         <div class="hs-env-hint mt-2">Use <code>{name}</code> in any field — URL, params, headers, auth, body.</div>
                     </div>
-                    <div>
+                    <div class="mt-2">
                         <span class="hs-sidebar-title">Constants</span>
                         <div id="envConstants" class="hs-env-tabs"></div>
                     </div>
@@ -304,8 +342,7 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script>
     $(function() {
-
-        /* ── ACCORDION ── */
+        /* ═══════════════ ACCORDION ═══════════════ */
         const $items = $('.ra-item');
         const total = $items.length;
         let activeMethod = 'ALL';
@@ -313,25 +350,42 @@
         $('#raTotalCount').text(total);
         $('#raVisibleCount').text(total);
 
-        // Toggle open/close
+        // Folder toggle — use direct child selectors to avoid cascading into nested folders
+        $(document).on('click', '.ra-folder-header', function(e) {
+            e.stopPropagation();
+            const $folder = $(this).closest('.ra-folder');
+            const isOpen = $folder.hasClass('ra-folder-open');
+            if (isOpen) {
+                $folder.removeClass('ra-folder-open');
+                // Only touch THIS header's direct icons
+                $(this).children('.ra-folder-chevron').css('transform', '');
+                $(this).children('.ra-folder-icon-closed').show();
+                $(this).children('.ra-folder-icon-open').hide();
+            } else {
+                $folder.addClass('ra-folder-open');
+                $(this).children('.ra-folder-chevron').css('transform', 'rotate(90deg)');
+                $(this).children('.ra-folder-icon-closed').hide();
+                $(this).children('.ra-folder-icon-open').show();
+            }
+        });
+
+        // Route item toggle
         $(document).on('click', '.ra-toggle', function() {
             $(this).closest('.ra-item').toggleClass('ra-open');
         });
 
-        // Copy URL — use attribute directly to avoid jQuery data() encoding issues
+        // Copy URL
         $(document).on('click', '.ra-copy-btn', function(e) {
             e.stopPropagation();
             const url = $(this).attr('data-url-copy');
             const $btn = $(this);
+            const doMark = () => {
+                $btn.addClass('copied').html('<i class="fas fa-check"></i> Copied');
+                setTimeout(() => $btn.removeClass('copied').html('<i class="fas fa-copy"></i> Copy'), 1800);
+            };
             if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(url).then(function() {
-                    $btn.addClass('copied').html('<i class="fas fa-check"></i> Copied');
-                    setTimeout(function() {
-                        $btn.removeClass('copied').html('<i class="fas fa-copy"></i> Copy');
-                    }, 1800);
-                });
+                navigator.clipboard.writeText(url).then(doMark);
             } else {
-                // fallback
                 const $ta = $('<textarea>').css({
                     position: 'fixed',
                     top: 0,
@@ -341,16 +395,13 @@
                 $ta[0].select();
                 try {
                     document.execCommand('copy');
-                    $btn.addClass('copied').html('<i class="fas fa-check"></i> Copied');
-                    setTimeout(function() {
-                        $btn.removeClass('copied').html('<i class="fas fa-copy"></i> Copy');
-                    }, 1800);
+                    doMark();
                 } catch (e) {}
                 $ta.remove();
             }
         });
 
-        // Filter by method
+        // Filter buttons
         $(document).on('click', '.ra-filter-btn', function() {
             activeMethod = $(this).data('method');
             $('.ra-filter-btn').removeClass('ra-active');
@@ -365,12 +416,8 @@
             let visible = 0;
 
             $items.each(function() {
-                const itemMethod = $(this).attr('data-method');
-                const itemSearch = $(this).attr('data-search');
-
-                const methodOk = activeMethod === 'ALL' || itemMethod === activeMethod;
-                const searchOk = !q || itemSearch.indexOf(q) !== -1;
-
+                const methodOk = activeMethod === 'ALL' || $(this).attr('data-method') === activeMethod;
+                const searchOk = !q || $(this).attr('data-search').indexOf(q) !== -1;
                 if (methodOk && searchOk) {
                     $(this).show();
                     visible++;
@@ -379,20 +426,24 @@
                 }
             });
 
-            // Show/hide group headers based on visible children
-            $('.ra-group').each(function() {
-                const hasVisible = $(this).find('.ra-item:visible').length > 0;
-                $(this).find('.ra-group-header').toggle(hasVisible);
+            // Hide/show folders based on visible children
+            // Process deepest first
+            const $folders = $('.ra-folder').get().reverse();
+            $folders.forEach(function(el) {
+                const hasVisible = $(el).find('.ra-item').css('display') != 'none';
+                console.log(hasVisible);
+                if (hasVisible) $(el).show();
+                else $(el).hide();
             });
 
             $('#raVisibleCount').text(visible);
             $('#raEmpty').toggle(visible === 0);
         }
 
-        $('#raExpandAll').on('click', function() {
+        $('#raExpandAll').on('click', () => {
             $items.filter(':visible').addClass('ra-open');
         });
-        $('#raCollapseAll').on('click', function() {
+        $('#raCollapseAll').on('click', () => {
             $items.removeClass('ra-open');
         });
 
@@ -726,6 +777,7 @@
             if (contentType) headers['Content-Type'] = contentType;
             const $btn = $(this).prop('disabled', true).addClass('loading');
             $('#copyBtn').hide();
+            $('#resultFullscreenBtn').hide();
             lastRawResponse = '';
             lastParsedJSON = null;
             isHtmlResponse = false;
@@ -776,6 +828,7 @@
                     }
                 }
                 $('#copyBtn').show();
+                $('#resultFullscreenBtn').show();
             } catch (err) {
                 alert('Request failed: ' + err.message);
             } finally {
@@ -832,6 +885,18 @@
             $(this).addClass('active');
             $('#viewPretty').removeClass('active');
             renderResponse();
+        });
+
+        $('#resultFullscreenBtn').on('click', function() {
+            let content = $('[response-content]');
+
+            if (content.attr('is-fullscreen') == 1) {
+                content.removeAttr('is-fullscreen').removeAttr('style');
+                $('.hs-response-wrap').removeAttr('style');
+            } else {
+                $('.hs-response-wrap').css('height', $('#hookshot .offcanvas-body').innerHeight());
+                content.attr('is-fullscreen', 1).attr('style', `position: absolute; top: 0; width: 100%; height: 100%; left: 0; z-index: 1000;`);
+            }
         });
 
         $('#copyBtn').on('click', function() {

@@ -10,6 +10,7 @@ return [
     'author'            => 'Mustafa-MacBook-Pro.local',
     'created_at'        => '2026-02-18 05:38:45',
     'framework_version' => '2.8.0',
+    'module_version'    => '1.0.2',
     'sort'              => 0,
     'callback'          => function () {
         $GLOBALS['menu']['hookshot'] = [

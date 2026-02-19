@@ -10,6 +10,7 @@ return [
     'author'            => '{author}',
     'created_at'        => '{date}',
     'framework_version' => '{framework_version}',
+    'module_version'    => '0.0.0',
     'sort'              => {sort},
     'callback'          => function () { }
 ];
