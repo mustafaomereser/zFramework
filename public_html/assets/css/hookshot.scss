@@ -86,90 +86,12 @@ $border-top-color_1: #fff;
     }
 }
 
-/* ═══════════════════════════════════════════
-   METHOD SELECT
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   URL BAR
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   SEND BUTTON
-═══════════════════════════════════════════ */
 @keyframes hs-spin {
     to {
         transform: rotate(360deg);
     }
 }
 
-/* ═══════════════════════════════════════════
-   SHORTCUT HINT
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   NAV PILLS
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   CARDS
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   ALL FORM CONTROLS
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   ADD / REMOVE BUTTONS
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   HIGHLIGHT WRAP — {var} chip preview below the input
-   Input is completely untouched and fully functional.
-   .hs-hl-overlay sits BELOW the input as a preview row.
-═══════════════════════════════════════════ */
-/* input inside wrap — no changes, works normally */
-/* preview row below input — hidden when empty */
-/* plain text parts */
-/* placeholder — never shown (overlay hidden when input empty) */
-/* variable chip */
-/* ═══════════════════════════════════════════
-   RESPONSE INFO BAR
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   RESPONSE OUTPUT
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   SIDEBAR — col-4
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   HISTORY
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   SCROLLBAR
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   FILE UPLOAD ROW
-═══════════════════════════════════════════ */
-/* ═══════════════════════════════════════════
-   ENVIRONMENTS PANEL
-═══════════════════════════════════════════ */
-/* env tab strip */
-/* rename input */
-/* env var rows */
-/* eye/lock button */
-/* hint text */
-/* ── ACTIVE ENV STRIP ── */
-/* const-brace decorative */
-/* ═══════════════════════════════════════════
-   DRAG & DROP — {var} token
-═══════════════════════════════════════════ */
-/* ── FILTER BUTTONS ── */
-/* ── META BAR ── */
-/* ── METHOD BADGES ── */
-/* ── ACCORDION ITEM ── */
-/* ── BODY ── */
-/* ── EMPTY STATE ── */
-/* ── PREFIX GROUPS ── */
-/* ── HTTP SPOOFING INFO ── */
-/* ── FOLDER TREE ── */
-/* ── HTTP SPOOFING INFO ── */
-/* ── PREFIX FOLDER TREE ── */
-/* Folder body: left border acts as tree line */
-/* ── HTTP SPOOFING INFO ── */
 :root {
     --bg-deep: #0d0f14;
     --bg-panel: #13161e;
