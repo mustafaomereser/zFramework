@@ -128,6 +128,7 @@ function createEndPointTester(parent) {
         let isHtmlResponse = false;
         let currentView = 'pretty';
         const HISTORY_KEY = 'hookshotHistory';
+        const REQUEST_TYPE_KEY = 'hookshotRequestType';
         const ENV_KEY = 'hookshotEnvironments';
         const ENV_ACTIVE = 'hookshotActiveEnv';
 
@@ -150,14 +151,16 @@ function createEndPointTester(parent) {
         }
 
         function resetAll() {
-            _PARENT.find('#method').val('ANY');
-            setMethodColor('ANY');
+            if (!localStorage.getItem(REQUEST_TYPE_KEY)) localStorage.setItem(REQUEST_TYPE_KEY, 'fetch');
+            _PARENT.find(`[name="request_type"][value="${localStorage.getItem(REQUEST_TYPE_KEY)}"]`).prop('checked', true);
+            _PARENT.find('#method').val('ANY').trigger('input');
             _PARENT.find('#urlWrapper').removeClass('border-danger text-danger').empty();
             _PARENT.find('#queryContainer').empty();
             _PARENT.find('#bodyFormDataContainer').empty();
             _PARENT.find('#bodyUrlencodedContainer').empty();
             _PARENT.find('#headersContainer').empty();
         }
+        resetAll();
 
         function setMethodColor(method) {
             _PARENT.find('#method').removeClass('method-get method-post method-put method-patch method-delete method-any').addClass('method-' + (method || 'any').toLowerCase());
@@ -165,10 +168,20 @@ function createEndPointTester(parent) {
 
         _PARENT.find('#method').on('input', function () {
             _PARENT.find('[data-bs-target="#bodyTab"], #bodyTab').css('opacity', 1).removeAttr('disabled').tooltip("dispose");
-            if (['GET', 'HEAD', 'ANY'].includes(this.value.toUpperCase())) _PARENT.find('[data-bs-target="#bodyTab"], #bodyTab').attr('disabled', true).css('opacity', .3).tooltip('dispose').tooltip({
-                title: '<small>Body can not use with GET, HEAD</small>',
-                html: true
-            });
+            if (['GET', 'HEAD', 'ANY'].includes(this.value.toUpperCase())) {
+                _PARENT.find('[data-bs-target="#bodyTab"], #bodyTab').attr('disabled', true).css('opacity', .3).tooltip('dispose').tooltip({
+                    title: '<small>Body can not use with GET, HEAD</small>',
+                    html: true
+                });
+
+                mustMethod = this.value !== 'ANY' ? this.value : 'GET';
+            } else mustMethod = 'POST';
+
+            setMethodColor(this.value);
+        });
+
+        _PARENT.find('[name="request_type"]').on('change', function () {
+            localStorage.setItem(REQUEST_TYPE_KEY, this.value);
         });
 
         $(document).on('click', '.testRouteBtn', function () {
@@ -176,7 +189,7 @@ function createEndPointTester(parent) {
 
             const httpMethod = $(this).data('method'); // POST or GET (actual HTTP)
             realMethod = $(this).data('real-method'); // PUT, DELETE, PATCH etc.
-            mustMethod = realMethod !== 'ANY' ? realMethod : 'GET';
+
             needsMethodField = $(this).data('needs-method-field') === 1 || $(this).data('needs-method-field') === '1';
             const url = $(this).data('url');
 
@@ -492,9 +505,29 @@ function createEndPointTester(parent) {
                     headers
                 };
                 if (body && !['GET', 'HEAD', 'ANY'].includes(method.toUpperCase())) opts.body = body;
-                const response = await fetch(url, opts);
-                const elapsed = Math.round(performance.now() - start),
-                    ct = response.headers.get('content-type') || '';
+
+                let response, ct;
+                switch (_PARENT.find('[name="request_type"]:is(:checked)').val()) {
+                    case 'fetch':
+                        response = await fetch(url, opts);
+                        ct = response.headers.get('content-type') || '';
+                        console.log(response);
+                        break;
+                    case 'xmlhttprequest':
+                        response = await $.ajax({
+                            url: url,
+                            enctype: contentType,
+                            type: opts.method,
+                            headers: opts.headers,
+                            data: opts?.body,
+                            complete: function (jqXHR, textStatus) {
+                                ct = jqXHR.getResponseHeader('Content-Type');
+                            }
+                        });
+                        break;
+                }
+
+                const elapsed = Math.round(performance.now() - start);
                 _PARENT.find('#responseTime').text(elapsed + ' ms');
                 setStatus(response.status);
                 const snapshot = {
@@ -512,14 +545,14 @@ function createEndPointTester(parent) {
                 };
                 saveHistory(method, rawUrlTemplate, paramValues, response.status, elapsed, snapshot);
                 if (ct.includes('application/json')) {
-                    const data = await response.json();
+                    const data = response?.json ? await response.json() : response;
                     lastParsedJSON = data;
                     lastRawResponse = JSON.stringify(data, null, 2);
                     isHtmlResponse = false;
                     updateResponseSize(lastRawResponse);
                     renderResponse();
                 } else {
-                    const text = await response.text();
+                    const text = response?.text ? await response.text() : response;
                     lastRawResponse = text;
                     isHtmlResponse = ct.includes('text/html');
                     updateResponseSize(text);
@@ -532,7 +565,18 @@ function createEndPointTester(parent) {
                 _PARENT.find('#copyBtn').show();
                 _PARENT.find('#resultFullscreenBtn').show();
             } catch (err) {
-                alert('Request failed: ' + err.message);
+                alert(err?.message ? err.message : 'Request failed');
+                if (err.responseJSON) {
+                    lastParsedJSON = err.responseJSON;
+                    lastRawResponse = JSON.stringify(lastParsedJSON, null, 2);
+                    isHtmlResponse = false;
+                } else {
+                    lastParsedJSON = null;
+                    lastRawResponse = err.responseText;
+                }
+
+                updateResponseSize(lastRawResponse);
+                renderResponse();
             } finally {
                 $btn.prop('disabled', false).removeClass('loading');
             }
@@ -652,18 +696,18 @@ function createEndPointTester(parent) {
 
         function addFileRow(cid) {
             const $row = $(`
-                    <div class="file-row mb-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <input type="checkbox" class="form-check-input kv-active" style="background-color: var(--bg-input)" checked>
-                            <div class="row align-items-center flex-fill g-2">
-                                <div class="col-6"><input type="text" class="form-control form-control-sm file-key" placeholder="Field name"></div>
-                                <div class="col-6"><label class="hs-file-label"><span class="hs-file-label-text">Choose file(s)...</span><input type="file" class="file-input" multiple style="display:none"></label></div>
-                            </div>
-                            <button type="button" class="btn btn-sm js-remove-kv">✕</button>
+                <div class="file-row mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="checkbox" class="form-check-input kv-active" style="background-color: var(--bg-input)" checked>
+                        <div class="row align-items-center flex-fill g-2">
+                            <div class="col-6"><input type="text" class="form-control form-control-sm file-key" placeholder="Field name"></div>
+                            <div class="col-6"><label class="hs-file-label"><span class="hs-file-label-text">Choose file(s)...</span><input type="file" class="file-input" multiple style="display:none"></label></div>
                         </div>
-                        <div class="hs-file-list mt-1"></div>
+                        <button type="button" class="btn btn-sm js-remove-kv">✕</button>
                     </div>
-                `);
+                    <div class="hs-file-list mt-1"></div>
+                </div>
+            `);
 
             $row.find('.kv-active').on('change', function () {
                 if ($(this).is(':checked')) $row.css('opacity', 1);
@@ -802,7 +846,6 @@ function createEndPointTester(parent) {
         function restoreSnapshot(item) {
             const s = item.snapshot || {};
             _PARENT.find('#method').val(item.method).trigger('input');
-            setMethodColor(item.method);
             rawUrlTemplate = item.template;
             paramValues = item.params || {};
             renderUrl();
@@ -1070,8 +1113,6 @@ function createEndPointTester(parent) {
         }
 
         function loadHistory() {
-            resetAll();
-
             const $list = _PARENT.find('#historyList').empty(),
                 h = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
             if (!h.length) {
@@ -1092,7 +1133,6 @@ function createEndPointTester(parent) {
                 });
                 $list.append($li);
             });
-            $list.append('<li class="list-group-item text-center p-2 js-clear-history"><span style="color:var(--danger);font-size:11px;cursor:pointer">Clear History</span></li>');
         }
 
         $(document).on('click', '.js-clear-history', function () {

@@ -562,7 +562,8 @@
   border: 1px solid var(--border) !important;
   border-radius: 10px !important;
   overflow: hidden;
-  height: 300px;
+  height: 400px;
+  background: white;
 }
 .hookshot #jsonOutput {
   background: var(--bg-deep) !important;
@@ -603,6 +604,8 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  height: 400px;
+  overflow-y: auto;
 }
 .hookshot #historyList .list-group-item {
   background: var(--bg-card) !important;
@@ -974,6 +977,12 @@
 }
 
 .ra-filter-btn[data-method=ALL].ra-active {
+  background: #e9ecef;
+  border-color: #adb5bd;
+  color: #495057;
+}
+
+.ra-filter-btn[data-method=ANY].ra-active {
   background: #e9ecef;
   border-color: #adb5bd;
   color: #495057;

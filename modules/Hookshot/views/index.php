@@ -28,6 +28,7 @@
                     </div>
                     <div class="ra-filters">
                         <button class="ra-filter-btn ra-active" data-method="ALL">ALL</button>
+                        <button class="ra-filter-btn" data-method="ANY">ANY</button>
                         <button class="ra-filter-btn" data-method="GET">GET</button>
                         <button class="ra-filter-btn" data-method="POST">POST</button>
                         <button class="ra-filter-btn" data-method="PUT">PUT</button>
@@ -214,8 +215,22 @@
                                 </button>
                             </div>
                         </div>
-                        <div id="shortcutHint" class="mb-2 text-end">
-                            <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to send
+                        <div class="row align-items-center mb-2">
+                            <div class="col-6">
+                                <div class="d-flex align-items-center gap-2">
+                                    <label for="request-type-xmlhttprequest" class="hs-env-hint">
+                                        <input type="radio" name="request_type" class="form-check-input" id="request-type-xmlhttprequest" value="xmlhttprequest" style="background-color: var(--bg-input)"> XmlHttpRequest
+                                    </label>
+                                    <label for="request-type-fetch" class="hs-env-hint">
+                                        <input type="radio" name="request_type" class="form-check-input" id="request-type-fetch" value="fetch" style="background-color: var(--bg-input)"> Fetch
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-6 text-end">
+                                <div id="shortcutHint">
+                                    <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to send
+                                </div>
+                            </div>
                         </div>
                         <ul class="nav nav-pills mb-3 small fw-semibold gap-2" role="tablist">
                             <li class="nav-item"><button class="nav-link active px-3 py-1" data-bs-toggle="tab" data-bs-target="#paramsTab">Params <span class="tab-count" id="paramsCount" style="display:none"></span></button></li>
@@ -302,8 +317,8 @@
                         <div response-content>
                             <div id="responseInfoBar">
                                 <div class="response-meta">
-                                    <span>Status: <span id="statusBadge" class="badge bg-secondary">-</span></span>
-                                    <span id="responseTime">- ms</span>
+                                    <span>Status: <span id="statusBadge" class="badge"></span></span>
+                                    <span id="responseTime"></span>
                                     <span id="responseSize"></span>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
@@ -312,7 +327,7 @@
                                         <button id="viewRaw">Raw</button>
                                     </div>
                                     <button id="copyBtn" style="display: none">⎘ Copy</button>
-                                    <button id="resultFullscreenBtn" class="hk-btn" style="display: none">⤢</button>
+                                    <button id="resultFullscreenBtn" class="btn" style="display: none">⤢ Fullscreen</button>
                                 </div>
                             </div>
                             <div class="hs-response-wrap">
@@ -341,7 +356,14 @@
                                 <div id="envConstants" class="hs-env-tabs"></div>
                             </div>
                         </div>
-                        <div class="hs-sidebar-title mb-2">History</div>
+                        <div class="row align-items-center mb-2">
+                            <div class="col-6">
+                                <div class="hs-sidebar-title mb-0">History</div>
+                            </div>
+                            <div class="col-6 text-end">
+                                <span style="color:var(--danger);font-size:11px;cursor:pointer" class="js-clear-history">Clear History</span>
+                            </div>
+                        </div>
                         <ul id="historyList" class="list-group small"></ul>
                     </div>
                 </div>

@@ -96,7 +96,7 @@ class Validator
 
     public static function email($data, $parameters, $nullable)
     {
-        if (!strlen($data['value'])) return true;
+        if (!@strlen($data['value'])) return true;
         if (filter_var($data['value'], FILTER_VALIDATE_EMAIL)) return true;
         return false;
     }
