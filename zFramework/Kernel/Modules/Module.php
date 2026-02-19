@@ -36,9 +36,11 @@ class Module
 
         if (is_dir(base_path("/modules/$name"))) return Terminal::text("[color=red]`$name` module already exists.[/color]");
 
-        foreach (['route', 'views', 'Controllers', 'Middlewares', 'Models', 'Requests', 'Observers', 'migrations'] as $folder) @mkdir(base_path("/modules/$name/$folder"), 0777, true);
+        foreach (['route', 'views'] as $folder) @mkdir(base_path("/modules/$name/$folder"), 0777, true);
         file_put_contents(base_path("/modules/$name/route/web.php"), str_replace(['{name}'], [$name], file_get_contents(self::$assets['route'])));
         file_put_contents(base_path("/modules/$name/info.php"), str_replace(['{name}', '{date}', '{author}', '{framework_version}', '{sort}'], [$name, Date::timestamp(), gethostname(), FRAMEWORK_VERSION, count(scan_dir(base_path("/modules")))], file_get_contents(self::$assets['info'])));
+
+        Terminal::text("[color=yellow]" . implode(', ', ['Controllers', 'Middlewares', 'Models', 'Requests', 'Observers', 'migrations']) . " folders do not created, but when you make an related asset its be appear.[/color]");
         return Terminal::text("[color=green]`$name` module is created.[/color]");
     }
 }

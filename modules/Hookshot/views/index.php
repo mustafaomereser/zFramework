@@ -41,7 +41,7 @@
             $tree = [];
             foreach ($routes as $key => $route) {
                 $prefix = trim(@$route['groups']['pre'] ?? '', '/');
-                $segments = $prefix !== '' ? explode('/', $prefix) : [];
+                $segments = $prefix !== '' ? explode('/', $prefix) : [''];
                 $node = &$tree;
                 foreach ($segments as $seg) {
                     if (!isset($node[$seg])) $node[$seg] = [];
@@ -55,11 +55,8 @@
 
         function renderPrefixTree(array $tree, int $depth = 0, string $pathSoFar = ''): void
         {
-            if (!empty($tree['__routes'])) {
-                foreach ($tree['__routes'] as $entry) {
-                    renderRouteItem($entry['key'], $entry['route']);
-                }
-            }
+            if (!empty($tree['__routes'])) foreach ($tree['__routes'] as $entry) renderRouteItem($entry['key'], $entry['route']);
+
             foreach ($tree as $segment => $subtree) {
                 if ($segment === '__routes') continue;
                 $fullPath   = $pathSoFar !== '' ? $pathSoFar . '/' . $segment : $segment;
@@ -67,16 +64,23 @@
                 // Start open by default
                 echo '<div class="ra-folder ra-folder-open" data-path="' . htmlspecialchars($fullPath) . '">';
                 echo '<div class="ra-folder-header">';
-                echo   '<i class="fas fa-chevron-right ra-folder-chevron" style="transform:rotate(90deg)"></i>';
-                echo   '<i class="fas fa-folder ra-folder-icon-closed" style="display:none"></i>';
-                echo   '<i class="fas fa-folder-open ra-folder-icon-open"></i>';
-                echo   '<span class="ra-folder-name">' . htmlspecialchars($segment) . '</span>';
-                echo   '<span class="ra-folder-path">/' . htmlspecialchars($fullPath) . '</span>';
-                echo   '<kbd class="ra-folder-count">' . $routeCount . '</kbd>';
+                echo    '<i class="fas fa-chevron-right ra-folder-chevron" style="transform:rotate(90deg)"></i>';
+                echo    '<i class="fas fa-folder ra-folder-icon-closed" style="display:none"></i>';
+                echo    '<i class="fas fa-folder-open ra-folder-icon-open"></i>';
+                echo    '<span class="ra-folder-name">' . htmlspecialchars($segment) . '</span>';
+                echo    '<span class="ra-folder-path">/' . htmlspecialchars($fullPath) . '</span>';
+                echo    '<kbd class="ra-folder-count">' . $routeCount . '</kbd>';
                 echo '</div>';
                 echo '<div class="ra-folder-body">';
+                echo    '<div class="ra-meta">';
+                echo        '<div class="ra-count">Has <strong>' . $routeCount . '</strong> routes</div>';
+                echo        '<div class="ra-actions">';
+                echo           '<button class="ra-action-btn" expand-all-items>Expand All</button>';
+                echo           '<button class="ra-action-btn" ra-collapse-all-items>Collapse All</button>';
+                echo        '</div>';
+                echo     '</div>';
                 renderPrefixTree($subtree, $depth + 1, $fullPath);
-                echo '</div>';
+                echo   '</div>';
                 echo '</div>';
             }
         }
@@ -84,9 +88,7 @@
         function countRoutesInTree(array $tree): int
         {
             $count = count($tree['__routes'] ?? []);
-            foreach ($tree as $k => $v) {
-                if ($k !== '__routes' && is_array($v)) $count += countRoutesInTree($v);
-            }
+            foreach ($tree as $k => $v) if ($k !== '__routes' && is_array($v)) $count += countRoutesInTree($v);
             return $count;
         }
 
@@ -104,9 +106,7 @@
         ?>
             <div class="ra-item"
                 data-method="<?= htmlspecialchars($method) ?>"
-                data-search="<?= htmlspecialchars(strtolower($url . ' ' . $key)) ?>"><?php // no depth needed 
-                                                                                        ?>
-
+                data-search="<?= htmlspecialchars(strtolower($url . ' ' . $key)) ?>">
                 <div class="ra-header">
                     <button class="ra-toggle" type="button">
                         <i class="fas fa-chevron-right ra-chevron"></i>
@@ -162,7 +162,6 @@
 
         $tree = buildPrefixTree(\zFramework\Core\Route::$routes);
         $totalRoutes = count(\zFramework\Core\Route::$routes);
-
         renderPrefixTree($tree);
         ?>
     </div>
@@ -344,6 +343,7 @@
     $(function() {
         /* ═══════════════ ACCORDION ═══════════════ */
         const $items = $('.ra-item');
+        const $folders = $('.ra-folder');
         const total = $items.length;
         let activeMethod = 'ALL';
 
@@ -428,10 +428,8 @@
 
             // Hide/show folders based on visible children
             // Process deepest first
-            const $folders = $('.ra-folder').get().reverse();
-            $folders.forEach(function(el) {
-                const hasVisible = $(el).find('.ra-item').css('display') != 'none';
-                console.log(hasVisible);
+            $('.ra-folder').get().reverse().forEach(function(el) {
+                const hasVisible = $(el).find('.ra-item').filter((__, item) => $(item).css('display') != 'none').length > 0;
                 if (hasVisible) $(el).show();
                 else $(el).hide();
             });
@@ -441,11 +439,21 @@
         }
 
         $('#raExpandAll').on('click', () => {
-            $items.filter(':visible').addClass('ra-open');
+            // $items.filter(':visible').addClass('ra-open');
+            $folders.addClass('ra-folder-open');
         });
         $('#raCollapseAll').on('click', () => {
+            $folders.removeClass('ra-folder-open');
             $items.removeClass('ra-open');
         });
+
+        $folders.each((_, folder) => {
+            folder = $(folder);
+            let items = folder.find('.ra-item');
+            folder.find('[expand-all-items]').on('click', () => items.filter(':visible').addClass('ra-open'));
+            folder.find('[ra-collapse-all-items]').on('click', () => items.removeClass('ra-open'));
+        });
+
 
         /* ── HOOKSHOT ── */
         let rawUrlTemplate = '';
@@ -507,6 +515,8 @@
                 $last.find('.kv-key').val('_method');
                 $last.find('.kv-val').val(realMethod).trigger('input');
             }
+
+            if ($('[response-content]').attr('is-fullscreen')) $('#resultFullscreenBtn').click();
 
             bootstrap.Offcanvas.getOrCreateInstance('#hookshot').show();
         });
