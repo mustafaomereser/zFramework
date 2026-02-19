@@ -225,7 +225,7 @@ $border-top-color_1: #fff;
 
     #urlWrapper {
         background: var(--bg-input) !important;
-        border: 1px solid var(--border) !important;
+        border: 1px solid var(--border);
         border-radius: 8px !important;
         min-height: 40px !important;
         padding: 6px 12px !important;
