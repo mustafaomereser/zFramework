@@ -1295,7 +1295,7 @@
 
     window._hsConstants = {
         csrf: "<?= zFramework\Core\Csrf::get() ?>",
-        baseUrl: "<?= host() ?>",
+        server: "<?= host() ?>",
     };
 </script>
 @endsection
