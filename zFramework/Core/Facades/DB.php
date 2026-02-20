@@ -97,10 +97,10 @@ class DB
             $e->execute($data);
         } catch (\Throwable $e) {
             $err = [
-                '1146' => fn() => throw new \Exception($e->getMessage(), 1001),
+                '1146' => fn() => throw new \PDOException($e->getMessage(), 1001),
             ][(string) $e->errorInfo['1']] ?? false;
             if ($err) return $err();
-            throw new \Exception($e->getMessage());
+            throw new \PDOException($e->getMessage());
         }
 
         $queryTime = microtime(true) - $queryTime;

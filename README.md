@@ -1117,7 +1117,7 @@ Run project.
     > php terminal run (press enter)
     
     // with custom ip and port
-    > php terminal run host=127.0.0.1 port=2000 (press enter)
+    > php terminal run --host=127.0.0.1 --port=2000 (press enter)
 ```
 
 ## 21. AutoSSL (Lets Encrypt)

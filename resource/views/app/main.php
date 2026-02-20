@@ -66,7 +66,8 @@ $lang_list = Lang::list();
             <div class="col-lg-6 col-12 mb-md-0 mb-3">
                 <div class="d-flex align-items-center justify-content-lg-start justify-content-center gap-2">
                     <a href="/api/v1">API</a>
-                    <a href="https://github.com/mustafaomereser/Z-Framework-php-mvc" target="_blank">Github & Docs</a>
+                    <a href="https://github.com/mustafaomereser/zFramework" target="_blank">Github</a>
+                    <a href="https://docs.zframework.dev" target="_blank">Docs</a>
                 </div>
             </div>
             <div class="col-lg-6 col-12">
