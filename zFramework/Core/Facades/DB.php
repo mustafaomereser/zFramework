@@ -92,17 +92,7 @@ class DB
         $data = count($data) ? $data : $this->buildQuery['data'] ?? [];
         $queryTime = microtime(true);
         $e = $this->connection()->prepare($sql);
-
-        try {
-            $e->execute($data);
-        } catch (\Throwable $e) {
-            $err = [
-                '1146' => fn() => throw new \PDOException($e->getMessage(), 1001),
-            ][(string) $e->errorInfo['1']] ?? false;
-            if ($err) return $err();
-            throw new \PDOException($e->getMessage());
-        }
-
+        $e->execute($data);
         $queryTime = microtime(true) - $queryTime;
         if (!$this->ignoreAnalyze && config('app.analyze')) DbCollector::analyze($this, $sql, $data, $queryTime);
         $this->reset();
