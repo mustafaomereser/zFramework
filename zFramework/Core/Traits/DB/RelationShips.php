@@ -7,7 +7,7 @@ trait RelationShips
     public function findRelation(string $model, string $value, ?string $column = null)
     {
         if (!$column) $column = $this->table . "_id";
-        return model($model)->where($column, $value);
+        return (new $model)->where($column, $value);
     }
 
     public function hasMany(string $model, string $value, ?string $column = null)

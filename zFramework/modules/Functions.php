@@ -65,6 +65,12 @@ function file_put_contents2($file_name, $content, $flags = 0)
 }
 
 
+// Refresh page.
+function refresh()
+{
+    die(header("Refresh:0"));
+}
+
 // Redirect to url what are you want.
 function redirect($url = "/")
 {
@@ -263,12 +269,6 @@ function getBrowser()
     ];
 }
 
-// for Easy call models
-function model($model)
-{
-    return new $model;
-}
-
 // scan dir remove dots.
 function scan_dir($dir)
 {
@@ -284,9 +284,8 @@ function rrmdir($dir)
     $objects = scan_dir($dir);
     foreach ($objects as $object) {
         $path = $dir . DIRECTORY_SEPARATOR . $object;
-        if (is_dir($path)) {
-            $delete += rrmdir($path);
-        } else {
+        if (is_dir($path)) $delete += rrmdir($path);
+        else {
             unlink($path);
             $delete++;
         }

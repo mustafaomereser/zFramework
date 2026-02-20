@@ -11,7 +11,7 @@ Route::pre('/blog')->group(function () {
     Route::resource('/categories', ClientCategoryController::class);
 });
 
-Route::middleware([App\Middlewares\Auth::class])::pre('/admin')->group(function () {
+Route::pre('/admin')->middleware([App\Middlewares\Auth::class])->group(function () {
     Route::pre('/blog')->group(function () {
         Route::resource('/categories', AdminBlogCategoriesController::class);
         Route::resource('/', AdminBlogController::class);

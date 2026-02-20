@@ -70,12 +70,12 @@ class Db
         $migrate_fresh      = in_array('--fresh', Terminal::$parameters) ?? false;
         $migrate_force      = in_array('--force', Terminal::$parameters) ?? false;
         $init_column_name   = "table_initilazing";
+        $types              = [3 => ['not changed.', 'dark-gray'], 1 => ['added', 'green'], 2 => ['modified', 'yellow']];
 
         $scans = [BASE_PATH . "/database/$migrations_path"];
 
-        if (in_array('--all', Terminal::$parameters)) {
-            foreach (self::$all_modules as $module) $scans[] = BASE_PATH . "/modules/$module/$migrations_path";
-        } else {
+        if (in_array('--all', Terminal::$parameters)) foreach (self::$all_modules as $module) $scans[] = BASE_PATH . "/modules/$module/$migrations_path";
+        else {
             if (isset(Terminal::$parameters['--module'])) {
                 # select one module migrations
                 $module = Terminal::$parameters['--module'];
@@ -341,8 +341,13 @@ class Db
                     $result['loop']   = false;
                 }
 
-                $types = [3 => ['not changed.', 'dark-gray'], 1 => ['added', 'green'], 2 => ['modified', 'yellow']];
-                Terminal::text("[color=" . $types[$result['status']][1] . "]-> `$column` " . $types[$result['status']][0] . "[/color]");
+                $migrate_diffs = [];
+                if ($result['status'] == 2) $migrate_diffs = array_diff($last_migrate['tables'][$table]['columns'][$column]['data'] ?? [], $data);
+
+                Terminal::text(
+                    "[color=" . $types[$result['status']][1] . "]-> `$column` " . $types[$result['status']][0] . "[/color]" .
+                        (count($migrate_diffs) ? " [color=dark-gray]diff:" . implode(",", $migrate_diffs) . "[/color]" : null)
+                );
 
                 $last_migrate['tables'][$table]['date']             = date('Y-m-d H:i:s');
                 $last_migrate['tables'][$table]['columns'][$column] = ['result' => ['status' => $result['status'], 'message' => $types[$result['status']][0]], 'data' => $data];

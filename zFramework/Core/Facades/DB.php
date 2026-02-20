@@ -92,7 +92,17 @@ class DB
         $data = count($data) ? $data : $this->buildQuery['data'] ?? [];
         $queryTime = microtime(true);
         $e = $this->connection()->prepare($sql);
-        $e->execute($data);
+
+        try {
+            $e->execute($data);
+        } catch (\Throwable $e) {
+            $err = [
+                '1146' => fn() => throw new \Exception($e->getMessage(), 1001),
+            ][(string) $e->errorInfo['1']] ?? false;
+            if ($err) return $err();
+            throw new \Exception($e->getMessage());
+        }
+
         $queryTime = microtime(true) - $queryTime;
         if (!$this->ignoreAnalyze && config('app.analyze')) DbCollector::analyze($this, $sql, $data, $queryTime);
         $this->reset();
@@ -106,6 +116,7 @@ class DB
      */
     public function table(string $table): self
     {
+        if (!in_array($table, array_keys($this->tables()['TABLE_COLUMNS'] ?? []))) throw new \Exception("`$table` is not there in database.", 1001);
         $this->table         = $table;
         $this->originalTable = $table;
         return $this;
@@ -113,9 +124,9 @@ class DB
 
     /**
      * Set all tables informations in database.
-     * @return void
+     * @return array
      */
-    private function tables(): void
+    private function tables(): array
     {
         $data = json_decode(@file_get_contents($this->cache_dir . "/" . $this->dbname . "/scheme.json"), true) ?? false;
         if (!$data) {
@@ -123,6 +134,7 @@ class DB
             file_put_contents2($this->cache_dir . "/" . $this->dbname . "/scheme.json", json_encode($data, JSON_UNESCAPED_UNICODE));
         }
         $GLOBALS['DB'][$this->dbname] = $data;
+        return $data;
     }
 
     /**
