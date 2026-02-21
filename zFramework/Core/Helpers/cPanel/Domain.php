@@ -10,6 +10,11 @@ class Domain
         return API::request("DomainInfo/list_domains");
     }
 
+    public static function data(): ?array
+    {
+        return API::request("DomainInfo/domains_data");
+    }
+
     public static function aliases(): ?array
     {
         return API::request("DomainInfo/main_domain_builtin_subdomain_aliases");
