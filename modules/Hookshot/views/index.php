@@ -117,7 +117,7 @@
                         $csrfNeeded  = ($method !== 'GET' && !@$route['groups']['no-csrf']) ? 'Yes' : 'No';
                         $prefix_val  = @$route['groups']['pre'] ?? 'None';
                         $params      = json_encode($route['parameters'] ?? [], JSON_PRETTY_PRINT);
-                        $middlewares = json_encode(array_column($route['groups']['middlewares'] ?? [], 0), JSON_PRETTY_PRINT);
+                        $middlewares = json_encode($route['groups']['middlewares'][0] ?? [], JSON_PRETTY_PRINT);
                         $httpMethod  = in_array($method, ['GET', 'POST', 'ANY']) ? $method : 'POST';
                         $needsMethodField = !in_array($method, ['GET', 'POST', 'ANY']);
                     ?>
