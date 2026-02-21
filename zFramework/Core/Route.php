@@ -325,7 +325,7 @@ class Route
      */
     public static function middleware(array $list, $callback = null)
     {
-        self::$add_groups['middlewares'] = [array_merge((self::$add_groups['middlewares'][0] ?? []), $list), $callback];
+        self::$add_groups['middlewares'] = [array_merge((self::$groups['middlewares'][0] ?? []), $list), $callback];
         return new self();
     }
 
