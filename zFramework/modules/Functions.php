@@ -108,7 +108,7 @@ function globals($name, $value = NULL)
 // Get Current Request Method.
 function method()
 {
-    return strtoupper($_POST['_method'] ?? $_SERVER['REQUEST_METHOD']);
+    return @strtoupper($_POST['_method'] ?? $_SERVER['REQUEST_METHOD']);
 }
 
 // Show method with ready input

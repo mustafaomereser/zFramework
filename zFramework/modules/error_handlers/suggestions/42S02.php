@@ -1,0 +1,1 @@
+<?php include('1001.php');
