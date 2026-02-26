@@ -4,26 +4,21 @@ namespace zFramework\Core;
 
 class View
 {
-
-    static $binds  = [];
-    static $config = [];
+    static $binds             = [];
+    static $config            = [];
     static $view;
     static $view_name;
     static $data;
-    static $sections;
-    static $directives = [];
-
-    /**
-     * Tracks all file paths involved in the current compilation
-     * (main view, extends, includes) for cache invalidation.
-     */
-    static $compiledFiles = [];
-
-    /**
-     * When true, the view contains dynamic extends (@extends($var))
-     * and cannot be safely cached since the layout depends on runtime data.
-     */
+    static $sections          = [];
+    static $directives        = [];
+    static $compiledFiles     = [];
     static $hasDynamicExtends = false;
+
+    /**
+     * Tracks which bind keys were used during compilation
+     * so they can be re-applied on cache hits.
+     */
+    static $usedBinds         = [];
 
     /**
      * Prepare config.
@@ -47,22 +42,44 @@ class View
      */
     private static function reset(): void
     {
-        self::$view              = null;
-        self::$view_name         = null;
-        self::$data              = null;
-        self::$sections          = [];
-        self::$compiledFiles     = [];
-        self::$hasDynamicExtends = false;
+        self::$view               = null;
+        self::$view_name          = null;
+        self::$data               = null;
+        self::$sections           = [];
+        self::$compiledFiles      = [];
+        self::$hasDynamicExtends  = false;
+        self::$usedBinds          = [];
+    }
+
+    /**
+     * Apply binds for a view name and merge into data.
+     * Tracks used binds so they can be stored in manifest.
+     */
+    private static function applyBinds(string $view_name, array $data): array
+    {
+        if (isset(self::$binds[$view_name])) {
+            if (!in_array($view_name, self::$usedBinds)) self::$usedBinds[] = $view_name;
+            $data = self::$binds[$view_name]() + $data;
+        }
+        return $data;
     }
 
     /**
      * Compile a view without executing it.
      * Resolves extends, sections, yields and all directives
      * but leaves PHP tags (<?= ?>, <?php ?>) intact.
+     *
+     * Static state is saved and restored around recursive calls
+     * (from @extends) so nested compilations don't clobber the parent.
      */
-    private static function compile(string $view_name, array $data = [], bool $isExtend = false): string
+    private static function compile(string $view_name, array $data = [], bool $isExtend = false): array
     {
-        $parentSections = self::$sections ?? [];
+        $prevView     = self::$view;
+        $prevViewName = self::$view_name;
+        $prevData     = self::$data;
+        $prevSections = self::$sections;
+
+        $data = self::applyBinds($view_name, $data);
 
         self::$view_name = $view_name;
 
@@ -70,19 +87,24 @@ class View
         if (!is_file($view_path)) $view_path = base_path('modules/' . self::parseViewName($view_name));
         if (!is_file($view_path)) $view_path = base_path(self::parseViewName($view_name));
 
-        // Track this file for cache invalidation
         self::$compiledFiles[] = $view_path;
+        self::$view            = file_get_contents($view_path);
+        self::$data            = $data;
 
-        self::$view = file_get_contents($view_path);
-        self::$data = $data;
-
-        if ($isExtend) {
-            self::$sections = $parentSections;
-        }
+        if ($isExtend) self::$sections = $prevSections;
 
         self::parse();
 
-        return self::$view;
+        $result = self::$view;
+
+        // Merge bind data back into parent so view() gets the full dataset
+        $mergedData = self::$data;
+
+        self::$view      = $prevView;
+        self::$view_name = $prevViewName;
+        self::$data      = $prevData;
+
+        return ['compiled' => $result, 'data' => $mergedData];
     }
 
     /**
@@ -96,7 +118,6 @@ class View
 
     /**
      * Get manifest path for a view.
-     * Manifest stores dependent file paths and their modification times as JSON.
      */
     private static function getManifestPath(string $view_name): string
     {
@@ -116,35 +137,38 @@ class View
      *
      * Reads the JSON manifest to get file paths and their stored mtimes,
      * compares with current filemtime (metadata only, no file content reads).
-     * Returns the cache path if everything is still fresh.
+     * Returns [cache_path, bind_keys] if fresh, null otherwise.
      */
-    private static function tryCache(string $view_name): ?string
+    private static function tryCache(string $view_name): ?array
     {
         $manifestPath = self::getManifestPath($view_name);
         if (!file_exists($manifestPath)) return null;
 
         $manifest = json_decode(file_get_contents($manifestPath), true);
-        if (!is_array($manifest) || empty($manifest)) return null;
+        if (!is_array($manifest) || !isset($manifest['files'])) return null;
 
-        foreach ($manifest as $file => $mtime) {
-            if (!is_file($file) || filemtime($file) !== $mtime) return null;
-        }
+        foreach ($manifest['files'] as $file => $mtime) if (!is_file($file) || filemtime($file) !== $mtime) return null;
 
         $cachePath = self::getCachePath($view_name);
         if (!file_exists($cachePath)) return null;
 
-        return $cachePath;
+        return [
+            'path'  => $cachePath,
+            'binds' => $manifest['binds'] ?? [],
+        ];
     }
 
     /**
      * Save manifest and compiled cache for a view.
+     *
+     * Manifest stores:
+     *   files - dependent file paths and their modification times
+     *   binds - view names that have binds (re-applied on cache hit)
      */
     private static function saveCache(string $view_name, string $compiled): string
     {
-        $manifest = [];
-        foreach (self::$compiledFiles as $file) {
-            $manifest[$file] = filemtime($file);
-        }
+        $manifest = ['files' => [], 'binds' => self::$usedBinds];
+        foreach (self::$compiledFiles as $file) $manifest['files'][$file] = filemtime($file);
 
         file_put_contents2(self::getManifestPath($view_name), json_encode($manifest));
 
@@ -165,16 +189,9 @@ class View
         $dir = self::$config['caches'] ?? '';
         if (!$dir || !is_dir($dir)) return;
 
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
 
-        foreach ($iterator as $file) {
-            if ($file->isFile() && in_array($file->getExtension(), ['php', 'json'])) {
-                @unlink($file->getRealPath());
-            }
-        }
+        foreach ($iterator as $file) if ($file->isFile() && in_array($file->getExtension(), ['php', 'json'])) @unlink($file->getRealPath());
     }
 
     /**
@@ -182,41 +199,43 @@ class View
      *
      * When caching is enabled:
      *   1. Check manifest for file modification times
-     *   2. If all files unchanged -> skip compile, include cache directly
-     *   3. If any file changed -> compile, minify, save cache + manifest
+     *   2. If all files unchanged -> re-apply stored binds, include cache directly
+     *   3. If any file changed -> compile, minify, save cache + manifest (with bind list)
      *
-     * Views with dynamic @extends are never cached since the layout
-     * depends on runtime data and may change between requests.
-     *
-     * Cache hit cost: 1 file_get_contents (manifest JSON) + N filemtime checks
-     *                 + 1 include (cache). No file content reads, no regex, no parsing.
+     * Binds always run (cache hit or miss) because they return runtime data
+     * (DB queries, auth state etc.) that cannot be cached.
      */
     public static function view(string $view_name, array $data = [])
     {
-        if (isset(self::$binds[$view_name])) $data = self::$binds[$view_name]() + $data;
+        $caching = (self::$config['caching'] ?? false) && !empty(self::$config['caches']);
+        $cache   = null;
+        $result  = null;
 
-        $caching = self::$config['caching'] ?? false;
-        $cache = null;
+        if ($caching) $result = self::tryCache($view_name);
 
-        if ($caching) $cache = self::tryCache($view_name);
+        if ($result) {
+            // Cache hit: re-apply all binds from the full chain
+            foreach ($result['binds'] as $bindKey) $data = self::applyBinds($bindKey, $data);
 
-        if ($cache) $output = (function () use ($data, $cache) {
-            ob_start();
-            extract($data);
-            include($cache);
-            return ob_get_clean();
-        })();
-        else {
-            $compiled = self::compile($view_name, $data);
+            $cache  = $result['path'];
+            $output = (function () use ($data, $cache) {
+                ob_start();
+                extract($data);
+                include($cache);
+                return ob_get_clean();
+            })();
+        } else {
+            $result   = self::compile($view_name, $data);
+            $compiled = $result['compiled'];
+            $data     = $result['data'];
 
             if (self::$config['minify'] ?? false) $compiled = self::minifyTemplate($compiled);
             if ($caching && !self::$hasDynamicExtends) $cache = self::saveCache($view_name, $compiled);
 
-            $output = (function () use ($data, $compiled, $cache) {
+            $output = (function () use ($data, $compiled) {
                 ob_start();
                 extract($data);
-                if ($cache) include($cache);
-                else echo eval('?>' . $compiled);
+                echo eval('?>' . $compiled);
                 return ob_get_clean();
             })();
         }
@@ -327,8 +346,9 @@ class View
                         if ($view[$i] === '\\') $i++;
                         $i++;
                     }
-                } elseif ($char === '(') $depth++;
+                } elseif ($char === '(')  $depth++;
                 elseif ($char === ')') $depth--;
+
                 $i++;
             }
 
@@ -353,7 +373,11 @@ class View
      */
     public static function parsePHP(): void
     {
-        self::$view = preg_replace_callback('/@php(.*?)@endphp/s', fn($code) => '<?php ' . $code[1] . ' ?>', self::$view);
+        self::$view = preg_replace_callback(
+            '/@php(.*?)@endphp/s',
+            fn($code) => '<?php ' . $code[1] . ' ?>',
+            self::$view
+        );
     }
 
     /**
@@ -362,7 +386,11 @@ class View
      */
     public static function parseVariables(): void
     {
-        self::$view = preg_replace_callback('/\{\{(.*?)\}\}/', fn($variable) => '<?=' . trim($variable[1]) . '?>', self::$view);
+        self::$view = preg_replace_callback(
+            '/\{\{(.*?)\}\}/',
+            fn($variable) => '<?=' . trim($variable[1]) . '?>',
+            self::$view
+        );
     }
 
     /**
@@ -375,7 +403,7 @@ class View
     public static function parseForEach(): void
     {
         $matches = self::matchBalancedParentheses('foreach', self::$view);
-        foreach (array_reverse($matches) as $match) self::$view = substr_replace(self::$view, '<?php foreach(' . $match['inner'] . '): ?>', $match['start'], $match['end'] - $match['start']);
+        foreach (array_reverse($matches) as $match) self::$view  = substr_replace(self::$view, '<?php foreach(' . $match['inner'] . '): ?>', $match['start'], $match['end'] - $match['start']);
         self::$view = preg_replace('/@endforeach/', '<?php endforeach; ?>', self::$view);
     }
 
@@ -386,7 +414,7 @@ class View
     public static function parseIncludes(): void
     {
         self::$view = preg_replace_callback('/@include\(\'(.*?)\'\)/', function ($viewName) {
-            $path = self::$config['views'] . '/' . self::parseViewName($viewName[1]);
+            $path                  = self::$config['views'] . '/' . self::parseViewName($viewName[1]);
             self::$compiledFiles[] = $path;
             return file_get_contents($path);
         }, self::$view);
@@ -409,7 +437,11 @@ class View
         self::$view = preg_replace_callback('/@extends\(([^)]+)\)/', function ($match) {
             $expression = trim($match[1]);
 
-            if (preg_match("/^'([^']+)'$/", $expression, $literal)) return self::compile($literal[1], self::$data, true);
+            if (preg_match("/^'([^']+)'$/", $expression, $literal)) {
+                $result     = self::compile($literal[1], self::$data, true);
+                self::$data = $result['data'];
+                return $result['compiled'];
+            }
 
             self::$hasDynamicExtends = true;
 
@@ -418,7 +450,9 @@ class View
                 return eval('return ' . $expression . ';');
             })();
 
-            return self::compile($resolvedName, self::$data, true);
+            $result     = self::compile($resolvedName, self::$data, true);
+            self::$data = $result['data'];
+            return $result['compiled'];
         }, self::$view);
     }
 
@@ -428,7 +462,11 @@ class View
      */
     public static function parseYields(): void
     {
-        self::$view = preg_replace_callback('/@yield\(\'(.*?)\'\)/', fn($yieldName) => self::$sections[$yieldName[1]] ?? '', self::$view);
+        self::$view = preg_replace_callback(
+            '/@yield\(\'(.*?)\'\)/',
+            fn($yieldName) => self::$sections[$yieldName[1]] ?? '',
+            self::$view
+        );
     }
 
     /**
@@ -501,7 +539,11 @@ class View
      */
     public static function parseEmpty(): void
     {
-        self::$view = preg_replace_callback('/@empty\((.*?)\)/', fn($expression) => '<?php if (empty(' . $expression[1] . ')): ?>', self::$view);
+        self::$view = preg_replace_callback(
+            '/@empty\((.*?)\)/',
+            fn($expression) => '<?php if (empty(' . $expression[1] . ')): ?>',
+            self::$view
+        );
         self::$view = preg_replace('/@endempty/', '<?php endif; ?>', self::$view);
     }
 
@@ -511,7 +553,11 @@ class View
      */
     public static function parseIsset(): void
     {
-        self::$view = preg_replace_callback('/@isset\((.*?)\)/', fn($expression) => '<?php if (isset(' . $expression[1] . ')): ?>', self::$view);
+        self::$view = preg_replace_callback(
+            '/@isset\((.*?)\)/',
+            fn($expression) => '<?php if (isset(' . $expression[1] . ')): ?>',
+            self::$view
+        );
     }
 
     /**
