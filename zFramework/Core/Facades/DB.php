@@ -715,11 +715,10 @@ class DB
      */
     public function paginate(int $per_page = 20, string $page_id = 'page', null|string $cache_id = null): array
     {
-        if (!$cache_id) {
-            Session::callback(function () {
-                unset($_SESSION[$this->db][$this->dbname]['paginate']['cache']);
-            });
-
+        if (!$cache_id) Session::callback(function () {
+            unset($_SESSION[$this->db][$this->dbname]['paginate']['cache']);
+        });
+        else {
             $cache = Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_id] ?? false);
             if ($cache) $row_count = $cache;
         }
