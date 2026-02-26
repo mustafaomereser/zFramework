@@ -1,5 +1,5 @@
 <?php
 return [
-    'caching' => false,
+    'caching' => true,
     'minify'  => true
 ];

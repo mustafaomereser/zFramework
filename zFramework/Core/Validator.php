@@ -3,7 +3,6 @@
 namespace zFramework\Core;
 
 use zFramework\Core\Facades\Alerts;
-use zFramework\Core\Facades\DB;
 use zFramework\Core\Facades\Lang;
 use zFramework\Core\Facades\Response;
 use zFramework\Core\Helpers\Http;
@@ -27,7 +26,7 @@ class Validator
         $errors  = [];
         $statics = [];
 
-        foreach ($validate as $key => $validateArray) {
+        foreach ($validate as $key => $validateList) {
             $value = @$data[$key];
 
             $length = -1;
@@ -49,7 +48,7 @@ class Validator
             $equivalent = null;
             $parameters = [];
 
-            foreach ($validateArray as $validate) {
+            foreach ($validateList as $validate) {
                 if (str_contains($validate, ':')) {
                     preg_match_all('/([\w$.()]+):(?:"([^"]*)"|([^\s;]+))/', $validate, $m, PREG_SET_ORDER);
                     $out = [];
@@ -58,11 +57,9 @@ class Validator
                     $equivalent = $out[$case];
                     unset($out[$case]);
                     foreach ($out as $param_key => $param) $parameters[$param_key] = $param;
-                } else {
-                    $case = $validate;
-                }
+                } else $case = $validate;
 
-                if (self::{$case}(compact('value', 'equivalent', 'length', 'type', 'key'), $parameters, in_array('nullable', $validateArray), $validateArray, $data)) {
+                if (self::{$case}(compact('value', 'equivalent', 'length', 'type', 'key', 'parameters', 'validateList', 'data') + ['required' => in_array('required', $validateList), 'nullable' => in_array('nullable', $validateList)])) {
                     $statics[$key] = $value;
                 } else {
                     $errors[$key][$case] = (Lang::get("validator.attributes.$key") ?? ($attributeNames[$key] ?? $key)) . " " . Lang::get("validator.errors.$case", self::$errors);
@@ -78,39 +75,38 @@ class Validator
                 if (Http::isAjax()) abort(400, Response::json($errors));
                 foreach ($errors as $key => $error_list) foreach ($error_list as $error) Alerts::danger($error);
                 back();
-            } else {
-                $callback($errors, $statics);
-            }
+            } else $callback($errors, $statics);
         }
 
         return $statics;
     }
 
-    public static function type($data, $parameters, $nullable)
+    public static function type($data)
     {
-        if ($nullable && !strlen($data['value'])) return true;
+        if ($data['required'] && !strlen($data['value'])) return false;
+        if ($data['nullable'] && !strlen($data['value'])) return true;
         if ($data['equivalent'] == $data['type']) return true;
         self::$errors = ['now-type' => $data['type'], 'must-type' => $data['equivalent']];
         return false;
     }
 
-    public static function email($data, $parameters, $nullable)
+    public static function email($data)
     {
         if (!@strlen($data['value'])) return true;
         if (filter_var($data['value'], FILTER_VALIDATE_EMAIL)) return true;
         return false;
     }
 
-    public static function required($data, $parameters, $nullable, $validate)
+    public static function required($data)
     {
-        if (in_array('nullable', $validate)) return throw new \Exception('“required” cannot be used in a validation that is ”nullable”.');
+        if (in_array('nullable', $data['validateList'])) return throw new \Exception('“required” cannot be used in a validation that is ”nullable”.');
         if ($data['length'] > 0) return true;
         return false;
     }
 
-    public static function nullable($data, $parameters, $nullable, $validate)
+    public static function nullable($data)
     {
-        if (in_array('required', $validate)) return throw new \Exception('“nullable” cannot be used in a validation that is ”required”.');
+        if (in_array('required', $data['validateList'])) return throw new \Exception('“nullable” cannot be used in a validation that is ”required”.');
         return true;
     }
 
@@ -128,25 +124,25 @@ class Validator
         return false;
     }
 
-    public static function same($data, $parameters, $nullable, $validate, $validate_data)
+    public static function same($data)
     {
-        if ($data['value'] === @$validate_data[$data['equivalent']]) return true;
+        if ($data['value'] === @$data['validateList'][$data['equivalent']]) return true;
         self::$errors = ['attribute-name' => (Lang::get("validator.attributes." . $data['equivalent']) ?? $data['equivalent'])];
         return false;
     }
 
-    public static function exists($data, $parameters)
+    public static function exists($data)
     {
-        $exists = (new $data['equivalent'])->whereRaw(($parameters['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
-        if ($ex = @$parameters['ex']) $exists->where('id', '!=', $ex);
+        $exists = (new $data['equivalent'])->whereRaw(($data['parameters']['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
+        if ($ex = @$data['parameters']['ex']) $exists->where('id', '!=', $ex);
         if ($exists->count()) return true;
         return false;
     }
 
-    public static function unique($data, $parameters)
+    public static function unique($data)
     {
-        $unique = (new $data['equivalent'])->whereRaw(($parameters['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
-        if ($ex = @$parameters['ex']) $unique->where('id', '!=', $ex);
+        $unique = (new $data['equivalent'])->whereRaw(($data['parameters']['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
+        if ($ex = @$data['parameters']['ex']) $unique->where('id', '!=', $ex);
         if ($unique->count()) return false;
         return true;
     }
