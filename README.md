@@ -13,7 +13,7 @@ PHP VERSION
 PHP>=7.0.23 (suggestion: >=8.0)
 ```
 
-### 0.1. zFramework (V2.8.0)
+### 0.1. zFramework (V2.9.0)
 ### 0.2. Easiest, fastest PHP framework. (Simple)
 ### 0.3. Document
 - [1. Route](#1-route)
