@@ -10,3 +10,4 @@ zFramework/storage
 zFramework/vendor
 config/crypt.php
 .DS_Store
+analysis
