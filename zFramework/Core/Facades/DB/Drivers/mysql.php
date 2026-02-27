@@ -82,12 +82,14 @@ class mysql
     }
 
     /**
-     * Parse and get where.
+     * Parse and get where or having.
+     * @param bool $checkSoftDelete
+     * @param string $gettype
      * @return null|string
      */
-    private function getWhere($checkSoftDelete = true): null|string
+    private function getWhereOrHaving($checkSoftDelete = true, string $gettype = 'where'): null|string
     {
-        if ($checkSoftDelete && isset($this->parent->softDelete)) $this->parent->buildQuery['where'][] = [
+        if ($checkSoftDelete && isset($this->parent->softDelete)) $this->parent->buildQuery[$gettype][] = [
             'type'     => 'row',
             'queries'  => [
                 [
@@ -100,10 +102,10 @@ class mysql
             ]
         ];
 
-        if (!count($this->parent->buildQuery['where'])) return null;
+        if (!count($this->parent->buildQuery[$gettype])) return null;
 
         $output = "";
-        foreach ($this->parent->buildQuery['where'] as $where_key => $where) {
+        foreach ($this->parent->buildQuery[$gettype] as $where_key => $where) {
             $response = "";
             foreach ($where['queries'] as $query_key => $query) {
                 $query['prev'] = strtoupper($query['prev']);
@@ -128,7 +130,7 @@ class mysql
             $output .= $response;
         }
 
-        return " WHERE $output ";
+        return " " . strtoupper($gettype) . " $output ";
     }
 
     /**
@@ -184,6 +186,6 @@ class mysql
                 throw new \Exception('something wrong, build invalid type.');
         }
 
-        return "$type " . $this->parent->table . " " . @$sets . $this->getJoin() . $this->getWhere($checkSoftDelete) . $this->getGroupBy() . $this->getOrderBy() . $limit;
+        return "$type " . $this->parent->table . " " . @$sets . $this->getJoin() . $this->getWhereOrHaving($checkSoftDelete) . $this->getGroupBy() . $this->getWhereOrHaving(false, 'having') . $this->getOrderBy() . $limit;
     }
 }

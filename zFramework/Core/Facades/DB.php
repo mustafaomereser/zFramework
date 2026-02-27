@@ -341,7 +341,7 @@ class DB
     public function where(): self
     {
         $this->wherePrev = 'AND';
-        return self::addWhere(func_get_args());
+        return self::addWhereOrHaving(func_get_args());
     }
 
     /**
@@ -351,15 +351,15 @@ class DB
     public function whereOr(): self
     {
         $this->wherePrev = 'OR';
-        return self::addWhere(func_get_args());
+        return self::addWhereOrHaving(func_get_args());
     }
 
     /**
-     * Add where item.
+     * Add where or having.
      * @param array $parameters
      * @return self
      */
-    private function addWhere(array $parameters): self
+    private function addWhereOrHaving(array $parameters, string $addtype = 'where'): self
     {
         if (gettype($parameters[0]) == 'array') {
             $type    = 'group';
@@ -386,7 +386,7 @@ class DB
             ];
         }
 
-        $this->buildQuery['where'][] = [
+        $this->buildQuery[$addtype][] = [
             'type'     => $type,
             'queries'  => $queries
         ];
@@ -572,9 +572,10 @@ class DB
         return compact('key', 'operator', 'value', 'prev');
     }
 
-    public function having($column, $operator, $value, $prev)
+    public function having()
     {
-        $this->buildQuery['having'][] = [];
+        $this->wherePrev = 'AND';
+        return self::addWhereOrHaving(func_get_args(), 'having');
     }
 
     /**
@@ -716,13 +717,23 @@ class DB
         if (!isset($row_count)) {
             $snapshot = $this->buildQuery;
 
-            # get row count
-            $this->buildQuery['orderBy'] = [];
-            $this->buildQuery['groupBy'] = [];
-            $row_count = $this->select("COUNT(" . (!empty($this->buildQuery['join']) ? 'DISTINCT ' : NULL) . "{$this->table}.{$this->getPrimary()}) as count")->first()['count'];
-            #
+            if (!empty($this->buildQuery['groupBy']) || !empty($this->buildQuery['having'])) {
+                // exists GROUP BY or HAVING subquery
+                $this->buildQuery['orderBy'] = [];
+                $this->buildQuery['limit']   = [];
+                $innerSQL  = $this->buildSQL('select');
+                $innerData = $this->buildQuery['data'] ?? [];
+                $this->resetBuild();
+                $row_count = $this->prepare("SELECT COUNT(*) as count FROM ({$innerSQL}) as sub", $innerData)->fetch(\PDO::FETCH_ASSOC)['count'];
+            } else {
+                // Normal count
+                $this->buildQuery['orderBy'] = [];
+                $this->buildQuery['groupBy'] = [];
+                $row_count = $this->select("COUNT(" . (!empty($this->buildQuery['join']) ? 'DISTINCT ' : null) . "{$this->table}.{$this->getPrimary()}) as count")->first()['count'];
+            }
 
             $this->buildQuery = $snapshot;
+
             if ($cache_id) Session::callback(fn() => $_SESSION[$this->db][$this->dbname]['paginate']['cache'][$cache_id] = $row_count);
         }
 

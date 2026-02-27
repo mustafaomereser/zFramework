@@ -88,7 +88,8 @@ function getCodeSnippets($stackTrace)
                 $argStrings = [];
                 foreach ($trace['args'] as $arg) {
                     if (is_string($arg)) {
-                        $argStrings[] = '"' . htmlspecialchars(mb_strimwidth($arg, 0, 80, '...')) . '"';
+                        // $argStrings[] = '"' . htmlspecialchars(mb_strimwidth($arg, 0, 80, '...')) . '"';
+                        $argStrings[] = htmlspecialchars($arg);
                     } elseif (is_numeric($arg)) {
                         $argStrings[] = $arg;
                     } elseif (is_bool($arg)) {
@@ -96,7 +97,13 @@ function getCodeSnippets($stackTrace)
                     } elseif (is_null($arg)) {
                         $argStrings[] = 'null';
                     } elseif (is_array($arg)) {
-                        $argStrings[] = 'Array(' . count($arg) . ')';
+                        // $argStrings[] = 'Array(' . count($arg) . ')';
+                        ob_start();
+                        echo '<pre>';
+                        print_r($arg);
+                        echo '</pre>';
+                        $text = ob_get_clean();
+                        $argStrings[] = $text;
                     } elseif (is_object($arg)) {
                         $argStrings[] = get_class($arg);
                     } else {
