@@ -131,7 +131,7 @@ class DB
      * Get primary key.
      * @return string|null
      */
-    private function getPrimary(): string|null
+    protected function getPrimary(): string|null
     {
         if (!$this->table) throw new \Exception('firstly you must select a table for get primary key.');
         return $this->primary ?? @$GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$this->table]['primary'] ?? null;
