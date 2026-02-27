@@ -4,22 +4,37 @@ namespace zFramework\Core;
 
 class GlobalCache
 {
+
+    static $prefix = "";
+
+    /**
+     * Build cache name
+     *
+     * @param string   $name
+     * @return mixed
+     */
+    private static function getName(string $name)
+    {
+        return self::$prefix . $name;
+    }
+
     /**
      * Cache a data and get it before timeout.
      *
      * @param string   $name
      * @param \Closure $callback
-     * @param int      $timeout
+     * @param int|null $timeout
      * @return mixed
      */
-    public static function cache(string $name, \Closure $callback, int $timeout = 5)
+    public static function cache(string $name, \Closure $callback, int|null $timeout = null)
     {
         if (!function_exists('apcu_fetch')) return $callback();
 
-        $data = apcu_fetch($name, $success);
+        $data = apcu_fetch(self::getName($name), $success);
         if (!$success) {
             $data = $callback();
-            apcu_store($name, $data, $timeout);
+            if (!is_null($timeout)) apcu_store(self::getName($name), $data, $timeout);
+            else apcu_store(self::getName($name), $data);
         }
 
         return $data;
@@ -34,7 +49,7 @@ class GlobalCache
     public static function remove(string $name): bool
     {
         if (!function_exists('apcu_delete')) return false;
-        apcu_delete($name);
+        apcu_delete(self::getName($name));
         return true;
     }
 

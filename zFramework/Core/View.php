@@ -249,9 +249,9 @@ class View
      * Bind extra parameters to a view.
      * @param string $view
      * @param object $callback
-     * @return array
+     * @return \Closure
      */
-    public static function bind(string $view, $callback)
+    public static function bind(string $view, \Closure $callback): \Closure
     {
         return self::$binds[$view] = $callback;
     }

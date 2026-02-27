@@ -655,16 +655,6 @@ class DB
     }
 
     /**
-     * Find or fail row by primary key
-     * @param string $value
-     * @return array 
-     */
-    public function findOrFail(string $value): array
-    {
-        return $this->where($this->getPrimary(), $value)->firstOrFail();
-    }
-
-    /**
      * Seek
      * @param array $lastrow
      * @return bool

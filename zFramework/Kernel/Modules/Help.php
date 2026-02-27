@@ -7,6 +7,9 @@ use zFramework\Kernel\Terminal;
 
 class Help
 {
+    /**
+     * Shows help page
+     */
     public static function begin()
     {
         Terminal::text("[color=green]Usable Modules:[/color]");

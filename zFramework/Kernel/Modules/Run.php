@@ -6,6 +6,11 @@ use zFramework\Kernel\Terminal;
 
 class Run
 {
+    /**
+     * Run the project.
+     * @param --host (optional)
+     * @param --port (optional)
+     */
     public static function begin()
     {
         chdir(config('app.public'));
@@ -20,9 +25,7 @@ class Run
                 socket_close($sock);
                 // This is the local machine's external IP address
                 $localAddr = $name;
-            } else {
-                $localAddr = getHostByName(getHostName());
-            }
+            } else $localAddr = getHostByName(getHostName());
 
             $server = ($localAddr ?? '127.0.0.1');
         }
