@@ -425,7 +425,7 @@ class Db
 
     /**
      * Description: Backup database
-     * @param --db (optional) (ifnull = Get first DB KEY)
+     * @param db (optional) (ifnull = Get first DB KEY)
      * @param --compress (optional)
      */
     public static function backup()
