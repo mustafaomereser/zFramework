@@ -172,6 +172,7 @@ class AutoSSL
 
     public function unlinkAccount(): void
     {
+        $this->kid = null;
         unlink($this->sslPath . '/account.kid');
         unlink($this->sslPath . '/account.key');
     }
