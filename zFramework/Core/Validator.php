@@ -33,10 +33,10 @@ class Validator
             $type   = null;
             if (is_numeric($value) || $value == "0") {
                 $type   = 'integer';
-                $length = strlen($value);
+                $length = (int) $value;
             } elseif (is_string($value)) {
                 $type   = 'string';
-                $length = strlen($value);
+                $length = @strlen($value);
             } elseif (is_array($value)) {
                 $type   = 'array';
                 $length = count($value);
@@ -83,8 +83,7 @@ class Validator
 
     public static function type($data)
     {
-        if ($data['required'] && !strlen($data['value'])) return false;
-        if ($data['nullable'] && !strlen($data['value'])) return true;
+        if (!@strlen($data['value'])) return true;
         if ($data['equivalent'] == $data['type']) return true;
         self::$errors = ['now-type' => $data['type'], 'must-type' => $data['equivalent']];
         return false;
@@ -112,6 +111,7 @@ class Validator
 
     public static function max($data)
     {
+        if (!@strlen($data['value'])) return true;
         if ($data['equivalent'] >= $data['length']) return true;
         self::$errors = ['now-val' => $data['length'], 'max-val' => $data['equivalent']];
         return false;
@@ -119,6 +119,7 @@ class Validator
 
     public static function min($data)
     {
+        if (!@strlen($data['value'])) return true;
         if ($data['length'] >= $data['equivalent']) return true;
         self::$errors = ['now-val' => $data['length'], 'min-val' => $data['equivalent']];
         return false;
