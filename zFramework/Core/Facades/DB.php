@@ -102,10 +102,11 @@ class DB
     /**
      * Select table.
      * @param string $table
-     * @return self
+     * @return self|bool
      */
-    public function table(string $table): self
+    public function table(string $table): self|bool
     {
+        if (!$this->dbname) return false;
         if (!in_array($table, array_keys($this->tables()['TABLE_COLUMNS'] ?? []))) throw new \Exception("`$table` is not there in database.", 1001);
         $this->table         = $table;
         $this->originalTable = $table;

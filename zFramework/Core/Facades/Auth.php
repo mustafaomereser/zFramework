@@ -17,6 +17,7 @@ class Auth
      */
     static $api_mode = false;
 
+    static $database_exists = false;
     /**
      * Columns for match
      */
@@ -29,8 +30,9 @@ class Auth
 
     public static function init()
     {
-        if ($columns = (new User)->special_columns) self::$columns = $columns;
-        if (isset($GLOBALS['databases']['connections'][(new User)->db]) && !self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
+        self::$database_exists = isset($GLOBALS['databases']['connections'][(new User)->db]);
+        if ($columns = @(new User)->special_columns) self::$columns = $columns;
+        if (self::$database_exists && !self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
     }
 
     /**
@@ -78,7 +80,7 @@ class Auth
      */
     public static function check(): bool
     {
-        if (isset(self::user()['id'])) return true;
+        if (self::$database_exists && isset(self::user()['id'])) return true;
         return false;
     }
 
