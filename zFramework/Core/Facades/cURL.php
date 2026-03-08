@@ -37,14 +37,17 @@ class cURL
     }
 
     /**
-     * Post parameters
-     * @param string $path
+     * Post file parameters
+     * @param string $fieldname
+     * @param string $filename
+     * @param string $content
+     * @param string $mime_type
      * @return self
      */
-    public static function file(string $key, string $content, string $mime_type = "text/plain"): self
+    public static function file(string $fieldname, string $filename, string $content, string $mime_type = "text/plain"): self
     {
         self::$post = true;
-        self::$postFields[$key] = new CURLFile($content, $mime_type, $key);
+        self::$postFields[$fieldname] = new CURLFile($content, $mime_type, $filename);
         return new self();
     }
 
