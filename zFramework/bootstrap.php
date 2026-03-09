@@ -27,8 +27,8 @@ $GLOBALS['databases'] = [
 
 if (!isset($cron_mode) && ((include(BASE_PATH . "/config/app.php"))['force-https'] ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off")) die(header('Location: https://' . ($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'])));
 
-include(BASE_PATH . '/zFramework/vendor/autoload.php');
-include(BASE_PATH . '/zFramework/run.php');
+include(FRAMEWORK_PATH . '/vendor/autoload.php');
+include(FRAMEWORK_PATH . '/run.php');
 
 spl_autoload_register(function ($class) {
     zFramework\Run::includer(BASE_PATH . "/$class.php");

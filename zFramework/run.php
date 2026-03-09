@@ -68,8 +68,8 @@ class Run
         ob_start();
         try {
             # includes
-            self::includer(BASE_PATH . '/zFramework/modules', false);
-            self::includer(BASE_PATH . '/zFramework/modules/error_handlers/handle.php');
+            self::includer(FRAMEWORK_PATH . '/modules', false);
+            self::includer(FRAMEWORK_PATH . '/modules/error_handlers/handle.php');
 
             # set view options
             \zFramework\Core\View::setSettings([
