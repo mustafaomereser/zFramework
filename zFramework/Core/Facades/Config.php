@@ -77,10 +77,8 @@ class Config
         if ($compare == true) {
             $data = self::get($config);
             foreach ($sets as $key => $set) $data[$key] = $set;
-        } else {
-            $data = $sets;
-        }
+        } else $data = $sets;
 
-        return file_put_contents($path, "<?php \nreturn " . var_export($data, true) . ";");
+        return file_put_contents2($path, "<?php \nreturn " . var_export($data, true) . ";");
     }
 }
