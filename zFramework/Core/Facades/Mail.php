@@ -22,7 +22,15 @@ class Mail
      */
     public static function init()
     {
-        $mailConfig = Config::get('mail');
+        self::set(Config::get('mail'));
+    }
+
+    /**
+     * Set mailer settings
+     * @param $mailConfig
+     */
+    public static function set(array $mailConfig)
+    {
         if (!$mailConfig['sending']) throw new \Exception(_l('errors.mail.sending-is-false'));
 
         self::$mail = new PHPMailer;
