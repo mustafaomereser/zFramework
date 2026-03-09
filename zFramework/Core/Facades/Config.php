@@ -37,6 +37,7 @@ class Config
 
         $output['name'] = $config_name ?? false;
         $output['path'] = $config_path;
+        $output['find'] = substr($find, 1);
 
         $output['args'] = implode('.', array_filter($config, fn($var) => strlen((string) $var)));
         if (isset($output['args']) && !$output['args']) unset($output['args']);
@@ -53,11 +54,12 @@ class Config
     {
         $data = self::parseUrl($config);
         if ($data === false) return $returnbool ? false : $config;
+        $cache_name = str_replace('/', '.', $data['find']);
 
-        $cache = isset(self::$caches[$data['name']]);
+        $cache = isset(self::$caches[$cache_name]);
         if (!$cache && function_exists('opcache_invalidate')) opcache_invalidate($data['path'], true);
-        $config = $cache ? self::$caches[$data['name']] : include($data['path']);
-        if (!$cache) self::$caches[$data['name']] = $config;
+        $config = $cache ? self::$caches[$cache_name] : include($data['path']);
+        if (!$cache) self::$caches[$cache_name] = $config;
 
         if (isset($data['args'])) foreach (explode('.', $data['args']) as $key) if (isset($config[$key])) $config = $config[$key];
         return $config;
