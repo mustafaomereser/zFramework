@@ -9,9 +9,10 @@ class Mail
 {
     static $mail;
 
-    static $toMail = [];
-    static $cc     = [];
-    static $bcc    = [];
+    static $toMail  = [];
+    static $cc      = [];
+    static $bcc     = [];
+    static $sending = false;
 
     private static $security = [
         'tls' => PHPMailer::ENCRYPTION_STARTTLS,
@@ -31,7 +32,8 @@ class Mail
      */
     public static function set(array $mailConfig)
     {
-        if (!$mailConfig['sending']) throw new \Exception(_l('errors.mail.sending-is-false'));
+        self::$sending = $mailConfig['sending'] ?? false;
+        if (!$mailConfig['sending']) return false;
 
         self::$mail = new PHPMailer;
         self::$mail->isSMTP();
@@ -127,7 +129,6 @@ class Mail
         return new self();
     }
 
-
     /**
      * Send Mail
      * @param array $data
@@ -135,6 +136,7 @@ class Mail
      */
     public static function send(array $data): bool
     {
+        if (!self::$sending) throw new \Exception(_l('errors.mail.sending-is-false'));
         if (!count(self::$toMail)) throw new \Exception(_l('errors.mail.must-set-a-mail'));
 
         self::$mail->Subject = Config::get('mail.subject') . (@$data['subject']);
