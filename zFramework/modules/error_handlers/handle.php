@@ -99,10 +99,9 @@ function getCodeSnippets($stackTrace)
                     } elseif (is_array($arg)) {
                         // $argStrings[] = 'Array(' . count($arg) . ')';
                         ob_start();
-                        echo '<pre>';
-                        print_r($arg);
-                        echo '</pre>';
+                        dump($arg);
                         $text = ob_get_clean();
+                        $argStrings[] = $text;
                         $argStrings[] = $text;
                     } elseif (is_object($arg)) {
                         $argStrings[] = get_class($arg);
