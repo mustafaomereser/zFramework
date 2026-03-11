@@ -302,3 +302,96 @@ function secondsToHours($seconds)
     $t = explode("/", sprintf('%02d/%02d/%02d', ($seconds / 3600), ($seconds / 60 % 60), $seconds % 60));
     return ['h' => $t[0], 'm' => $t[1], 's' => $t[2]];
 }
+
+// dump
+function dump(...$vars): void
+{
+    static $stylesPrinted = false;
+    $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1)[0];
+    $file  = ($trace['file'] ?? '?') . ':' . ($trace['line'] ?? '?');
+
+    if (!$stylesPrinted) {
+        echo <<<HTML
+        <style>
+            * { box-sizing: border-box }
+            body { background: #0f0f1a; color: #cdd6f4; font-family: 'Fira Code', monospace; padding: 24px; margin: 0; font-size: 13px; line-height: 1.6 }
+            .dd-wrap { background: #1e1e2e; border: 1px solid #313244; border-left: 4px solid #f38ba8; padding: 16px; margin: 0 0 12px; border-radius: 6px }
+            .dd-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #313244 }
+            .dd-file { color: #6c7086; font-size: 11px }
+            .dd-file span { color: #89b4fa }
+            .dd-type { background: #f38ba8; color: #1e1e2e; font-size: 10px; font-weight: bold; padding: 2px 7px; border-radius: 10px; letter-spacing: .5px }
+            .dd-body { padding: 4px 0 }
+            .row { padding: 2px 0 2px 16px; border-left: 1px solid #313244; margin-left: 4px }
+            .row:hover { background: #2a2a3e }
+            .k { color: #89b4fa }
+            .s { color: #a6e3a1 }
+            .n { color: #fab387 }
+            .b { color: #f38ba8 }
+            .null { color: #6c7086; font-style: italic }
+            .arr-label { color: #cba6f7; font-weight: bold }
+            .toggle { cursor: pointer; user-select: none }
+            .toggle::before { content: "▾ "; color: #6c7086; font-size: 11px }
+            .toggle.closed::before { content: "▸ " }
+            .collapsible.closed { display: none }
+            .btn-xs { background: #313244; color: #cdd6f4; border: none; padding: 1px 7px; border-radius: 3px; cursor: pointer; font-size: 10px; font-family: inherit; margin-left: 4px }
+            .btn-xs:hover { background: #45475a }
+            .toolbar { margin-bottom: 14px }
+            .btn { background: #313244; color: #cdd6f4; border: 1px solid #45475a; padding: 5px 14px; border-radius: 5px; cursor: pointer; font-size: 12px; font-family: inherit; margin-right: 6px }
+            .btn:hover { background: #45475a }
+        </style>
+        <div class="toolbar">
+            <button class="btn" onclick="document.querySelectorAll('.collapsible').forEach(e=>e.classList.remove('closed'));document.querySelectorAll('.toggle').forEach(e=>e.classList.remove('closed'))">▾ Expand All</button>
+            <button class="btn" onclick="document.querySelectorAll('.collapsible').forEach(e=>e.classList.add('closed'));document.querySelectorAll('.toggle').forEach(e=>e.classList.add('closed'))">▸ Collapse All</button>
+        </div>
+        HTML;
+        $stylesPrinted = true;
+    }
+
+    foreach ($vars as $var) {
+        $type = strtoupper(gettype($var));
+        $body = hl($var);
+        echo <<<HTML
+        <div class="dd-wrap">
+            <div class="dd-meta">
+                <span class="dd-type">{$type}</span>
+                <span class="dd-file">📍 <span>{$file}</span></span>
+            </div>
+            <div class="dd-body">{$body}</div>
+        </div>
+        HTML;
+    }
+}
+//highlight
+function hl(mixed $v, int $d = 0): string
+{
+    if (is_null($v))                return '<span class="null">null</span>';
+    if (is_bool($v))                return '<span class="b">' . ($v ? 'true' : 'false') . '</span>';
+    if (is_int($v) || is_float($v)) return '<span class="n">' . $v . '</span>';
+    if (is_string($v))              return '<span class="s">"' . htmlspecialchars($v) . '"</span>';
+
+    if (is_array($v) || is_object($v)) {
+        $id    = uniqid('dd');
+        $items = is_array($v) ? $v : (array) $v;
+        $count = count($items);
+        $label = is_array($v) ? "array({$count})" : get_class($v) . "{{$count}}";
+
+        if (empty($items)) return '<span class="arr-label">' . $label . '</span> <span class="null">[]</span>';
+
+        $expand   = "var c=document.getElementById('{$id}');c.classList.remove('closed');c.querySelectorAll('.collapsible').forEach(e=>e.classList.remove('closed'));c.querySelectorAll('.toggle').forEach(e=>e.classList.remove('closed'))";
+        $collapse = "var c=document.getElementById('{$id}');c.classList.add('closed');c.querySelectorAll('.collapsible').forEach(e=>e.classList.add('closed'));c.querySelectorAll('.toggle').forEach(e=>e.classList.add('closed'))";
+
+        $out  = '<span class="toggle arr-label" onclick="this.classList.toggle(\'closed\');document.getElementById(\'' . $id . '\').classList.toggle(\'closed\')">' . $label . '</span>';
+        $out .= '<button class="btn-xs" onclick="' . $expand   . '">+</button>';
+        $out .= '<button class="btn-xs" onclick="' . $collapse . '">−</button>';
+        $out .= '<div class="collapsible closed" id="' . $id . '">';
+
+        foreach ($items as $k => $val) $out .= '<div class="row"><span class="k">' . htmlspecialchars((string) $k) . '</span>'
+            . ' <span style="color:#6c7086">=></span> '
+            . hl($val, $d + 1) . '</div>';
+
+        $out .= '</div>';
+        return $out;
+    }
+
+    return htmlspecialchars(print_r($v, true));
+}
