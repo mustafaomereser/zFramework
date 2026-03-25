@@ -31,7 +31,7 @@ class Validator
 
             $length = -1;
             $type   = null;
-            if (is_numeric($value) || $value == "0") {
+            if (is_numeric($value) || $value === "0") {
                 $type   = 'integer';
                 $length = (int) $value;
             } elseif (is_string($value)) {
@@ -99,7 +99,7 @@ class Validator
     public static function required($data)
     {
         if (in_array('nullable', $data['validateList'])) return throw new \Exception('“required” cannot be used in a validation that is ”nullable”.');
-        if ($data['length'] > 0) return true;
+        if ($data['length'] > 0 || ($data['type'] == 'integer' && strlen($data['value']))) return true;
         return false;
     }
 
