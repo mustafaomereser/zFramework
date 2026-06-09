@@ -11,3 +11,4 @@ zFramework/vendor
 config/crypt.php
 .DS_Store
 analysis
+CLAUDE.md
