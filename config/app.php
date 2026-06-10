@@ -10,7 +10,8 @@ return [
         }
     ],
 
-    'force-https' => false, # force redirect https.
+    'force-https'      => false, # force redirect https.
+    'x-powered-by'     => true,  # set false to hide X-Powered-By response header.
 
     'lang'        => 'tr', # if browser haven't language in Languages list auto choose that default lang.
     'title'       => 'zFramework',

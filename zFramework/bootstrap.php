@@ -1,7 +1,7 @@
 <?php
 define('FRAMEWORK_PATH', __DIR__);
 define('FRAMEWORK_VERSION', '2.9.0');
-header("X-Powered-By: zFramework v" . FRAMEWORK_VERSION);
+if ((include(BASE_PATH . "/config/app.php"))['x-powered-by'] ?? true) header("X-Powered-By: zFramework v" . FRAMEWORK_VERSION);
 
 // Initalize settings
 date_default_timezone_set('Europe/Istanbul');

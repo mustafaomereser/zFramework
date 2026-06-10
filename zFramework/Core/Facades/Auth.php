@@ -92,7 +92,7 @@ class Auth
     {
         if (!$user_id = (self::getMode())::get('auth-token')) return false;
         if (self::$user == null) self::$user = (new User)->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
-        if (!@self::$user['id'] || self::$user[self::$columns['password']] != (self::getMode())::get('auth-password')) return self::logout();
+        if (!@self::$user['id'] || !hash_equals((string) self::$user[self::$columns['password']], (string) (self::getMode())::get('auth-password'))) return self::logout();
         return self::$user;
     }
 

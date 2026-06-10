@@ -4,9 +4,7 @@ namespace zFramework\Core\Facades;
 
 class Alerts
 {
-
     static $name = null;
-
 
     /**
      * Get current Alerts list.
@@ -14,19 +12,18 @@ class Alerts
      */
     private static function list(): array
     {
-        return json_decode(Cookie::get('alerts') ?? '[]', true);
+        return Session::get('alerts') ?? [];
     }
 
     /**
      * Set just one time alerts.
-     * @param mixed
      * @return self
      */
     private static function set(): self
     {
         $alerts = self::list();
         $alerts[self::$name ? self::$name : Str::rand(10)] = func_get_args();
-        Cookie::set('alerts', json_encode($alerts, JSON_UNESCAPED_UNICODE));
+        Session::set('alerts', $alerts);
         self::$name = null;
         return new self();
     }
@@ -60,7 +57,7 @@ class Alerts
      */
     public static function unset(): void
     {
-        Cookie::delete('alerts');
+        Session::delete('alerts');
     }
 
     /**
