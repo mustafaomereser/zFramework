@@ -59,10 +59,15 @@ class Validator
                     foreach ($out as $param_key => $param) $parameters[$param_key] = $param;
                 } else $case = $ruleString;
 
-                if (self::{$case}(compact('value', 'equivalent', 'length', 'type', 'key', 'parameters', 'validateList', 'data') + ['required' => in_array('required', $validateList), 'nullable' => in_array('nullable', $validateList)])) {
-                    $statics[$key] = $value;
-                } else {
-                    $errors[$key][$case] = (Lang::get("validator.attributes.$key") ?? ($attributeNames[$key] ?? $key)) . " " . Lang::get("validator.errors.$case", self::$errors);
+                $ruleData = compact('value', 'equivalent', 'length', 'type', 'key', 'parameters', 'validateList', 'data') + [
+                    'required' => in_array('required', $validateList),
+                    'nullable' => in_array('nullable', $validateList),
+                ];
+
+                $rule = self::resolveRule($case);
+
+                if (!$rule->handle($ruleData)) {
+                    $errors[$key][$case] = (Lang::get("validator.attributes.$key") ?? ($attributeNames[$key] ?? $key)) . " " . Lang::get("validator.errors.$case", $rule->errors);
                     Alerts::danger($errors[$key][$case]);
                     unset($data[$key]);
                 } else $statics[$key] = $value;
@@ -89,56 +94,33 @@ class Validator
      */
     private static function resolveTypeAndLength(mixed $value, ?string $declared): array
     {
-        if (!@strlen($data['value'])) return true;
-        if (filter_var($data['value'], FILTER_VALIDATE_EMAIL)) return true;
-        return false;
+        if (is_array($value))  return ['array',  count($value)];
+        if (is_object($value)) return ['object', count((array) $value)];
+
+        $type = $declared ?? match (true) {
+            is_int($value)                              => 'integer',
+            is_float($value)                            => 'float',
+            preg_match('/^-?\d+$/', (string) $value)    => 'integer',
+            is_numeric($value)                          => 'float',
+            default                                     => 'string',
+        };
+
+        $length = match ($type) {
+            'integer' => (int) $value,
+            'float'   => (float) $value,
+            default   => is_string($value) ? strlen($value) : 0,
+        };
+
+        return [$type, $length];
     }
 
-    public static function required($data)
-    {
-        if (in_array('nullable', $data['validateList'])) return throw new \Exception('“required” cannot be used in a validation that is ”nullable”.');
-        if ($data['length'] > 0 || ($data['type'] == 'integer' && strlen($data['value']))) return true;
-        return false;
-    }
-
-    public static function nullable($data)
-    {
-        if (in_array('required', $data['validateList'])) return throw new \Exception('“nullable” cannot be used in a validation that is ”required”.');
-        return true;
-    }
-
-    public static function max($data)
-    {
-        if (!@strlen($data['value'])) return true;
-        if ($data['equivalent'] >= $data['length']) return true;
-        self::$errors = ['now-val' => $data['length'], 'max-val' => $data['equivalent']];
-        return false;
-    }
-
-    public static function min($data)
-    {
-        if (!@strlen($data['value'])) return true;
-        if ($data['length'] >= $data['equivalent']) return true;
-        self::$errors = ['now-val' => $data['length'], 'min-val' => $data['equivalent']];
-        return false;
-    }
-
-    public static function same($data)
-    {
-        if ($data['value'] === @$data['validateList'][$data['equivalent']]) return true;
-        self::$errors = ['attribute-name' => (Lang::get("validator.attributes." . $data['equivalent']) ?? $data['equivalent'])];
-        return false;
-    }
-
-    public static function exists($data)
-    {
-        $exists = (new $data['equivalent'])->whereRaw(($data['parameters']['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
-        if ($ex = @$data['parameters']['ex']) $exists->where('id', '!=', $ex);
-        if ($exists->count()) return true;
-        return false;
-    }
-
-    public static function unique($data)
+    /**
+     * Resolves a rule name to its Rule instance from the rule map.
+     * @param string $case Rule name (e.g. "required", "max", "exists")
+     * @return Rule
+     * @throws \Exception If the rule is not registered
+     */
+    private static function resolveRule(string $case): Rule
     {
         $class = self::$ruleMap[$case] ?? null;
         if (!$class) throw new \Exception("Unknown validation rule: \"$case\"");
