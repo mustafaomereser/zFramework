@@ -4,6 +4,7 @@ namespace App\Controllers;
 
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
+use zFramework\Core\Helpers\AutoSSL;
 
 class HomeController extends Controller
 {

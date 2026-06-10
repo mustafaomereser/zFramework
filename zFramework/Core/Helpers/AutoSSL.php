@@ -4,7 +4,6 @@ namespace zFramework\Core\Helpers;
 
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-use zFramework\Core\Facades\Response;
 use ZipArchive;
 
 class AutoSSL
@@ -21,7 +20,7 @@ class AutoSSL
     private array $openSSLConfig = ['private_key_bits' => 4096, 'private_key_type' => OPENSSL_KEYTYPE_RSA];
     private ?string $kid = null;
 
-    public function __construct(string $directoryUrl = self::STAGING, null|string $openSSLConfig = null)
+    public function __construct(string $directoryUrl = self::STAGING, ?string $openSSLConfig = null)
     {
         global $storage_path;
         if (!is_null($openSSLConfig)) $this->openSSLConfig['config'] = $openSSLConfig;
@@ -31,8 +30,8 @@ class AutoSSL
         $this->webChallengePath = public_dir('/.well-known/acme-challenge');
         $this->accountKeyPath   = $this->sslPath . '/account.key';
 
-        if (!is_dir($this->sslPath)) mkdir($this->sslPath, 0777, true);
-        if (!is_dir($this->webChallengePath)) mkdir($this->webChallengePath, 0777, true);
+        if (!is_dir($this->sslPath)) mkdir($this->sslPath, 0755, true);
+        if (!is_dir($this->webChallengePath)) mkdir($this->webChallengePath, 0755, true);
 
         if (!file_exists($this->accountKeyPath)) $this->generateAccountKey();
         $this->loadAccountKey();
@@ -180,9 +179,13 @@ class AutoSSL
     public function checkSSL(string $domain): array
     {
         $ctx    = stream_context_create(["ssl" => ["capture_peer_cert" => true]]);
-        $client = stream_socket_client("ssl://$domain:443", $errno, $errstr, 10, STREAM_CLIENT_CONNECT, $ctx);
-        $cont   = stream_context_get_params($client);
-        $cert   = openssl_x509_parse($cont["options"]["ssl"]["peer_certificate"]);
+        $client = @stream_socket_client("ssl://$domain:443", $errno, $errstr, 10, STREAM_CLIENT_CONNECT, $ctx);
+        if (!$client) throw new \Exception("Cannot connect to $domain:443 — $errstr ($errno)");
+        $cont = stream_context_get_params($client);
+        fclose($client);
+        if (!isset($cont["options"]["ssl"]["peer_certificate"])) throw new \Exception("No peer certificate captured for $domain");
+        $cert = openssl_x509_parse($cont["options"]["ssl"]["peer_certificate"]);
+        if (!$cert) throw new \Exception("Cannot parse certificate for $domain");
         return ['domain' => $cert['subject']['CN'], 'givenby' => $cert['issuer']['O'], 'last_date' => date('Y-m-d H:i:s', $cert['validTo_time_t']), 'days_left' => floor(($cert['validTo_time_t'] - time()) / 86400)];
     }
 
@@ -215,19 +218,21 @@ class AutoSSL
         return ['filename' => "$domain.zip", 'filesize' => $filesize, 'raw' => $raw];
     }
 
-    public function prepareDomain($domain)
+    public function prepareDomain(string $domain): array
     {
         $domain = trim($domain);
         if ($domain === '') throw new \Exception("Domain empty");
-        $dir = $this->sslPath . '/' . $domain;
-        if (!is_dir($dir)) mkdir($dir, 0777, true);
+        $dirName = preg_replace('/^\*\./', 'wildcard.', $domain);
+        $dir = $this->sslPath . '/' . $dirName;
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
 
         return compact('domain', 'dir');
     }
 
-    public function newOrder($domain)
+    public function newOrder(array $domains = []): array
     {
-        $res = $this->postAsJWS($this->dir['newOrder'], ['identifiers' => [['type' => 'dns', 'value' => $domain]]]);
+        $res = $this->postAsJWS($this->dir['newOrder'], ['identifiers' => array_map(fn($domain) => ['type' => 'dns', 'value' => $domain], $domains)]);
+
         if (!in_array($res['status'], [201, 200])) throw new \Exception("newOrder failed: " . $res['body']);
         $order    = json_decode($res['body'], true);
         $location = $res['headers']['Location'] ?? $res['headers']['location'] ?? null;
@@ -235,39 +240,94 @@ class AutoSSL
 
         $authUrls = $order['authorizations'] ?? [];
         if (count($authUrls) === 0) throw new \Exception("No authorizations in order");
-        $authURL = $authUrls[0];
 
-        // GET authorization
-        $authResp = $this->httpRequest($authURL, 'GET');
-        $body     = json_decode($authResp['body'], true);
-        return compact('body', 'authURL', 'order', 'location');
+        // GET each authorization to collect its challenges (one authorization per identifier).
+        $authorizations = [];
+        foreach ($authUrls as $authUrl) {
+            $authResp = $this->httpRequest($authUrl, 'GET');
+            if ($authResp['status'] !== 200) throw new \Exception("Cannot load authorization: " . $authResp['body']);
+            $adata = json_decode($authResp['body'], true);
+            $authorizations[] = [
+                'url'        => $authUrl,
+                'identifier' => $adata['identifier']['value'] ?? null,
+                'wildcard'   => $adata['wildcard'] ?? false,
+                'challenges' => $adata['challenges'] ?? [],
+            ];
+        }
+
+        // prepare per-domain storage folders.
+        $preparedDomains = [];
+        foreach ($domains as $domain) {
+            $prepare = $this->prepareDomain($domain);
+            $preparedDomains[$prepare['domain']] = $prepare['dir'];
+        }
+
+        $finalize = $order['finalize'] ?? null;
+
+        return compact('order', 'location', 'finalize', 'authorizations') + ['domains' => $preparedDomains];
     }
 
-    public function challenge($challenges)
+    public function challenge(array $authorizations, string $type = "http-01"): array
     {
-        $getChallenge = (function () use ($challenges) {
-            foreach ($challenges as $challenge) if ($challenge['type'] === 'http-01') return $challenge;
-            return false;
-        })();
-        if (!$getChallenge) throw new \Exception("No http-01 challenge available");
+        $thumbprint = $this->jwkThumbprint($this->getJWK());
 
-        $url   = $getChallenge['url'];
-        $token = $getChallenge['token'];
-        $key   = $token . '.' . $this->jwkThumbprint($this->getJWK());
+        $list = [];
+        foreach ($authorizations as $auth) {
+            $selected = null;
+            foreach ($auth['challenges'] as $challenge) if ($challenge['type'] === $type) {
+                $selected = $challenge;
+                break;
+            }
+            if (!$selected) throw new \Exception("No $type challenge available for " . ($auth['identifier'] ?? '?'));
 
-        return compact('key', 'url', 'token');
+            $keyAuth = $selected['token'] . '.' . $thumbprint;
+            $domain  = ($auth['wildcard'] ? '*.' : '') . $auth['identifier'];
+
+            $entry = [
+                'type'    => $type,
+                'authUrl' => $auth['url'],
+                'domain'  => $domain,
+                'url'     => $selected['url'],
+                'token'   => $selected['token'],
+            ];
+
+            if ($type === 'dns-01') {
+                // TXT record name strips the wildcard prefix; value is the SHA-256 digest of the key authorization.
+                $entry['record'] = '_acme-challenge.' . preg_replace('/^\*\./', '', $domain);
+                $entry['value']  = self::base64url(hash('sha256', $keyAuth, true));
+            } else {
+                $entry['content']  = $keyAuth;
+                $entry['filePath'] = $this->webChallengePath . '/' . $selected['token'];
+            }
+
+            $list[] = $entry;
+        }
+
+        return $list;
     }
 
-    public function notifyChallenge($challenge)
+    public function publishChallenge(array $challenge): void
+    {
+        if (($challenge['type'] ?? null) !== 'http-01') throw new \Exception("publishChallenge only supports http-01; dns-01 TXT records must be published manually");
+        if (file_put_contents($challenge['filePath'], $challenge['content']) === false) throw new \Exception("Cannot write challenge file");
+        chmod($challenge['filePath'], 0644);
+    }
+
+    private function cleanupChallenges(array $challenges): void
+    {
+        foreach ($challenges as $challenge) if (($challenge['type'] ?? null) === 'http-01' && isset($challenge['filePath'])) @unlink($challenge['filePath']);
+    }
+
+    public function notifyChallenge(array $challenge): string
     {
         $trigger = $this->postAsJWS($challenge['url'], new \stdClass);
         if (!in_array($trigger['status'], [200, 202])) throw new \Exception("Notify challenge failed: " . $trigger['body']);
         return $trigger['body'];
     }
 
-    public function challengeAuth($order, $tries = 1)
+    public function challengeAuth(string $authUrl, int $tries = 1): array
     {
-        $check    = $this->httpRequest($order['authURL'], 'GET');
+        $check    = $this->httpRequest($authUrl, 'GET');
         $adata    = json_decode($check['body'], true);
         $status   = $adata['status'] ?? null;
         $response = ['message' => 'ok', 'status' => true, 'tries' => $tries];
@@ -275,8 +335,9 @@ class AutoSSL
         if ($status === null) throw new \Exception("Authorization status is null");
         // try again.
         if ($status === 'pending') {
+            if ($tries >= 20) throw new \Exception("Authorization still pending after $tries tries");
             sleep(5);
-            return $this->challengeAuth($order, $tries + 1);
+            return $this->challengeAuth($authUrl, $tries + 1);
         }
 
         if ($status === 'invalid') {
@@ -288,17 +349,22 @@ class AutoSSL
         return $response;
     }
 
-    public function finalize($order, $domain, $domainDir)
+    public function finalize(array $order, array $domains): array
     {
-        $domainKey = $domainDir . '/private.key';
-        $csrPath   = $domainDir . '/domain.csr.pem';
-        if (!file_exists($domainKey) || !file_exists($csrPath)) $this->generateDomainKeyAndCSR($domain, $domainKey, $csrPath);
+        // single SAN certificate: one private key + one CSR covering every domain, stored under the primary.
+        $primary    = $domains[0];
+        $primaryDir = $order['domains'][$primary] ?? null;
+        if (!$primaryDir) throw new \Exception("Primary domain dir not prepared: $primary");
+
+        $domainKey = $primaryDir . '/private.key';
+        $csrPath   = $primaryDir . '/domain.csr.pem';
+        if (!file_exists($domainKey) || !file_exists($csrPath)) $this->generateDomainKeyAndCSR($domains, $domainKey, $csrPath);
 
         $csrPem = file_get_contents($csrPath);
         $csrDer = $this->pemToDer($csrPem);
         $csr64  = self::base64url($csrDer);
 
-        $finalize = $order['order']['finalize'] ?? null;
+        $finalize = $order['finalize'] ?? ($order['order']['finalize'] ?? null);
         if (!$finalize) throw new \Exception("No finalize URL");
 
         $finalizeResp = $this->postAsJWS($finalize, ['csr' => $csr64]);
@@ -307,68 +373,92 @@ class AutoSSL
         return compact('domainKey');
     }
 
-    public function getCertificate($order, $domainKey, $tries = 1)
+    public function getCertificate(array $order, string $domainKey, int $tries = 1): array
     {
         $ordCheck = $this->httpRequest($order['location'], 'GET');
         $odata    = json_decode($ordCheck['body'], true);
-        if (isset($odata['certificate'])) $certUrl = $odata['certificate'];
         if (($odata['status'] ?? '') === 'invalid') return ['status' => false, 'tries' => $tries, 'message' => 'can not get cert url.'];
 
-        // try again.
-        if (!isset($certUrl)) return $this->getCertificate($order, $domainKey, $tries + 1);
+        $certUrl = $odata['certificate'] ?? null;
+        // order not yet ready: poll again with a guard against infinite recursion.
+        if (!$certUrl) {
+            if ($tries >= 10) return ['status' => false, 'tries' => $tries, 'message' => 'certificate url not ready.'];
+            sleep(3);
+            return $this->getCertificate($order, $domainKey, $tries + 1);
+        }
 
-        // download certificate
+        // download the full chain.
         $certGet = $this->httpRequest($certUrl, 'GET');
         if ($certGet['status'] !== 200) throw new \Exception("Failed to download certificate");
-        $certPem = explode('
 
-', $certGet['body']);
+        // split leaf certificate from the CA bundle on the END CERTIFICATE boundary.
+        $marker = "-----END CERTIFICATE-----";
+        $pos    = strpos($certGet['body'], $marker);
+        if ($pos === false) throw new \Exception("Invalid certificate response");
+        $leaf    = trim(substr($certGet['body'], 0, $pos + strlen($marker)));
+        $bundle  = trim(substr($certGet['body'], $pos + strlen($marker)));
+        $private = file_get_contents($domainKey);
 
-        return ['status' => true, 'getCertUrlTries' => $tries, 'certificate' => $certPem[0], 'ca_bundle' => $certPem[1], 'private' => file_get_contents($domainKey)];
+        // persist to the primary domain folder (renewAll / getDaysLeftFromBundle read these back).
+        $dir = dirname($domainKey);
+        file_put_contents($dir . '/certificate.crt', $leaf);
+        file_put_contents($dir . '/ca_bundle.key', $bundle);
+
+        return ['status' => true, 'getCertUrlTries' => $tries, 'certificate' => $leaf, 'ca_bundle' => $bundle, 'private' => $private];
     }
 
-    public function issue(string $domain): array
+    public function issue(array $domains, string $challenge_type = "http-01"): array
     {
-        $domain    = $this->prepareDomain($domain);
-        $domainDir = $domain['dir'];
+        // dns-01 needs manual TXT publishing between requests, so it cannot be fully automated here.
+        if ($challenge_type === 'dns-01') throw new \Exception("dns-01 cannot be issued automatically (manual TXT publishing required). Use newOrder/challenge/notifyChallenge/challengeAuth/finalize/getCertificate step by step — see HomeController for an example.");
 
         #region order and challenge
-        $order     = $this->newOrder($domain['domain']);
-        $challenge = $this->challenge($order['body']['challenges']);
+        $order      = $this->newOrder($domains);
+        $challenges = $this->challenge($order['authorizations'], $challenge_type);
 
-        $challengeFile = $this->webChallengePath . '/' . $challenge['token'];
-        if (file_put_contents($challengeFile, $challenge['key']) === false) throw new \Exception("Cannot write challenge file");
-        chmod($challengeFile, 0644);
+        // publish + notify every challenge first, then poll each authorization.
+        foreach ($challenges as $challenge) {
+            $this->publishChallenge($challenge);
+            $this->notifyChallenge($challenge);
+        }
 
-        $this->notifyChallenge($challenge);
-        $challengeAuth = $this->challengeAuth($order);
-        // do notify and challengeAuth remove after challenge file.
-        @unlink($challengeFile);
+        $authTries = [];
+        foreach ($order['authorizations'] as $auth) {
+            $challengeAuth = $this->challengeAuth($auth['url']);
+            $authTries[$auth['identifier']] = $challengeAuth['tries'];
+            if (!$challengeAuth['status']) {
+                $this->cleanupChallenges($challenges);
+                throw new \Exception("Authorization failed for " . $auth['identifier'] . ": " . json_encode($challengeAuth['adata'] ?? []));
+            }
+        }
 
-        if (!$challengeAuth['status']) die(Response::json($challengeAuth, JSON_PRETTY_PRINT));
+        $this->cleanupChallenges($challenges);
         #endregion
 
-        $finalize = $this->finalize($order, $domain['domain'], $domainDir);
+        $finalize = $this->finalize($order, $domains);
         $pollCert = $this->getCertificate($order, $finalize['domainKey']);
-        if (!$pollCert['status']) die(Response::json($pollCert, JSON_PRETTY_PRINT));
+        if (!$pollCert['status']) throw new \Exception($pollCert['message'] ?? 'Certificate retrieval failed');
 
-        file_put_contents($domainDir . '/certificate.key', $pollCert['certificate']);
-        file_put_contents($domainDir . '/ca_bundle.key', $pollCert['ca_bundle']);
-        file_put_contents($domainDir . '/private.key', $pollCert['private']);
-
-        return ['details' => ['getCertUrlTries' => $pollCert['getCertUrlTries'], 'challengeAuthTries' => $challengeAuth['tries']], 'cert' => $pollCert['certificate'], 'ca_bundle' => $pollCert['ca_bundle'], 'private' => $pollCert['private']];
+        return ['details' => ['getCertUrlTries' => $pollCert['getCertUrlTries'], 'authTries' => $authTries], 'cert' => $pollCert['certificate'], 'ca_bundle' => $pollCert['ca_bundle'], 'private' => $pollCert['private']];
     }
 
     public function renewAll(): void
     {
-        foreach ($this->list() as $domain) {
-            $full   = "$domain/ca_bundle.key";
-            $domain = basename($domain);
-            $days   = file_exists($full) ? $this->getDaysLeftFromBundle($full) : $this->checkSSL($domain)['days_left'];
+        foreach ($this->list() as $path) {
+            $domain = basename($path);
+
+            // wildcard domains use dns-01, which needs manual TXT publishing — cannot auto-renew.
+            if (strpos($domain, '*') !== false) {
+                echo "Skipping $domain (wildcard, dns-01 manual renewal)\n";
+                continue;
+            }
+
+            $leaf = "$path/certificate.crt";
+            $days = file_exists($leaf) ? $this->getDaysLeftFromBundle($leaf) : $this->checkSSL($domain)['days_left'];
             if ($days < 20) {
                 echo "Renewing: $domain ($days days left)\n";
                 try {
-                    $this->issue($domain);
+                    $this->issue([$domain]);
                     echo "Renewed $domain\n";
                 } catch (\Exception $e) {
                     echo "Failed to renew $domain: " . $e->getMessage() . "\n";
@@ -379,7 +469,7 @@ class AutoSSL
         }
     }
 
-    private function generateDomainKeyAndCSR(string $domain, string $keyPath, string $csrPath): void
+    private function generateDomainKeyAndCSR(array $domains, string $keyPath, string $csrPath): void
     {
         $res = openssl_pkey_new($this->openSSLConfig);
         if ($res === false) throw new \RuntimeException("Private key generation failed: " . openssl_error_string());
@@ -388,7 +478,21 @@ class AutoSSL
         file_put_contents($keyPath, $pem);
         chmod($keyPath, 0600);
 
-        $csrRes = openssl_csr_new(['commonName' => $domain], $res, ['digest_alg' => 'sha256'] + $this->openSSLConfig);
+        // SAN certificate: emit a temporary openssl config carrying every domain as subjectAltName.
+        $san     = implode(',', array_map(fn($d) => 'DNS:' . $d, $domains));
+        $tmpConf = tempnam(sys_get_temp_dir(), 'san');
+        file_put_contents($tmpConf, "[req]\ndistinguished_name = req_distinguished_name\nreq_extensions = v3_req\n[req_distinguished_name]\n[v3_req]\nbasicConstraints = CA:FALSE\nkeyUsage = nonRepudiation, digitalSignature, keyEncipherment\nsubjectAltName = $san\n");
+
+        $configargs = [
+            'digest_alg'       => 'sha256',
+            'config'           => $tmpConf,
+            'req_extensions'   => 'v3_req',
+            'private_key_bits' => $this->openSSLConfig['private_key_bits'],
+            'private_key_type' => $this->openSSLConfig['private_key_type'],
+        ];
+
+        $csrRes = openssl_csr_new(['commonName' => $domains[0]], $res, $configargs);
+        @unlink($tmpConf);
 
         if ($csrRes === false) throw new \RuntimeException("CSR generation failed: " . openssl_error_string());
 
@@ -408,13 +512,13 @@ class AutoSSL
     private function getDaysLeftFromBundle(string $certFile): int
     {
         $certContent = file_get_contents($certFile);
-        if (!$certContent) return 0;
+        if ($certContent === false || $certContent === '') throw new \Exception("Cannot read certificate file: $certFile");
 
         $cert = openssl_x509_read($certContent);
-        if (!$cert) return 0;
+        if (!$cert) throw new \Exception("Cannot parse certificate: $certFile");
 
         $certData = openssl_x509_parse($cert);
-        if (!isset($certData['validTo_time_t'])) return 0;
+        if (!isset($certData['validTo_time_t'])) throw new \Exception("Certificate has no expiry date: $certFile");
         return (int) floor(($certData['validTo_time_t'] - time()) / 86400);
     }
 }

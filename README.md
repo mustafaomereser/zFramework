@@ -1122,18 +1122,40 @@ Run project.
 
 ## 21. AutoSSL (Lets Encrypt)
 ```php
-    $ssl = new AutoSSL(AutoSSL::STAGING | AutoSSL::PROD);
+    // Constructor — choose STAGING (test) or PROD
+    $ssl = new AutoSSL(AutoSSL::STAGING);
+    $ssl = new AutoSSL(AutoSSL::PROD);
 
-    # if openssl won't create a key;
-    $ssl = new AutoSSL(AutoSSL::STAGING | AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');
-    $ssl->ensureAccount(); # register account. (just once time for k id)
-    $ssl->unlinkAccount(); # remove account. (need again ensureAccount.)
+    // Provide an OpenSSL config path if key generation fails (e.g. Windows/XAMPP)
+    $ssl = new AutoSSL(AutoSSL::STAGING, 'D:\xampp\apache\conf\openssl.cnf');
 
-    $ssl->issue('domain.com'); # create issue for domain.
-    $ssl->renewAll(); # renew all issued domains lower than 20 days.
-    $ssl->list(); # list issued domains.
+    // Account management — constructor handles this automatically on first run
+    $ssl->ensureAccount(); // create and persist the ACME account KID
+    $ssl->unlinkAccount(); // reset account (ensureAccount must be called again)
 
-    print_r($ssl->checkSSL('domain.com')); # info website's ssl.
+    // List issued domains / check live SSL / auto-renew
+    $ssl->list();                        // returns all issued domain directories
+    $ssl->checkSSL('domain.com');        // returns live certificate info
+    $ssl->renewAll();                    // renews certificates with less than 20 days left (wildcards skipped)
+
+    // http-01 — fully automatic in one call (no wildcard support)
+    $cert = $ssl->issue(['domain.com', 'www.domain.com'], 'http-01');
+    // $cert: ['cert' => '...', 'ca_bundle' => '...', 'private' => '...']
+
+    // dns-01 — two-step flow for wildcard and multi-domain certificates
+    // Step 1: open order and retrieve TXT record values
+    $order   = $ssl->newOrder(['domain.com', '*.domain.com']);
+    $records = $ssl->challenge($order['authorizations'], 'dns-01');
+    // $records: [['record' => '_acme-challenge.domain.com', 'value' => '...'], ...]
+    // Add every entry to DNS as a TXT record (same name, different values — add both)
+    // Wait for propagation: dig TXT _acme-challenge.domain.com +short
+
+    // Step 2: notify, validate, finalize, and download the certificate
+    foreach ($records as $c) $ssl->notifyChallenge($c);
+    foreach ($order['authorizations'] as $a) $ssl->challengeAuth($a['url']);
+    $fin  = $ssl->finalize($order, ['domain.com', '*.domain.com']);
+    $cert = $ssl->getCertificate($order, $fin['domainKey']);
+    // $cert: ['certificate' => '...', 'ca_bundle' => '...', 'private' => '...']
 ```
 
 ## 22. cPanel
