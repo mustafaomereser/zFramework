@@ -16,7 +16,8 @@ class Security
 
     /**
      * Description: Create a crypt key.
-     * @param --regen (optional)
+     * Usage: php kernel security key [--regen]
+     * @param --regen (optional) force regenerate existing key
      */
     public static function key()
     {

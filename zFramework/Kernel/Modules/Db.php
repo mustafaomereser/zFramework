@@ -52,14 +52,15 @@ class Db
     }
 
     /**
-     * Description: Migrate Database
-     * @param --module={module_name} (optional)
-     * @param --all (optional) (for all migrations do migrate)
-     * @param --db (optional) (overwrite migrations $db parameter)
-     * @param --path (optional)
-     * @param --force (optional) (for migration forcefully)
-     * @param --fresh (optional) (delete everything and again migration)
-     * @param --seed (optional)
+     * Description: Migrate database
+     * Usage: php kernel db migrate [--fresh] [--force] [--seed] [--all] [--module=blog] [--db=default] [--path=sub]
+     * @param --fresh            (optional) drop all tables and re-migrate
+     * @param --force            (optional) force migration even if unchanged
+     * @param --seed             (optional) run seeders after migrate
+     * @param --all              (optional) include all module migrations
+     * @param --module={name}    (optional) migrate only this module
+     * @param --db={key}         (optional) override db connection key
+     * @param --path={subdir}    (optional) sub-path inside migrations folder
      */
     public static function migrate()
     {
@@ -407,8 +408,9 @@ class Db
     }
 
     /**
-     * Description: Seeder
-     * @param --db (optional) (ifnull = Get first DB KEY)
+     * Description: Run database seeders
+     * Usage: php kernel db seed [--db=default]
+     * @param --db={key}  (optional) db connection key, defaults to first
      */
     public static function seed()
     {
@@ -424,9 +426,10 @@ class Db
     }
 
     /**
-     * Description: Backup database
-     * @param db (optional) (ifnull = Get first DB KEY)
-     * @param --compress (optional)
+     * Description: Backup database to file
+     * Usage: php kernel db backup [--compress] [--separate]
+     * @param --compress  (optional) gzip compress the backup file
+     * @param --separate  (optional) save each table as a separate file
      */
     public static function backup()
     {
@@ -441,8 +444,9 @@ class Db
     }
 
     /**
-     * Description: Restore Backup
-     * @param --db (optional) (ifnull = Get first DB KEY)
+     * Description: Restore a database backup (interactive)
+     * Usage: php kernel db restore [--db=default]
+     * @param --db={key}  (optional) db connection key, defaults to first
      */
     public static function restore()
     {

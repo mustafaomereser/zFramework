@@ -14,7 +14,8 @@ class Cache
 
     /**
      * Description: Cache Clear
-     * options: views, sessions
+     * Usage: php kernel cache clear {views|sessions}
+     * @param {views|sessions} (second argument)
      */
     public static function clear()
     {

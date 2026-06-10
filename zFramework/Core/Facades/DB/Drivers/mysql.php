@@ -25,7 +25,7 @@ class mysql
 
             $columns = $this->parent->prepare("SELECT COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH, COLUMN_TYPE, COLUMN_KEY FROM information_schema.columns where table_schema = DATABASE() AND table_name = :table", ['table' => $table['TABLE_NAME']])->fetchAll(\PDO::FETCH_ASSOC);
             $data["TABLE_COLUMNS"][$table['TABLE_NAME']] = [
-                'primary' => $columns[array_search("PRI", array_column($columns, 'COLUMN_KEY'))]['COLUMN_NAME'],
+                'primary' => (($idx = array_search("PRI", array_column($columns, 'COLUMN_KEY'))) !== false) ? $columns[$idx]['COLUMN_NAME'] : null,
                 'columns' => $columns
             ];
         }

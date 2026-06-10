@@ -8,6 +8,7 @@ class Run
 {
     /**
      * Run the project.
+     * Usage: php kernel run [--host=0.0.0.0] [--port=8080]
      * @param --host (optional)
      * @param --port (optional)
      */

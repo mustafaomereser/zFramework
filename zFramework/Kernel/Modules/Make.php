@@ -91,10 +91,10 @@ class Make
 
 
     /**
-     * Description: Create an Request
-     * @important $make
-     * @param $make (third arguman)    
-     * @param --module={module_name} (optional)
+     * Description: Create a Request class
+     * Usage: php kernel make request StoreUserRequest [--module=blog]
+     * @param {name}           (third argument)
+     * @param --module={name}  (optional)
      */
     public static function request($make)
     {
@@ -102,11 +102,11 @@ class Make
     }
 
     /**
-     * Description: Create an Controller
-     * @important $make
-     * @param $make (third arguman)
-     * @param --resource (optional)
-     * @param --module={module_name} (optional)
+     * Description: Create a Controller class
+     * Usage: php kernel make controller UserController [--resource] [--module=blog]
+     * @param {name}           (third argument)
+     * @param --resource       (optional) generate resource methods
+     * @param --module={name}  (optional)
      */
     public static function controller($make)
     {
@@ -114,10 +114,10 @@ class Make
     }
 
     /**
-     * Description: Create an Middleware
-     * @important $make
-     * @param $make (third arguman)
-     * @param --module={module_name} (optional)
+     * Description: Create a Middleware class
+     * Usage: php kernel make middleware AuthMiddleware [--module=blog]
+     * @param {name}           (third argument)
+     * @param --module={name}  (optional)
      */
     public static function middleware($make)
     {
@@ -125,12 +125,12 @@ class Make
     }
 
     /**
-     * Description: Create an Migration
-     * @important $make
-     * @param $make (third arguman)
-     * @param --module={module_name} (optional)
-     * @param --table (optional) (ifnull = Get self Migration Name)
-     * @param --dbname (optional) (ifnull = Get first DB KEY)
+     * Description: Create a Migration file
+     * Usage: php kernel make migration CreateUsersTable [--table=users] [--dbname=default] [--module=blog]
+     * @param {name}             (third argument)
+     * @param --table={table}    (optional) defaults to snake_case of name
+     * @param --dbname={key}     (optional) defaults to first db connection
+     * @param --module={name}    (optional)
      */
     public static function migration($make)
     {
@@ -153,11 +153,11 @@ class Make
     }
 
     /**
-     * Description: Create an Model
-     * @important $make
-     * @param $make (third arguman)
-     * @param --module={module_name} (optional)
-     * @param --table (optional) (ifnull = Get self Model Name)
+     * Description: Create a Model class
+     * Usage: php kernel make model User [--table=users] [--module=blog]
+     * @param {name}           (third argument)
+     * @param --table={table}  (optional) defaults to snake_case of name
+     * @param --module={name}  (optional)
      */
     public static function model($make)
     {
@@ -178,10 +178,9 @@ class Make
     }
 
     /**
-     * Description: Create an Seeder
-     * @important $make
-     * @param $make (third arguman)
-     * @param --module={module_name} (optional)
+     * Description: Create a Seeder class
+     * Usage: php kernel make seeder UserSeeder
+     * @param {name}  (third argument)
      */
     public static function seeder($make)
     {
@@ -189,10 +188,10 @@ class Make
     }
 
     /**
-     * Description: Create an Observer
-     * @important $make
-     * @param $make (third arguman)
-     * @param --module={module_name} (optional)
+     * Description: Create an Observer class
+     * Usage: php kernel make observer UserObserver [--module=blog]
+     * @param {name}           (third argument)
+     * @param --module={name}  (optional)
      */
     public static function observer($make)
     {

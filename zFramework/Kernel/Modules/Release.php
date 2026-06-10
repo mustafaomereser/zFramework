@@ -25,10 +25,11 @@ class Release
     }
 
     /**
-     * Make release, easily make release for updates.
-     * @param string --name (optional)   -> release profile name (default: default).
-     * @param string --date (optional)   -> start check filemtime.
-     * @param string --minify (optional) -> to minify css and js files.
+     * Description: Make a release zip of changed files.
+     * Usage: php kernel release make [--name=default] [--date=2024-01-01] [--minify]
+     * @param --name={profile} (optional) release profile name, default: default
+     * @param --date={Y-m-d}   (optional) include files modified after this date
+     * @param --minify         (optional) minify css and js files in the zip
      */
     public static function make()
     {

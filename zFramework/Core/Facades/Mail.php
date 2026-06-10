@@ -83,7 +83,7 @@ class Mail
      */
     public static function clearTo(): self
     {
-        self::$toMail[] = [];
+        self::$toMail = [];
         return new self();
     }
 
@@ -104,7 +104,7 @@ class Mail
      */
     public static function clearCc(): self
     {
-        self::$cc[] = [];
+        self::$cc = [];
         return new self();
     }
 
@@ -125,7 +125,7 @@ class Mail
      */
     public static function clearBcc(): self
     {
-        self::$bcc[] = [];
+        self::$bcc = [];
         return new self();
     }
 
