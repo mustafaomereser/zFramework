@@ -6,13 +6,20 @@ namespace zFramework\Core\Facades\DB;
  * Wraps a DB row so columns and closures are accessible
  * both as array keys ($row['id']) and object properties/methods ($row->id, $row->posts()).
  */
-class ModelResult implements \ArrayAccess, \JsonSerializable
+class ModelResult implements \ArrayAccess, \Countable, \JsonSerializable
 {
     private array $attributes;
 
     public function __construct(array $attributes = [])
     {
         $this->attributes = $attributes;
+    }
+
+    // --- Countable ---
+
+    public function count(): int
+    {
+        return count(array_filter($this->attributes, fn($v) => !($v instanceof \Closure)));
     }
 
     // --- ArrayAccess ---
