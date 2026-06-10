@@ -7,11 +7,12 @@ use zFramework\Core\Crypter;
 class Cookie
 {
     static $options = [
-        'expires'   => 0, // expire time
-        'path'      => '/', // store path
-        'domain'    => '', // store domain
+        'expires'   => 0,     // expire time
+        'path'      => '/',   // store path
+        'domain'    => '',    // store domain
         'security'  => false, // only ssl
-        'http_only' => false // only http protocol
+        'http_only' => false, // only http protocol
+        'samesite'  => 'Lax', // Lax: blocks cross-site POST, allows same-site subdomains
     ];
 
     /**
@@ -45,7 +46,14 @@ class Cookie
     {
         if (is_array($value) || is_object($value)) $value = json_encode($value, JSON_UNESCAPED_UNICODE);
         $_COOKIE[self::keyparse($key)] = Crypter::encode($value);
-        return setcookie(self::keyparse($key), Crypter::encode($value), ($expires ? (time() + $expires) : self::$options['expires']), self::$options['path'], self::$options['domain'], self::$options['security'], self::$options['http_only']);
+        return setcookie(self::keyparse($key), Crypter::encode($value), [
+            'expires'  => $expires ? (time() + $expires) : self::$options['expires'],
+            'path'     => self::$options['path'],
+            'domain'   => self::$options['domain'],
+            'secure'   => self::$options['security'],
+            'httponly' => self::$options['http_only'],
+            'samesite' => self::$options['samesite'],
+        ]);
     }
 
     /**
@@ -65,6 +73,13 @@ class Cookie
      */
     public static function delete(string $key): bool
     {
-        return setcookie(self::keyparse($key), '', -1, self::$options['path'], self::$options['domain'], self::$options['security'], self::$options['http_only']);
+        return setcookie(self::keyparse($key), '', [
+            'expires'  => -1,
+            'path'     => self::$options['path'],
+            'domain'   => self::$options['domain'],
+            'secure'   => self::$options['security'],
+            'httponly' => self::$options['http_only'],
+            'samesite' => self::$options['samesite'],
+        ]);
     }
 }

@@ -145,6 +145,6 @@ class Auth
      */
     public static function id(): int|null
     {
-        return self::user()['id'] ?? null;
+        return (self::user() ?: [])['id'] ?? null;
     }
 }

@@ -4,6 +4,7 @@ namespace zFramework\Core\Facades;
 
 use ReflectionClass;
 use zFramework\Core\Facades\Analyzer\DbCollector;
+use zFramework\Core\Facades\DB\ModelResult;
 use zFramework\Core\Helpers\Date;
 use zFramework\Core\Traits\DB\OrMethods;
 use zFramework\Core\Traits\DB\RelationShips;
@@ -245,8 +246,9 @@ class DB
     }
 
     /**
-     * Set Closures for rows
-     * @return array
+     * Set Closures for rows and wrap each row in ModelResult.
+     * Enables both $row['key'] and $row->key / $row->relation() access.
+     * @return array<ModelResult>
      */
     public function setClosures(array $rows): array
     {
@@ -254,10 +256,12 @@ class DB
         foreach ($rows as $key => $row) {
             foreach ($GLOBALS['model-closures'][$this->db][$this->table] as $closure) $rows[$key][$closure] = fn(...$args) => $this->{$closure}(...array_merge($args, [$row]));
 
-            if (!isset($row[$primary_key])) continue;
+            if (isset($row[$primary_key])) {
+                $rows[$key]['update'] = fn($sets) => $this->where($primary_key, $row[$primary_key])->update($sets);
+                $rows[$key]['delete'] = fn() => $this->where($primary_key, $row[$primary_key])->delete();
+            }
 
-            $rows[$key]['update'] = fn($sets) => $this->where($primary_key, $row[$primary_key])->update($sets);
-            $rows[$key]['delete'] = fn() => $this->where($primary_key, $row[$primary_key])->delete();
+            $rows[$key] = new ModelResult($rows[$key]);
         }
         return $rows;
     }
@@ -639,9 +643,9 @@ class DB
 
     /**
      * get one row in rows
-     * @return array 
+     * @return ModelResult|array
      */
-    public function first(): array
+    public function first(): ModelResult|array
     {
         return $this->limit(1)->get()[0] ?? [];
     }
