@@ -2,6 +2,14 @@
 
 namespace zFramework\Core\Helpers\cPanel;
 
+/**
+ * cPanel UAPI base client.
+ *
+ * Configuration (set once at boot or in config):
+ *   API::$domain   = 'example.com';      // cPanel hostname (without port)
+ *   API::$username = 'cpanelusername';    // cPanel account username
+ *   API::$apiToken = 'TOKEN_STRING';      // cPanel → Security → Manage API Tokens
+ */
 class API
 {
     // CONFIG
@@ -11,7 +19,12 @@ class API
     private static bool $verifySSL = false;
 
     /**
-     * Request function
+     * Send a UAPI request to cPanel (port 2083).
+     *
+     * @param string $endpoint  UAPI module/function path, e.g. "DomainInfo/list_domains"
+     * @param array  $params    GET query parameters
+     * @param array  $post      POST fields; when non-empty the request becomes a POST
+     * @return array|null       Decoded JSON response, or ["error" => "..."] on curl failure
      */
     public static function request(string $endpoint, array $params = [], array $post = []): ?array
     {
@@ -33,7 +46,6 @@ class API
 
         $response = curl_exec($ch);
         if (curl_errno($ch)) return ["error" => curl_error($ch)];
-        curl_close($ch);
         return json_decode($response, true);
     }
 }

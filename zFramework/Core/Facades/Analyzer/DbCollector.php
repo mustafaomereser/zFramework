@@ -36,11 +36,13 @@ class DbCollector
                 self::walkExplain($root, $analysis);
             }
 
-            $row = $pdo->query("EXPLAIN ANALYZE FORMAT=JSON $executed")->fetch(\PDO::FETCH_ASSOC);
-            if ($row) {
-                $plan = json_decode(current($row), true);
-                $root = $plan['query_plan'] ?? $plan;
-                self::walkAnalyze($root, $analysis);
+            if (preg_match('/^\s*SELECT\b/i', $executed)) {
+                $row = $pdo->query("EXPLAIN ANALYZE FORMAT=JSON $executed")->fetch(\PDO::FETCH_ASSOC);
+                if ($row) {
+                    $plan = json_decode(current($row), true);
+                    $root = $plan['query_plan'] ?? $plan;
+                    self::walkAnalyze($root, $analysis);
+                }
             }
 
             $analysis['tables']       = array_values(array_unique($analysis['tables']));
@@ -51,7 +53,7 @@ class DbCollector
             foreach ($analysis['tables'] as $table) {
                 $analysis['row_stats'][$table]['scanned']  = $analysis['metrics'][$table]['actual_rows'] ?? 0;
                 $analysis['row_stats'][$table]['returned'] = self::extractLimit($sql) ?? ($analysis['metrics'][$table]['actual_rows'] ?? 0);
-                $analysis['row_stats'][$table]['mode']     = !isset($analysis['warnings'][$table]) || in_array('FULL_SCAN', $analysis['warnings'][$table]) ? 'FULL_SCAN' : 'INDEX';
+                $analysis['row_stats'][$table]['mode']     = isset($analysis['warnings'][$table]) && in_array('FULL_SCAN', $analysis['warnings'][$table]) ? 'FULL_SCAN' : 'INDEX';
 
                 $size = self::approxTableRows($pdo, $table);
                 $analysis['metrics'][$table]['estimated_rows'] = $size;
@@ -62,10 +64,10 @@ class DbCollector
                 }
             }
 
-            $used  = $analysis['used_columns'];
-            $size  = $analysis['metrics']['estimated_rows'] ?? 0;
+            $used = $analysis['used_columns'];
 
             foreach ($analysis['tables'] as $table) {
+                $size = $analysis['metrics'][$table]['estimated_rows'] ?? 0;
                 if (!isset($analysis['warnings'][$table])) continue;
                 if ($analysis['row_stats'][$table]['mode'] == 'FULL_SCAN' && empty($analysis['used_indexes'])) {
                     $cols = self::extractIndexableColumns($sql);
@@ -108,7 +110,6 @@ class DbCollector
             if (isset($node['actual_rows'])) $a['metrics'][$table]['actual_rows'] = $node['actual_rows'];
             if (isset($node['actual_last_row_ms'])) $a['metrics'][$table]['actual_time_ms'] = $node['actual_last_row_ms'];
         }
-        if (!empty($node['inputs']) && is_array($node['inputs'])) foreach ($node['inputs'] as $child) self::walkAnalyze($child, $a);
         foreach ($node as $child) if (is_array($child)) self::walkAnalyze($child, $a);
     }
 
