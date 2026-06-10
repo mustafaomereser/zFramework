@@ -3,7 +3,7 @@
 namespace Database\Migrations;
 
 use App\Models\User;
-use zFramework\Core\Crypter;
+use zFramework\Core\Facades\Auth;
 use zFramework\Core\Facades\Str;
 
 class Users
@@ -17,7 +17,7 @@ class Users
         return [
             'id'        => ['primary'],
             'username'  => ['varchar:51', 'unique:user'],
-            'password'  => ['varchar:50'],
+            'password'  => ['varchar:255'],
             'email'     => ['varchar:50', 'unique:user'],
             'api_token' => ['varchar:60', 'required'],
 
@@ -33,7 +33,7 @@ class Users
     {
         (new User($db))->insert([
             'username'  => 'admin',
-            'password'  => Crypter::encode('admin'),
+            'password'  => Auth::encodePassword('admin'),
             'email'     => 'admin@localhost.com',
             'api_token' => Str::rand(60)
         ]);

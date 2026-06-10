@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Requests\Auth\SigninRequest;
 use App\Requests\Auth\SignupRequest;
 use zFramework\Core\Abstracts\Controller;
-use zFramework\Core\Crypter;
 use zFramework\Core\Facades\Alerts;
 use zFramework\Core\Facades\Auth;
 use zFramework\Core\Facades\Response;
@@ -33,9 +32,8 @@ class AuthController extends Controller
         if (Auth::attempt(['email' => $validate['email'], 'password' => $validate['password']], (bool) $validate['keep-logged-in'])) {
             $response['status'] = 1;
             Alerts::success('Welcome again!');
-        } else {
-            Alerts::danger('E-mail or Password not match!');
-        }
+        } else Alerts::danger('E-mail or Password not match!');
+
 
         return Response::json($response);
     }
@@ -48,7 +46,7 @@ class AuthController extends Controller
         (new User)->insert([
             'username'  => $validate['username'],
             'email'     => $validate['email'],
-            'password'  => Crypter::encode($validate['password']),
+            'password'  => Auth::encodePassword($validate['password']),
             'api_token' => Str::rand(60)
         ]);
 

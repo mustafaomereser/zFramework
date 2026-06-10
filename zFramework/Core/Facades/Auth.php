@@ -97,6 +97,20 @@ class Auth
     }
 
     /**
+     * Hash a plain password using the configured encode method.
+     * @param string $plain
+     * @return string
+     */
+    public static function encodePassword(string $plain): string
+    {
+        return match (self::$columns['passwordencode']) {
+            'bcrypt' => password_hash($plain, PASSWORD_BCRYPT),
+            'md5'    => md5($plain),
+            default  => Crypter::encode($plain),
+        };
+    }
+
+    /**
      * Attempt for login.
      * @param array $fields
      * @param bool $staymein
@@ -106,10 +120,15 @@ class Auth
     {
         if (self::check()) return false;
 
-        $user = (new User)->select('id, api_token, ' . self::$columns['password']);
-        if (isset($fields[self::$columns['password']])) $fields[self::$columns['password']] = ['crypter' => fn() => Crypter::encode($fields[self::$columns['password']]), 'md5' => fn() => md5($fields[self::$columns['password']])][self::$columns['passwordencode']]();
+        $user  = (new User)->select('id, api_token, ' . self::$columns['password']);
+        $plain = $fields[self::$columns['password']] ?? null;
+        unset($fields[self::$columns['password']]);
         foreach ($fields as $key => $value) $user->where($key, $value);
         $user = $user->first();
+
+        $hash  = $user[self::$columns['password']] ?? '';
+        $valid = self::$columns['passwordencode'] === 'bcrypt' ? password_verify($plain, $hash) : self::encodePassword($plain) === $hash;
+        if (!@$user['id'] || ($plain !== null && !$valid)) return false;
 
         if (@$user['id']) {
             self::login($user);

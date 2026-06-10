@@ -19,7 +19,7 @@ class User extends Model
     public $special_columns = [
         'email'          => 'email',
         'password'       => 'password',
-        'passwordencode' => 'crypter' # crypter | md5
+        'passwordencode' => 'bcrypt' # crypter | md5 | bcrypt
     ];
 
     /**
