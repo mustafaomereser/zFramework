@@ -10,7 +10,7 @@ cmd> composer install
 
 PHP VERSION
 ```php
-PHP>=7.0.23 (suggestion: >=8.0)
+PHP>=8.1
 ```
 
 ### 0.1. zFramework (V2.9.0)
