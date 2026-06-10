@@ -110,7 +110,7 @@ trait RelationShips
         $relatedLocalKey = $relatedLocalKey ?? $instance->getPrimary();
 
         return $instance
-            ->join(null, $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$relatedLocalKey}")
+            ->join('INNER', $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$relatedLocalKey}")
             ->whereRaw("{$pivotTable}.{$foreignKey} = :value", compact('value'))
             ->get();
     }
@@ -155,7 +155,7 @@ trait RelationShips
 
         return $instance
             ->select("{$relatedTable}.*{$pivotSelect}")
-            ->join(null, $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$relatedLocalKey}")
+            ->join('INNER', $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$relatedLocalKey}")
             ->whereRaw("{$pivotTable}.{$foreignKey} = :value", compact('value'))
             ->get();
     }
@@ -201,7 +201,7 @@ trait RelationShips
         $secondLocalKey = $secondLocalKey ?? $through->getPrimary();
 
         return $instance
-            ->join(null, $model, "{$throughTable}.{$secondLocalKey} = {$finalTable}.{$secondKey}")
+            ->join('INNER', $model, "{$throughTable}.{$secondLocalKey} = {$finalTable}.{$secondKey}")
             ->whereRaw("{$throughTable}.{$firstKey} = :value", compact('value'))
             ->get();
     }
@@ -242,7 +242,7 @@ trait RelationShips
         $secondLocalKey = $secondLocalKey ?? $through->getPrimary();
 
         return $instance
-            ->join(null, $model, "{$throughTable}.{$secondLocalKey} = {$finalTable}.{$secondKey}")
+            ->join('INNER', $model, "{$throughTable}.{$secondLocalKey} = {$finalTable}.{$secondKey}")
             ->whereRaw("{$throughTable}.{$firstKey} = :value", compact('value'))
             ->first();
     }
@@ -349,10 +349,10 @@ trait RelationShips
         $relatedTable = $instance->table;
         $pivotTable   = $pivotTable ?? "{$morphName}s";
         $foreignKey   = $foreignKey ?? "{$morphName}_id";
-        $relatedKey   = $relatedKey ?? rtrim($relatedTable, 's') . '_id';
+        $relatedKey   = $relatedKey ?? substr($relatedTable, 0, -1) . '_id';
 
         return $instance
-            ->join(null, $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$instance->getPrimary()}")
+            ->join('INNER', $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$instance->getPrimary()}")
             ->whereRaw(
                 "{$pivotTable}.{$foreignKey} = :morph_id AND {$pivotTable}.{$morphName}_type = :morph_type",
                 ['morph_id' => $value, 'morph_type' => $type]
@@ -387,10 +387,10 @@ trait RelationShips
         $relatedTable = $instance->table;
         $pivotTable   = $pivotTable ?? "{$morphName}s";
         $relatedKey   = $relatedKey ?? "{$morphName}_id";
-        $foreignKey   = $foreignKey ?? rtrim($this->table, 's') . '_id';
+        $foreignKey   = $foreignKey ?? substr($this->table, 0, -1) . '_id';
 
         return $instance
-            ->join(null, $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$instance->getPrimary()}")
+            ->join('INNER', $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$instance->getPrimary()}")
             ->whereRaw(
                 "{$pivotTable}.{$foreignKey} = :fk_val AND {$pivotTable}.{$morphName}_type = :morph_type",
                 ['fk_val' => $value, 'morph_type' => $model]
@@ -408,7 +408,7 @@ trait RelationShips
     {
         if (empty($this->eagerLoad) || empty($results)) return;
 
-        foreach ($this->earLoad as $relation) {
+        foreach ($this->eagerLoad as $relation) {
             if (!method_exists($this, $relation)) continue;
             foreach ($results as &$row) $row[$relation] = $this->{$relation}($row);
         }
@@ -516,8 +516,16 @@ trait RelationShips
      */
     public function sync(string $pivotTable, string $foreignKey, string $foreignValue, string $relatedKey, array $relatedValues, array $extra = []): void
     {
-        $this->detach($pivotTable, $foreignKey, $foreignValue);
-        foreach ($relatedValues as $relatedValue) $this->attach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue, $extra);
+        $pivot = (new \zFramework\Core\Facades\DB)->table($pivotTable);
+        $pivot->beginTransaction();
+        try {
+            $this->detach($pivotTable, $foreignKey, $foreignValue);
+            foreach ($relatedValues as $relatedValue) $this->attach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue, $extra);
+            $pivot->commit();
+        } catch (\Throwable $e) {
+            $pivot->rollback();
+            throw $e;
+        }
     }
 
     /**

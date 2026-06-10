@@ -360,6 +360,42 @@ class DB
     }
 
     /**
+     * add a "AND NOT" where — negates the condition.
+     * whereNot('status', 'active')          → WHERE status != 'active'
+     * whereNot('name', 'LIKE', '%test%')    → WHERE name NOT LIKE '%test%'
+     * @return self
+     */
+    public function whereNot(): self
+    {
+        $this->wherePrev = 'AND';
+        return self::addWhereOrHaving(self::negateArgs(func_get_args()));
+    }
+
+    /**
+     * add a "OR NOT" where — negates the condition with OR connector.
+     * @return self
+     */
+    public function whereOrNot(): self
+    {
+        $this->wherePrev = 'OR';
+        return self::addWhereOrHaving(self::negateArgs(func_get_args()));
+    }
+
+    /**
+     * Negate where/having arguments.
+     * 2-arg: ['key', value]          → ['key', '!=', value]
+     * 3-arg: ['key', 'op', value]    → ['key', 'NOT op', value]
+     * @param array $args
+     * @return array
+     */
+    private static function negateArgs(array $args): array
+    {
+        if (count($args) === 2) return [$args[0], '!=', $args[1]];
+        if (count($args) >= 3) return [$args[0], 'NOT ' . $args[1], $args[2]];
+        return $args;
+    }
+
+    /**
      * Add where or having.
      * @param array $parameters
      * @return self
@@ -577,10 +613,46 @@ class DB
         return compact('key', 'operator', 'value', 'prev');
     }
 
-    public function having()
+    /**
+     * add a "AND" having
+     * @return self
+     */
+    public function having(): self
     {
         $this->wherePrev = 'AND';
         return self::addWhereOrHaving(func_get_args(), 'having');
+    }
+
+    /**
+     * add a "OR" having
+     * @return self
+     */
+    public function havingOr(): self
+    {
+        $this->wherePrev = 'OR';
+        return self::addWhereOrHaving(func_get_args(), 'having');
+    }
+
+    /**
+     * add a "AND NOT" having
+     * havingNot('count', 5)              → HAVING count != 5
+     * havingNot('name', 'LIKE', '%x%')   → HAVING name NOT LIKE '%x%'
+     * @return self
+     */
+    public function havingNot(): self
+    {
+        $this->wherePrev = 'AND';
+        return self::addWhereOrHaving(self::negateArgs(func_get_args()), 'having');
+    }
+
+    /**
+     * add a "OR NOT" having
+     * @return self
+     */
+    public function havingOrNot(): self
+    {
+        $this->wherePrev = 'OR';
+        return self::addWhereOrHaving(self::negateArgs(func_get_args()), 'having');
     }
 
     /**
