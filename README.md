@@ -1,1178 +1,1368 @@
-<a href="https://buymeacoffee.com/mustafaomereser" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+<a href="https://buymeacoffee.com/mustafaomereser" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;" ></a>
 
+# zFramework v2.9.0
 
-You can select version on branch list.
+**Easiest, fastest PHP framework. (Simple)**
 
-Install packages
-```php
-cmd> composer install
+![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-blue)
+![Version](https://img.shields.io/badge/version-2.9.0-green)
+![License](https://img.shields.io/badge/license-MIT-orange)
+
+---
+
+### Features
+
+| | |
+|---|---|
+| ⚡ Route — GET/POST/PUT/PATCH/DELETE, groups, named routes, resource | 🛡️ CSRF protection built-in |
+| 🗄️ DB / ORM — fluent query builder, full relation system, pivot ops | 🔐 Auth — session, api token, bcrypt / md5 / crypter |
+| 📦 Module system | 📧 Mail — SMTP via PHPMailer |
+| 🌍 Multi-language | 🔄 AutoSSL — Let's Encrypt http-01 & dns-01 |
+| ✅ Validator | 🖥️ cPanel API — Domain, DNS, DB, Email, SSL |
+| 🗃️ Cache — Session-based & APCu (global) | 🔍 Query Analyzer — EXPLAIN + EXPLAIN ANALYZE |
+| 🎨 View / template engine (Blade-like directives) | 🔧 Terminal — Artisan-like CLI tool |
+
+---
+
+### Quick Start
+
+```bash
+composer install
+php terminal run           # starts dev server on local IP:80
+php terminal help          # list all available commands
 ```
 
-PHP VERSION
 ```php
-PHP>=8.1
+// route/web.php
+Route::get('/', fn() => view('home.index'));
+Route::post('/posts', [PostController::class, 'store']);
+Route::pre('/admin')->middleware([Auth::class])->group(function () {
+    Route::resource('/posts', PostController::class);
+});
 ```
 
-### 0.1. zFramework (V2.9.0)
-### 0.2. Easiest, fastest PHP framework. (Simple)
-### 0.3. Document
+---
+
+## Table of Contents
+
 - [1. Route](#1-route)
-  - [1.1. Form examples](#11-form-examples)
-  - [1.2. Route Options](#12-route-options)
-  - [1.3. Find Route's Url](#13-find-routes-url)
-- [2. Model](#2-model)
-  - [2.1. User](#21-user)
-  - [2.2. Observers](#22-observers)
-  - [2.3. Database Migrate](#23-database-migrate)
-  - [2.4. Database Seeders](#24-database-seeders)
-  - [2.5. Transaction](#25-transaction)
-- [3. Date](#3-date)
-- [4. Mail](#4-mail)
-- [5. Controller](#5-controller)
-- [6. View](#6-view)
-  - [6.1. ViewProvider](#61-viewprovider)
-- [7. zhelper (deprecated)](#7-zhelper-deprecated)
-- [8. Terminal](#8-terminal)
-- [9. Csrf](#9-csrf)
-- [10. Language](#10-language)
-- [11. Crypter](#11-crypter)
-- [12. Config](#12-config)
-- [13. Alerts](#13-alerts)
-- [14. Validator](#14-validator)
-- [15. Middleware](#15-middleware)
-- [16. Cache](#16-cache)
-- [17. API](#17-api)
-- [18. Development](#18-development)
-- [19. Helper Methods](#19-helper-methods)
-- [20. Run Project](#20-run-project)
-- [21. AutoSSL (Lets Encrypt)](#21-autossl-lets-encrypt)
-- [22. cPanel](#22-cpanel)
+- [2. Model & DB](#2-model--db)
+  - [2.1. Auth](#21-auth)
+  - [2.2. Relations](#22-relations)
+  - [2.3. Pivot Operations](#23-pivot-operations)
+  - [2.4. Observers](#24-observers)
+  - [2.5. Migrations](#25-migrations)
+  - [2.6. Seeders](#26-seeders)
+  - [2.7. Transactions](#27-transactions)
+- [3. View](#3-view)
+- [4. Controller](#4-controller)
+- [5. Validator](#5-validator)
+- [6. Middleware](#6-middleware)
+- [7. Mail](#7-mail)
+- [8. Cache](#8-cache)
+- [9. Alerts](#9-alerts)
+- [10. Csrf](#10-csrf)
+- [11. Language](#11-language)
+- [12. Crypter](#12-crypter)
+- [13. Config](#13-config)
+- [14. Terminal](#14-terminal)
+- [15. API](#15-api)
+- [16. Helper Methods](#16-helper-methods)
+- [17. AutoSSL](#17-autossl)
+- [18. cPanel](#18-cpanel)
+
+---
 
 ## 1. Route
+
+### HTTP Methods
+
 ```php
-    // Any METHOD Route
-    Route::any('/', function() {
-         return 'Method: ' . method();
-    });
-     
-    // Get METHOD Route
-    Route::get('/', function() {
-         return 'Hi 👋';
-    });
-    
-    // POST METHOD Route
-    Route::post('/', function() {
-         return 'You verified CSRF Token.';
-    });
-    
-    // PATCH METHOD Route
-    Route::patch('/', function() {
-         return 'patch.';
-    });
-    
-    // PUT METHOD Route
-    Route::put('/', function() {
-         return 'put.';
-    });
-    
-    // DELETE METHOD Route
-    Route::delete('/', function() {
-         return 'delete.';
-    });
-    
-    // Also you can use like that: (2. Parameter: 'Controller@method')
-    Route::get('/', 'HomeController@index');
+Route::get('/posts', fn() => view('posts.index'));
+Route::post('/posts', [PostController::class, 'store']);
+Route::put('/posts/{id}', [PostController::class, 'update']);
+Route::patch('/posts/{id}', [PostController::class, 'update']);
+Route::delete('/posts/{id}', [PostController::class, 'delete']);
+Route::any('/ping', fn() => 'pong');   // matches any HTTP method
+```
 
+### Controller Syntax
 
-    // you can use parameters in uri.
-    Route::get('/test/{name}/{?surname}', function($name, $surname = null) {
-        echo "Hey $name $surname";
-    });
+Both forms are equivalent:
 
-    // if you create resource controller it's like that simple
-    Route::resource('/', TestController::class, ['name' => 'home']);
-   
-   
-    Resource Route list:
-   
-    |--------------|-------------|---------------------|---------------|
-    | URL          | METHOD      | Callback Function   | Route Name    |
-    | ------------ | ----------- | ------------------- | ------------- |
-    | /            | GET         | index()             | home.index    |
-    | /            | POST        | store()             | home.store    |
-    | /{id}        | GET         | show($id)           | home.show     |
-    | /{id}/edit   | GET         | edit($id)           | home.edit     |
-    | /create      | GET         | create()            | home.create   |
-    | /{id}        | PUT/PATCH   | update($id)         | home.update   |
-    | /{id}        | DELETE      | delete($id)         | home.delete   |
-    | ------------ | ----------- | ------------------- | ------------- |
+```php
+Route::get('/', [HomeController::class, 'index']);
+Route::get('/', 'HomeController@index');
+```
 
+The controller is resolved by `findFile()` — it searches recursively in `App/Controllers/`.
 
-    # if you wanna simple use route names for resource
-    Route::resource('/test', ResourceController::class);
-    # result:
-    test.index
-    test.store
-    test.show
-    test.edit
-    test.create
-    test.update
-    test.delete
+### URL Parameters
 
-    // two example for select name.
-    Route::find('test.index'); // output: www.host.com/test
-    Route::find('test.edit', ['id' => 1]); // output: www.host.com/test/1/edit
+```php
+Route::get('/user/{id}', fn($id) => ...);                         // required
+Route::get('/user/{id}/{?name}', fn($id, $name = null) => ...);   // optional
+```
 
-    // for Group usage:
-    
-    // prefix_URL
-    Route::pre('/admin')->group(function() {
-        Route::resource('/', ResourceController::class);
-    });
-    Route::find('admin.index'); // output www.host.com/admin
+### Dependency Injection
 
-    // url: /admin/user/...
-    Route::pre('/admin')->group(function() {
-        Route::pre('/user')->group(function() {
-            Route::post(..., ...);
+Class-typed parameters in route callbacks are automatically resolved via Reflection:
+
+```php
+Route::get('/posts', function (PostRepository $repo) {
+    return $repo->all();
+});
+```
+
+### Redirect
+
+```php
+Route::redirect('/old-url', '/new-url');   // issues a 302
+```
+
+### Resource
+
+```php
+Route::resource('/posts', PostController::class);
+```
+
+Registers 7 routes automatically:
+
+| URL | HTTP Method | Controller Method | Route Name |
+|---|---|---|---|
+| /posts | GET | index() | posts.index |
+| /posts | POST | store() | posts.store |
+| /posts/create | GET | create() | posts.create |
+| /posts/{id} | GET | show($id) | posts.show |
+| /posts/{id}/edit | GET | edit($id) | posts.edit |
+| /posts/{id} | PUT / PATCH | update($id) | posts.update |
+| /posts/{id} | DELETE | delete($id) | posts.delete |
+
+### Named Routes
+
+```php
+Route::get('/posts/{id}/edit', [PostController::class, 'edit'])->name('posts.edit');
+
+route('posts.edit', ['id' => 5]);        // returns full URL: https://example.com/posts/5/edit
+Route::find('posts.edit', ['id' => 5]);  // same
+Route::find('posts.edit', [], true);     // returns bool — does this route exist?
+```
+
+### Groups
+
+`pre()` sets a URL prefix **and** a route name prefix. Both accumulate when nested.
+
+```php
+Route::pre('/admin')
+    ->middleware([Auth::class, IsAdmin::class], fn($declines) => abort(403))
+    ->noCSRF()
+    ->group(function () {
+
+        // URL: /admin/dashboard  — name: admin.dashboard
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        // URLs: /admin/posts, /admin/posts/{id}, ...
+        // Names: admin.posts.index, admin.posts.store, admin.posts.show, ...
+        Route::resource('/posts', PostController::class);
+
+        // Nested pre — prefix keeps accumulating
+        Route::pre('/settings')->group(function () {
+            // URL: /admin/settings/general  — name: admin.settings.general
+            Route::get('/general', [SettingsController::class, 'general'])->name('general');
         });
     });
-
-    Route::noCSRF()->group(function() {
-        Route::post(..., ...); // that not need a csrf token allow all request like GET method.
-    });
-
-    // merge using
-    Route::pre('/admin')->noCSRF()->group(function() {
-        Route::post(..., ...); // that not need a csrf token allow all request like GET method. and have /admin prefix.
-    });
-    
-    Route::pre('/admin')->noCSRF()->middleware([App\Middlewares\IsAdmin::class])->group(function() {
-        Route::post(..., ...); // that not need a csrf token allow all request like GET method. and have /admin prefix.
-    });
-
-    // And you can use for Route::find
-    route('admin.index') // output www.host.com/admin
-
-
-    // current uri has a spesific keyword?
-
-    if(Route::has('/admin')) echo "You are now in admin pages.";
-
 ```
-### 1.1. Form examples
+
+`route()` always expects the full name:
+
+```php
+route('admin.posts.show', ['id' => 5]);   // https://example.com/admin/posts/5
+route('admin.settings.general');
+```
+
+```php
+Route::has('/admin');   // true if the current URI contains '/admin'
+```
+
+### Forms
 
 ```html
-    You must use csrf token for POST methods. (if you not add "no-csrf" option.)
+<!-- POST -->
+<form method="POST">
+    {{ csrf() }}
+    ...
+</form>
 
-
-    <!-- for store() method -->
-    <form method="POST">
-        {{ Csrf::csrf() }}
-        <input type="submit">
-    </form>
-
-    <!-- for update() method -->
-    <form action="/1" method="POST">
-        {{ Csrf::csrf() }}
-        {{ inputMethod('PATCH') }}
-        <input type="submit">
-    </form>
-
-    <!-- for delete() method -->
-    <form action="/1" method="POST">
-        {{ Csrf::csrf() }}
-        {{ inputMethod('DELETE') }}
-        <input type="submit">
-    </form>
-
-    Also you can use `csrf()` method
-    <form method="POST">
-        {{ csrf() }}
-        ...
-    </form>
+<!-- PUT / PATCH / DELETE via hidden field -->
+<form action="/posts/1" method="POST">
+    {{ csrf() }}
+    {{ inputMethod('PATCH') }}
+    ...
+</form>
 ```
 
+`inputMethod()` renders `<input type="hidden" name="_method" value="PATCH" />`.
 
-Callback function can be a Controller class example:
+---
+
+## 2. Model & DB
+
+### Model Definition
+
 ```php
-    // App\Controllers\TestController.php
-    class ...{
-        public function index() {
-            return 'Hi 👋';
-        }
-    }
-    // Route/web.php
-    Route::get('/', [TestController::class, 'index']);
+class Post extends Model
+{
+    use softDelete;
+
+    public $table      = 'posts';
+    public $db         = 'local';        // connection name from database/connections.php; defaults to first
+    public $guard      = ['secret'];     // columns excluded from get() / first() results
+    public $primary    = 'id';           // auto-detected from schema if omitted
+    public $created_at = 'created_at';   // set to null to disable auto-timestamping
+    public $updated_at = 'updated_at';
+    public $deleted_at = 'deleted_at';   // used by softDelete trait
+}
 ```
-How i use parameters? (it's same for Controller's functions)
+
+### CRUD
+
 ```php
-    Route::get('/{id}', function($id) {
-        return "ID: $id";
-    })
+$p = new Post;
+
+$p->get();                              // all rows as array of ModelResult
+$p->first();                            // first row or empty array
+$p->firstOrFail();                      // first row or abort(404)
+$p->firstOrFail('Custom message');      // first row or abort(404) with message
+$p->find(1);                            // find by primary key
+$p->findOrFail(1);                      // find or abort(404)
+$p->count();                            // row count (int)
+$p->updateOrInsert(['title' => 'Hi']);  // update if row found, otherwise insert
+
+// insert() returns the full inserted row (ModelResult) or affected row count
+$row = $p->insert(['title' => 'Hello', 'user_id' => 1]);
+$p->insert(['title' => 'Hello'], just_insert: true);   // skip re-fetch, returns int
+
+$p->where('id', 1)->update(['title' => 'Hi']);   // returns affected rows (int)
+$p->where('id', 1)->delete();                    // returns affected rows (int)
 ```
-ALSO you can normal query like /1?test=true
 
-### 1.2. Route Options
-```php                                                  
-    Route::post('/store', [TestController::class, 'store']);
+### WHERE
 
-    // Other way for middleware (if you use that way you can not find route name.)
-    Middleware::middleware([Auth::class, Guest::class], function ($declined) {
-        if (count($declined)) return;
-        
-        Route::get('/test', function () {
-            return "Hey 👋";
-        })->name('test'); // if middleware not verify you can not find that name.
-    });
-
-    // if you want use route with middleware and name still findable.
-    Route::pre('/admin')->middleware([Auth::class, Admin::class], function($declines) { # Optional callback method.
-        abort(403, 'Access Forbidden');
-    })->group(function() {
-        Route::get('/dashboard')->name('dashboard');
-    });
-
-    echo route('admin.dashboard'); # i can still find route but i cant access with out middlewares verify.
-
-    Route::pre('/admin')->group(function() {
-        Route::get('/any-page', AnyController::class)->name('any-page');
-        Route::resource('/', DashboardController::class);
-    });
-```
-### 1.3. Find Route's Url
 ```php
-    // Route/web.php
-    Route::get('/test/{id}/{username}', function ($id, $username) {
-        echo "$id - $username";
-    })->name('test');
+// Equality
+$p->where('status', 'published')->get();
+$p->where('views', '>', 100)->get();           // any comparison operator
 
-    // Usage:
-    echo Route::find('test', ['id' => 1, 'username' => 'Admin']); // output: www.host.com/test/1/Admin
-    # or
-    echo route('test', ['id' => 1, 'username' => 'Admin']) // same output.
+// OR connector
+$p->where('status', 'published')->whereOr('status', 'featured')->get();
+
+// Negation
+$p->whereNot('status', 'deleted')->get();       // status != 'deleted'
+$p->whereNot('name', 'LIKE', '%test%')->get();  // name NOT LIKE '%test%'
+$p->whereOrNot('status', 'hidden')->get();      // OR status != 'hidden'
+
+// IN / NOT IN
+$p->whereIn('id', [1, 2, 3])->get();
+$p->whereNotIn('id', [1, 2, 3])->get();
+$p->whereIn('id', [1, 2, 3], 'OR')->get();   // OR id IN (...)
+
+// BETWEEN / NOT BETWEEN
+$p->whereBetween('views', 10, 100)->get();
+$p->whereNotBetween('created_at', '2024-01-01', '2024-12-31')->get();
+
+// Raw SQL — use named bindings
+$p->whereRaw('(id = :a OR id = :b)', ['a' => 1, 'b' => 2])->get();
+$p->whereRaw('YEAR(created_at) = :y', ['y' => 2024])->get();
+
+// Grouped WHERE — array of conditions wrapped in parentheses
+$p->where([
+    ['status', 'published'],
+    ['views',  '>',  50, 'OR'],   // 4th element sets the connector inside the group
+])->get();
+// generates: WHERE (status = 'published' OR views > 50)
 ```
 
-## 2. Model
+### Query Building
+
 ```php
-    class User extends Model {
-        use softDelete; // (optional) if you are need soft delete a table's row use this. that mean delete you can not seen but not delete in db.
+// SELECT specific columns
+$p->select('id, title, created_at')->get();
+$p->select(['id', 'title'])->get();
 
-        public $table = "users";
-        public $db    = "local"; // (optional) if you do not write that it's connect your first connection.
+// ORDER BY — pass an associative array
+$p->orderBy(['created_at' => 'DESC'])->get();
+$p->orderBy(['views' => 'DESC', 'id' => 'ASC'])->get();
 
-        // do not show that columns but if you use ->select('guarded_column_name') you can see it
-        public $guard = ['password', 'api_token'];
+// GROUP BY — pass an array
+$p->groupBy(['user_id'])->get();
 
+// HAVING — same syntax as where
+$p->groupBy(['user_id'])->having('total', '>', 5)->get();
+$p->groupBy(['user_id'])->havingOr('total', '<', 2)->get();
+$p->groupBy(['user_id'])->havingNot('total', 0)->get();   // total != 0
+$p->groupBy(['user_id'])->havingOrNot('total', 0)->get();
 
-        public $primary    = "column_name" // (optional) select table primary key it's default is null and select automatic primary key
-        public $updated_at = "custom_updated_at_name" // (optional) if you use updated_at attribute it's default = updated_at
-        public $created_at = "custom_created_at_name" // (optional) if you use created_at attribute it's default = created_at
-        public $deleted_at = "custom_deleted_at_name" // (optional) if you use deleted_at attribute it's default = deleted_at
-    }
-    
-    // if you wanna see your deleted_at items
-    $users = (new DB)->table('users')->get(); // return with deleted_at items.
+// LIMIT — limit(offset, count) or limit(count)
+$p->limit(10)->get();               // take 10
+$p->limit(20, 10)->get();           // skip 20, take 10
 
-    // Usage:
-    
-    use App\Models\User;
-    $user = new User;
-    echo "<pre>";
-    print_r([
-        "get"         => $user->get(),
-        "count"       => $user->count(),
-        "first"       => $user->where('id', 1)->first(),
-        "firstOrFail" => $user->where('id', '=', 1)->firstOrFail(), // If can not find a row abort 404
-        "paginate"    => $user->paginate(20, 'page_request_name', 'cache_id'), // cache_id for get row count for once.
-        "insert"      => $user->insert(['username' => 'username', 'password' => 'password','email' => 'email@mail.com']),
-        "update"      => $user->where('id', 1)->update(['email' => 'test@mail.com']),
-        "delete"      => $user->where('id', '>', 2)->delete()
-    ]);
+// JOIN — type: INNER / LEFT / RIGHT / FULL OUTER
+$p->join('LEFT', Comment::class, 'comments.post_id = posts.id')->get();
+$p->join('INNER', User::class, 'users.id = posts.user_id')->select('posts.*, users.name as author')->get();
 
-    // if you wanna get type class = ->get(true) | ->first(true);
+// Fetch type
+$p->fetchType('unique')->get();     // keyed by primary key (PDO::FETCH_UNIQUE)
+$p->fetchType('keypair')->get();    // PDO::FETCH_KEY_PAIR (first col => second col)
 
-    // Where example
-    $user->where('id', 1)->where('email', '=', 'test@mail.com', 'OR')->get();
-    $user->whereOr('email', 'test@mail.com')->get();
-    $user->whereIn('id', [1, 2])->get();
-    $user->whereNotIn('id', [1, 2])->get();
-    $user->whereBetween('id', 1, 10)->get();
-    $user->whereNotBetween('id', 1, 10)->get();
-    $user->whereRaw('(id = :id1 OR id = :id2)', ['id1' => 1, 'id2' => 2])->get();
+// Disable relation closures on result rows (performance)
+$p->closureMode(false)->get();
 
-    // Where group
-    $user->where([['id', 1], ['email', '=', 'test@mail.com', 'OR']]);
-
-
-    // Find example that is for primary key.
-    $user->find(1);
-
-    // Select example
-    $user->select('id, username')->get();
-
-    // OrderBy example
-    $user->orderBy(['id' => 'ASC', 'username' => 'DESC'])->get();
-
-    // GroupBy example
-    $user->groupBy('username');
-    
-    // Limit example args: 10(startCount), 10(rowCount)
-    $user->limit(5, 10)->get();
-
-    // Limit example args: 10(rowCount)
-    $user->limit(10)->get();
-
-    // paginate example
-    if($page == 1 || @!$_SESSION[$table . "_paginate_cache_id"]) $_SESSION[$table . "_paginate_cache_id"] = uniqid();
-    $user->paginate(20, 'request_id', $_SESSION[$table . "_paginate_cache_id"]);
-
-    // Joins examples
-    $user->join('LEFT|RIGHT|OUTER|FULL|NULL', App\Models\User::class, 'table_name.id = this_table.id')->get();
-    $user->join('LEFT|RIGHT|OUTER|FULL|NULL', 'users', 'table_name.id = this_table.id')->get();
-
-    // Debug Example
-    $user->sqlDebug(true)->select('id, username')->where('id', 1)->update([
-        'username' => 'John Doe'
-    ]);
-
-    #output
-    UPDATE users SET username = 'John Doe' WHERE id = '1' AND deleted_at IS NULL
-
-
-    # Note
-    If row has a model and has a primary key, row automaticly have delete and update closures.
-
-    #example
-    $user->where('id', 1)->first()['update']([
-        'username' => 'test'
-    ]);
-
-    $user->where('id', 1)->first()['delete']();
-
-    #raw SQL usage with soft delete.
-    (new DB)->prepare('SELECT * FROM users WHERE id = 1 AND deleted_at IS NULL')->fetch(\PDO::FETCH_ASSOC);
+// Debug — dumps executed SQL + EXPLAIN ANALYZE to /db-debug/ and stdout
+$p->sqlDebug(true)->where('id', 1)->first();
 ```
 
-### 2.1. User
+### Pagination
+
 ```php
-    Auth::login($user) // login with $user->first()
+$result = (new Post)
+    ->where('status', 'published')
+    ->orderBy(['created_at' => 'DESC'])
+    ->paginate(
+        per_page: 20,
+        page_id:  'page',      // query string param name (?page=2)
+        cache_id: 'pub_posts'  // cache the total count in session (optional)
+    );
 
-    Auth::api_login($token) // login with api_token
-
-    Auth::logout() // logout user
-    
-    Auth::check() // check is logged in?
-    
-    Auth::user() // (if logged in) get user
-
-    Auth::attempt(array, true|false) // example ['username' => 'test', 'password' => 'test'], true (for stay in)
- 
-    Auth::id() // get user id
-    
+// $result keys:
+// 'items'        → array of ModelResult for the current page
+// 'item_count'   → total row count
+// 'shown'        → e.g. "21 / 40" (range shown on this page)
+// 'start'        → start index of current page
+// 'per_page'     → rows per page
+// 'page_count'   → total number of pages
+// 'current_page' → current page number
+// 'links'        → Closure — call $result['links']() to render pagination view
 ```
 
-### 2.2. Observers
 ```php
-    // An example model
-    class User extends Model
+// In the view:
+echo $result['links']();                            // uses config('app.pagination.default-view')
+echo $result['links']('partials.my-pagination');    // custom view
+```
+
+### ModelResult — Row Access
+
+Every row returned by `get()`, `first()`, `find()`, and `insert()` is a `ModelResult` instance. It implements `ArrayAccess` and `JsonSerializable`.
+
+```php
+$post = (new Post)->find(1);
+
+// Array access
+$post['title'];
+$post['user_id'];
+
+// Object property access
+$post->title;
+$post->user_id;
+
+// Call relation closures defined on the model
+$post->comments();       // invokes Post::comments(array $row)
+$post->author();         // invokes Post::author(array $row)
+
+// Row-level update / delete (scoped to the primary key of this row)
+$post->update(['title' => 'Updated']);
+$post->delete();
+
+// Serialization — closures are automatically excluded
+json_encode($post);
+$post->toArray();
+```
+
+### Column Introspection
+
+```php
+$p = new Post;
+$p->columns();              // ['id', 'title', 'body', ...] — respects $guard
+$p->columnsLength();        // ['title' => 200, 'body' => 65535, ...]
+$p->compareColumnsLength(['title' => str_repeat('x', 300)]);
+// returns ['title' => ['length' => 300, 'excess' => 100, 'max' => 200]]
+```
+
+---
+
+### 2.1. Auth
+
+```php
+// Attempt login — checks credentials against the users table
+Auth::attempt(['email' => 'user@example.com', 'password' => 'secret']);
+Auth::attempt(['email' => 'user@example.com', 'password' => 'secret'], staymein: true);
+// staymein: true sets a persistent cookie (auth-stay-in) using the user's api_token
+
+// Login directly from a user row (e.g. after OAuth)
+Auth::login($userRow);
+
+// Login via api_token value
+Auth::token_login('api_token_string');
+
+// Logout — clears session/cookie tokens
+Auth::logout();
+
+Auth::check();   // bool — is a user currently authenticated?
+Auth::user();    // ModelResult of the authenticated user, or false
+Auth::id();      // int|null — authenticated user's id
+
+// Hash a password using the configured method (bcrypt / md5 / crypter)
+Auth::encodePassword('plain-password');
+```
+
+**Password encode method** is configured via `App\Models\User::$special_columns['passwordencode']`:
+
+```php
+// bcrypt (recommended)
+public $special_columns = ['email' => 'email', 'password' => 'password', 'passwordencode' => 'bcrypt'];
+
+// md5
+public $special_columns = [..., 'passwordencode' => 'md5'];
+
+// Crypter (default)
+public $special_columns = [..., 'passwordencode' => 'crypter'];
+```
+
+---
+
+### 2.2. Relations
+
+Relation methods are defined on the model and accept `array $row` (the current row). They are automatically bound as closures on each `ModelResult`, callable as `$row->posts()`.
+
+```php
+class User extends Model
+{
+    // One-to-many: user has many posts
+    public function posts(array $row): array
     {
-        use softDelete;
-
-        public $observe = UserObserver::class; // Put here that because we must do select observer.
-        
-        public $table = "users";
-
-        // reletable closures callbacks
-        public function posts(array $values)
-        {
-            return $this->hasMany(Posts::class, $values['id'], 'user_id');
-        }
-        
-        public function user_email(array $values)
-        {
-            return $this->hasOne(UserEmails::class, $values['id'], 'user_id');
-        }
+        return $this->hasMany(Post::class, $row['id'], 'user_id');
     }
 
-    // create observer
-    > php terminal make observer UserObserver
-
-    // created a observer like that
-    class UserObserver extends Observer
+    // One-to-one: user has one profile
+    public function profile(array $row): ?array
     {
-        /**
-         * Insert before run that
-         */
-        public function oninsert(array $args)
-        {
-            echo "inserting";
-            print_r($args);
-            return $args;
-        }
-
-        /**
-         * Insert after run that
-         */
-        public function oninserted(array $args)
-        {
-            echo "inserted: ";
-            print_r($args);
-        }
-
-        /**
-         * Update before run that
-         */
-        public function onupdate(array $args)
-        {
-            echo "updating:";
-            var_dump($args);
-        }
-
-        /**
-         * Update after run that
-         */
-        public function onupdated(array $args)
-        {
-            echo "updated:";
-            var_dump($args);
-        }
-
-        /**
-         * Delete before run that
-         */
-        public function ondelete(array $args)
-        {
-            echo "deleting:";
-            var_dump($args);
-        }
-
-        /**
-         * Delete after run that
-         */
-        public function ondeleted(array $args)
-        {
-            echo "deleted:";
-            var_dump($args);
-        }
+        return $this->hasOne(Profile::class, $row['id'], 'user_id');
     }
+
+    // Count without loading
+    public function postsCount(array $row): int
+    {
+        return $this->hasManyCount(Post::class, $row['id'], 'user_id');
+    }
+
+    // Check existence without loading
+    public function hasPosts(array $row): bool
+    {
+        return $this->hasRelation(Post::class, $row['id'], 'user_id');
+    }
+
+    // Has-many through: Country -> User -> Post
+    public function posts(array $row): array
+    {
+        return $this->hasManyThrough(Post::class, User::class, $row['id'], 'country_id', 'user_id');
+    }
+}
+
+class Post extends Model
+{
+    // belongsTo: post belongs to a user
+    public function author(array $row): ?array
+    {
+        return $this->belongsTo(User::class, $row['user_id']);
+    }
+
+    // Many-to-many through pivot table
+    public function tags(array $row): array
+    {
+        return $this->belongsToMany(Tag::class, 'post_tag', $row['id'], 'post_id', 'tag_id');
+    }
+
+    // Many-to-many with pivot columns included in result
+    public function tagsWithMeta(array $row): array
+    {
+        return $this->belongsToManyWithPivot(
+            Tag::class, 'post_tag', $row['id'],
+            'post_id', 'tag_id',
+            ['assigned_at', 'weight']   // pivot columns returned as pivot_assigned_at, pivot_weight
+        );
+    }
+
+    // Polymorphic: post has many comments (via commentable)
+    public function comments(array $row): array
+    {
+        return $this->morphMany(Comment::class, 'commentable', $row['id']);
+    }
+
+    // Polymorphic many-to-many: post has many tags via taggables pivot
+    public function polyTags(array $row): array
+    {
+        return $this->morphToMany(Tag::class, 'taggable', $row['id']);
+    }
+}
+
+class Comment extends Model
+{
+    // Inverse of morphMany — resolves the parent model dynamically from _type / _id columns
+    public function commentable(array $row): ?array
+    {
+        return $this->morphTo($row, 'commentable');
+        // reads $row['commentable_type'] and $row['commentable_id']
+    }
+}
 ```
 
-### 2.3. Database Migrate
+**Calling relations on rows:**
+
 ```php
-    // You can find how create a migration in zhelper section
+$user = (new User)->find(1);
+$posts   = $user->posts();       // calls User::posts(['id' => 1, ...])
+$profile = $user->profile();
 
-    // Folder path: database/migrations
+$post = (new Post)->find(1);
+$tags = $post->tags();
+$author = $post->author();
+```
 
-    // Example: (that file is real)
-    // (Folder path)/Users.php
-    class Users
+---
+
+### 2.3. Pivot Operations
+
+```php
+// attach — insert a pivot record
+$user->attach('user_roles', 'user_id', $userId, 'role_id', $roleId);
+$user->attach('user_roles', 'user_id', $userId, 'role_id', $roleId, ['assigned_at' => date('Y-m-d')]);
+
+// detach — remove a specific pivot record
+$user->detach('user_roles', 'user_id', $userId, 'role_id', $roleId);
+
+// detach all — remove all pivot records for this model
+$user->detach('user_roles', 'user_id', $userId);
+
+// sync — replace all existing pivot records with the given IDs (runs in a transaction)
+$user->sync('user_roles', 'user_id', $userId, 'role_id', [1, 2, 3]);
+$user->sync('user_roles', 'user_id', $userId, 'role_id', [1, 2, 3], ['assigned_at' => date('Y-m-d')]);
+
+// toggleAttach — attach if missing, detach if present
+$user->toggleAttach('user_roles', 'user_id', $userId, 'role_id', $roleId);
+```
+
+---
+
+### 2.4. Observers
+
+```php
+// App/Models/Post.php
+class Post extends Model
+{
+    public $observe = PostObserver::class;
+}
+
+// App/Observers/PostObserver.php
+class PostObserver extends Observer
+{
+    // called before insert — return modified $args to change what gets inserted
+    public function oninsert(array $args): array  { return $args; }
+
+    // called after successful insert — $args is the inserted row
+    public function oninserted(array $args): void { }
+
+    // called before update — return modified $args to change what gets updated
+    public function onupdate(array $args): array  { return $args; }
+
+    // called after successful update
+    public function onupdated(array $args): void  { }
+
+    // called before delete
+    public function ondelete(array $args): void   { }
+
+    // called after successful delete
+    public function ondeleted(array $args): void  { }
+}
+```
+
+```bash
+php terminal make observer PostObserver
+```
+
+---
+
+### 2.5. Migrations
+
+```php
+// database/migrations/Posts.php
+class Posts
+{
+    static $storageEngine = 'InnoDB';
+    static $charset       = 'utf8_general_ci';
+    static $table         = 'posts';
+    static $db            = 'local';
+
+    public static function columns(): array
     {
-        static $storageEngine = "InnoDB"; // you can change that what are you want to store your sql engine.
-        static $charset       = "utf8_general_ci"; // set default charset for table (so that effect all columns)
-        static $table         = "users"; // create table name
-        static $db            = "local"; // db key from database/connections.php
+        return [
+            'id'         => ['primary'],
+            'user_id'    => ['bigint', 'required'],
+            'title'      => ['varchar:200', 'charset:utf8mb4_general_ci'],
+            'body'       => ['text', 'nullable'],
+            'status'     => ['varchar:20', 'default:draft'],
+            'views'      => ['int', 'default:0'],
+            'score'      => ['decimal', 'nullable'],
+            'published_at' => ['datetime', 'nullable'],
+            'timestamps',     // shorthand: adds created_at + updated_at
+            'softDelete',     // shorthand: adds deleted_at
+        ];
+    }
+}
+```
 
-        public static function columns() // Insert columns
-        {
-            return [
-                'id'         => ['primary'],
-                'username'   => ['varchar:50', 'charset:utf8mb4_general_ci'],
-                'password'   => ['varchar:50', 'charset:utf8mb4_general_ci'],
-                'email'      => ['varchar:50', 'charset:utf8mb4_general_ci', 'unique'],
-                'api_token'  => ['varchar:60', 'required', 'charset:utf8mb4_general_ci'],
-                'timestamps', // create updated_at, created_at columns
-                'softDelete' // Use soft delete column
-            ];
-        }
+**Column options:**
+
+| Option | SQL equivalent |
+|---|---|
+| `primary` | INT AUTO_INCREMENT PRIMARY KEY |
+| `bigint` / `bigint:N` | BIGINT |
+| `int` / `int:N` | INT |
+| `smallint` | SMALLINT |
+| `tinyint` | TINYINT |
+| `varchar` / `varchar:N` | VARCHAR(255) / VARCHAR(N) |
+| `char` / `char:N` | CHAR(50) / CHAR(N) |
+| `text` | TEXT |
+| `longtext` | LONGTEXT |
+| `decimal` / `float` | DECIMAL / FLOAT |
+| `date` / `datetime` / `time` | DATE / DATETIME / TIME |
+| `required` | NOT NULL |
+| `nullable` | NULL |
+| `default:VALUE` | DEFAULT VALUE — use `default:NULL` for null default |
+| `unique` | UNIQUE KEY |
+| `unique:group_name` | composite UNIQUE (groups columns with the same name) |
+| `index` | INDEX |
+| `index:group_name` | composite INDEX |
+| `charset:utf8mb4_general_ci` | per-column CHARACTER SET + COLLATE |
+| `timestamps` | adds `created_at DATETIME` + `updated_at DATETIME` |
+| `softDelete` | adds `deleted_at DATETIME NULL` |
+
+```bash
+php terminal db migrate                   # apply pending migrations
+php terminal db migrate --fresh           # drop all tables and re-run
+php terminal db migrate --fresh --seed    # drop + migrate + seed
+php terminal db migrate --module=blog     # only migrate the 'blog' module
+php terminal db migrate --all             # include all modules
+```
+
+---
+
+### 2.6. Seeders
+
+```php
+// database/seeders/PostsSeeder.php
+class PostsSeeder
+{
+    public function destroy(): static
+    {
+        (new Post)->delete();
+        return $this;
     }
 
-    // can use parameters:
-    [
-        'primary',
-        'unique', 'unique:group_name' // you can unique for per column and you can against unique with group; its called competite.
-        'index', 'index:group_name', // you can index for per column and you can against index with group; its called competite.
-        'text',
-        'bigint', 
-        'int', 
-        'smallint', 
-        'tinyint', 
-        'decimal', 
-        'float', 
-        'varchar', // default 255
-        'char', // default 50
-        'char:numeric_length', 
-        'varchar:numeric_length', 
-        'date',
-        'datetime',
-        'time',
-        'required', 
-        'nullable', 
-        'default', // default NULL 
-        'default:{default value}', 
-        'charset:utf8mb4_general_ci',
-        'timestamps', // create updated_at, created_at columns
-        'softDelete' // Use soft delete column
-    ]
+    public function seed(): void
+    {
+        (new Post)->insert([
+            'title'   => 'Hello World',
+            'user_id' => 1,
+            'status'  => 'published',
+        ]);
+    }
+}
+```
+
+```bash
+php terminal db seed
+```
+
+---
+
+### 2.7. Transactions
+
+Requires InnoDB storage engine.
+
+```php
+$user = new User;
+$user->beginTransaction();
+try {
+    $user->insert(['name' => 'Alice', 'email' => 'alice@example.com']);
+    $user->where('id', 99)->update(['status' => 'inactive']);
+    $user->commit();
+} catch (\Throwable $e) {
+    $user->rollback();
+    throw $e;
+}
+```
+
+---
+
+## 3. View
+
+```php
+// From a controller:
+return view('posts.index', compact('posts'));        // resolves to App/Views/posts/index.php
+return View::view('posts.index', ['posts' => $posts]);
+```
+
+### Directives
 
 ```
-### 2.4. Database Seeders
+@if($condition)       @elseif($other)      @else      @endif
+@foreach($items as $item)                             @endforeach
+@forelse($items as $item)                  @empty     @endforelse
+@isset($var)                                          @endisset
+@empty($var)                                          @endempty
+@php                                                  @endphp
+@include('partials.nav')
+@extends('layouts.app')
+@section('content')                                   @endsection
+@yield('content')
+@json($var)              — outputs json_encode($var)
+@dump($var)              — visual dump (does not die)
+@dd($var)                — visual dump + die
+{{ $var }}               — escaped output (htmlspecialchars)
+{!! $var !!}             — raw unescaped output
+```
+
+### Custom Directives
+
 ```php
-    // You can find how create a seeder in zhelper section
-    // Folder path: database/seeders
+// App/Providers/ViewProvider.php
+View::directive('alert', fn($type, $msg) => "<div class='alert alert-{$type}'>{$msg}</div>");
 
-    // Example: (that file is real)
-    // (Folder path)/Seeder.php
-    class Seeder
+// Usage in .php view file:
+// @alert('success', 'Saved!')
+```
+
+### View::bind — ViewProvider
+
+Inject variables automatically into specific views without passing them from every controller:
+
+```php
+// App/Providers/ViewProvider.php
+View::bind('layouts.app', fn() => [
+    'user'   => Auth::user(),
+    'locale' => Lang::locale(),
+]);
+```
+
+---
+
+## 4. Controller
+
+```php
+class PostController
+{
+    public function __construct()
     {
-        public function __construct()
-        {
-            $this->user = new User;
-        }
-
-        public function seed()
-        {
-            $this->user->insert([
-                'username'  => 'admin',
-                'password'  => Crypter::encode('admin'),
-                'email'     => 'admin@localhost.com',
-                'api_token' => Str::rand(60)
-            ]); 
-        }
+        $this->post = new Post;
     }
 
-    // Like that.
-```
-### 2.5. Transaction
-```php
-    If you wanna use that system, your table's store engine is must InnoDB.
+    public function index(): mixed
+    {
+        $posts = $this->post
+            ->where('status', 'published')
+            ->orderBy(['created_at' => 'DESC'])
+            ->paginate(20, 'page');
 
-    $this->user = new User;
-    $this->user->beginTransaction();
-    $this->user->insert([
-        'username' => 'admin',
-        'password' => .....,
-        .......
+        return view('posts.index', compact('posts'));
+    }
+
+    public function show(int $id): mixed
+    {
+        return view('posts.show', [
+            'post' => $this->post->findOrFail($id),
+        ]);
+    }
+
+    public function store(): mixed
+    {
+        $this->post->insert([
+            'title'   => request('title'),
+            'body'    => request('body'),
+            'user_id' => Auth::id(),
+        ]);
+        Alerts::success('Post created.');
+        return redirect(route('posts.index'));
+    }
+
+    public function update(int $id): mixed
+    {
+        $this->post->where('id', $id)->update([
+            'title' => request('title'),
+            'body'  => request('body'),
+        ]);
+        return back();
+    }
+
+    public function delete(int $id): mixed
+    {
+        $this->post->where('id', $id)->delete();
+        return redirect(route('posts.index'));
+    }
+}
+```
+
+---
+
+## 5. Validator
+
+```php
+Validator::validate($_REQUEST, [
+    'email'    => ['required', 'email', 'unique:' . User::class . ';key:email'],
+    'password' => ['required', 'min:8', 'max:72'],
+    'confirm'  => ['required', 'same:password'],
+    'age'      => ['nullable', 'type:int', 'min:18', 'max:120'],
+    'role_id'  => ['required', 'exists:' . Role::class . ';key:id'],
+]);
+
+// Custom attribute names in error messages
+Validator::validate($_REQUEST, ['email' => ['required', 'email']], ['email' => 'E-mail Address']);
+
+// With a callback — custom logic when validation fails
+Validator::validate($_REQUEST, ['title' => ['required']], [], function (array $errors) {
+    return Response::json($errors);
+});
+```
+
+On failure: adds `Alerts::danger()` for each error and redirects back. On AJAX requests, aborts with 400 + JSON errors.
+
+**Rules:**
+
+| Rule | Description |
+|---|---|
+| `required` | Field must be present and non-empty |
+| `nullable` | Field may be empty or absent; skips further rules if empty |
+| `type:string` / `type:int` / `type:float` / `type:array` | PHP type check |
+| `min:N` | Minimum value (int/float) or minimum string/array length |
+| `max:N` | Maximum value (int/float) or maximum string/array length |
+| `same:other_field` | Must exactly match the value of `other_field` |
+| `email` | Must be a valid e-mail address |
+| `unique:Model;key:column` | Value must not already exist in the model's column |
+| `exists:Model;key:column` | Value must exist in the model's column |
+
+---
+
+## 6. Middleware
+
+```php
+// App/Middlewares/Auth.php
+class Auth
+{
+    public function __construct()
+    {
+        if (\Auth::check()) return true;
+        // return false / nothing → middleware declined
+    }
+
+    public function error(): void
+    {
+        abort(401);
+    }
+}
+```
+
+**Standalone middleware check:**
+
+```php
+// Pass — all middlewares must return true
+Middleware::middleware([Auth::class, IsAdmin::class]);
+
+// With callback — $declined is the list of failed middleware classes
+Middleware::middleware([Auth::class, IsAdmin::class], function (array $declined) {
+    if (count($declined)) abort(403, implode(', ', $declined));
+});
+```
+
+**On routes** (via group middleware):
+
+```php
+Route::pre('/admin')
+    ->middleware([Auth::class, IsAdmin::class], fn($declines) => abort(403))
+    ->group(function () { ... });
+```
+
+---
+
+## 7. Mail
+
+```php
+Mail::to('user@example.com')
+    ->cc('manager@example.com')
+    ->bcc('archive@example.com')
+    ->send([
+        'subject'      => 'Welcome!',
+        'message'      => view('emails.welcome', compact('user')),
+        'altbody'      => 'Plain-text fallback for email clients that do not support HTML.',
+        'attachements' => ['storage/uploads/invoice.pdf'],
     ]);
 
-
-    $api = ...... #(output: status = 0)
-
-    if($api->status) {
-        $this->user->commit();
-        echo "Successfully done.";
-    }else {
-        $this->user->rollback();
-        echo "Process fail, rollbacked.";
-    }
+// Clear recipient lists between sends
+Mail::clearTo();
+Mail::clearCc();
+Mail::clearBcc();
 ```
 
-## 3. Date
+SMTP settings are configured in `config/mail.php`.
+
+---
+
+## 8. Cache
+
+### Session Cache (per-user)
+
 ```php
-    Date::setLocale('Europe/Istanbul');
-    Date::locale(); // return Europe/Istanbul
-    Date::format(time()|date(), 'd.m.Y H:i');
-    Date::now(); // d.m.Y H:i
-    Date::timestamp(); // current TIMESTAMP
+// Returns cached value if not expired, otherwise runs the closure and caches the result
+$posts = Cache::cache('recent_posts', fn() => (new Post)->limit(10)->get(), ttl: 300);
+
+Cache::remove('recent_posts');   // invalidate one key
+Cache::clear();                  // clear all session cache
 ```
 
-## 4. Mail
+### Global Cache (APCu — shared across all requests)
+
 ```php
-    // Config
-    // edit: config/mail.php
-    // if you wanna mail send you must be true sending parameter
+$stats = GlobalCache::cache('site_stats', fn() => computeStats(), ttl: 3600);
 
-    // Usage
-    Mail::to('mustafaomereser@gmail.com')->send([
-        'subject' => 'test',
-        'message' => 'test mesaj', // you can also use view('view_name', ['hash' => Str::rand()]) method and set veriables;
-        'altbody' => 'Alt body',
-        'attachements' => [
-            'uploads/1.png',
-            'uploads/2.png'
-        ]
-    ]);
-
-    // Or Usage
-    Mail::to(...)->send([...]);
+GlobalCache::remove('site_stats');
+GlobalCache::clear();
 ```
 
-## 5. Controller
+Requires the `apcu` PHP extension.
+
+---
+
+## 9. Alerts
+
+Flash messages stored in session. Displayed once and cleared on the next request.
+
 ```php
-    class ... {
-        public function __construct() {
-            echo "Hi, this is __construct.";
-            $this->user = new User;
-        }
-        
-        public function index() {
-            $hi = 'hey';                                  
-            return View::view('home.index', compact('hi');
-        }
-        
-        public function show($id) {
-            return View::view('home.user', ['user' => $this->user->first()]);
-            //
-            return view('home.user', ['user' => $this->user->first()]); // also you can use that
-        }
-    }
+Alerts::success('Record saved.');
+Alerts::danger('An error occurred.');
+Alerts::warning('This action cannot be undone.');
+Alerts::info('Your session expires in 5 minutes.');
 ```
-## 6. View
-```php
 
-    ### Currently directions, like blade view engine.
-    - `@if`, `@elseif` and `@else`
-    - `@empty` and `@endempty`
-    - `@isset` and `@endisset`
-    - `@foreach` and `@endforeach`
-    - `@forelse`, `@empty` and `@endforelse`
-    - `@php` and `@endphp`
-    - `@json`
-    - `@dump` and `@dd`
-    - `@include`
-    - `@extends`, `@yield` and `@section`
-
-    # You can add custom direction
-    View::directive('style', function($href = null) {
-        if ($href) return '<link rel="stylesheet" type="text/css" href="' . $href . '" />';
-        return '<style>';
-    });
-
-    View::directive('endstyle', function() {
-        return '</style>';
-    });
-
-    View::directive('page', function($page) {
-        return '<?php if (isset($_GET["page"]) && $_GET["page"] === \'' . $page . '\'): ?>';
-    });
-
-    View::directive('endpage', function() {
-        return '<?php endif; ?>';
-    });
-
-
-    // Use That
-    view('home.index', ['hi' => 'hey']);
-    
-    // OR That
-    use Core\View;
-    echo View::view('home.index', ['hi' => 'hey']);
-
-    // call in view. In home.index:
-    <div>
-        List:
-        {{ view('home.list', $view_parameters) }}       // Output: echo $hi; = hey  // SAME
-        {{ View::view('home.list', $view_parameters) }} // Output: echo $hi; = hey // RESULT
+```html
+<?php foreach (Alerts::get() as [$type, $message]): ?>
+    <div class="alert alert-<?= $type ?>">
+        <?= htmlspecialchars($message) ?>
     </div>
+<?php endforeach ?>
 ```
-### 6.1. ViewProvider
+
+---
+
+## 10. CSRF
+
+CSRF tokens are automatically verified on every non-GET route (unless `noCSRF()` is used).
+
 ```php
-    // path: App\Providers\ViewProvider.php
-    class ViewProvider
-    {
-        public function __construct()
-        {
-            View::bind('test', function () {
-                $user = new User;
-                return [
-                    'users' => $user->get()
-                ];
-            });
-        }
-    }
-
-    // test view get every time $users parameter.
+csrf()                   // renders: <input type="hidden" name="_token" value="...">
+Csrf::get()              // returns current token string
+Csrf::set()              // generates and stores a new token
+Csrf::unset()            // destroys all tokens
+Csrf::remainTimeOut()    // seconds remaining until token rotation
 ```
 
-## 7. zhelper (deprecated)
+---
+
+## 11. Language
+
+```
+lang/
+  en/
+    lang.php      // ['greeting' => 'Hello, :name!']
+    auth.php
+  tr/
+    lang.php      // ['greeting' => 'Merhaba, :name!']
+    auth.php
+```
+
 ```php
-    ....
-    > php zhelper
-    
-    // Makes Usage:
-    # Controller                // what are u want  // if u want get ready resource controller (Optional)
-    > php zhelper make controller Test\TestController resource
-    
-    # Model                  // what are u want
-    > php zhelper make model Test\Test
-    
-    # Observer                // what are u want
-    > php zhelper make observer Test\TestObserver
-    
-    # Middleware                  // what are u want
-    > php zhelper make middleware Test\Test
+Lang::locale('tr');                              // set active locale
+Lang::get('lang.greeting', ['name' => 'Ali']);   // "Merhaba, Ali!"
+_l('lang.greeting', ['name' => 'Ali']);          // shortcut
+Lang::list();                                    // returns all keys for active locale
 
-    # Database Migration          // what are u want
-    > php zhelper make migration Users
-
-    # Database Seeder          // what are u want
-    > php zhelper make seeder UsersSeeder
-
-
-    # Database Migrator:
-    php zhelper db migrate // output: just add/modify after changes columns.
-    php zhelper db migrate fresh // output: reset table and write all columns.
-    
-    # Database Seeder:
-    php zhelper db seed // output: seed all seeders.
-    
-    # Database Backup:
-    # you must set app.config.mysql.mysqldump path.
-    php zhelper db backup local // output: backup db to /database/backups/mysql/...
-
-    # cache delete
-    php zhelper cache clear sessions|caches|views
+// Default locale set in config/app.php:
+'lang' => 'en'
 ```
-Run project.
+
+---
+
+## 12. Crypter
+
+Reversible encoding for tokens and cookies. **Not intended for passwords** — use bcrypt for passwords.
+
 ```php
-    ....
-    // Default run host's ip and 1000 port
-    > php zhelper run (press enter)
-    
-    // with custom ip and port
-    > php zhelper run 127.0.0.1 2000 (press enter)
+$encoded = Crypter::encode('value');
+$decoded = Crypter::decode($encoded);
+
+$encodedArr = Crypter::encodeArray(['a', 'b', 'c']);
+$decodedArr = Crypter::decodeArray($encodedArr);
 ```
 
-## 8. Terminal
+Configure key and salt in `config/app.php`:
+
 ```php
-    ....
-
-    # open advanced terminal (if don't give any arguman more open advanced mode.)
-    > php terminal
-    
-    // Makes Usage:
-    # Controller                   # what are u want  // if u want get ready resource controller (Optional)
-    > php terminal make controller Test/TestController --resource
-    
-    #region MODEL
-    # Model                   # what are u want
-    > php terminal make model Test/Test
-
-    #optional parameters for model
-    > php terminal make model Test/Test dbname=main table=test_table
-    #endregion
-    
-
-    # Request for methods.      # what are u want
-    > php terminal make request Users/StoreRequest
-
-    # Usage:
-        function($id, $vars = null, StoreRequest $request) {
-            $request = $request->validated();
-        }
-
-
-    # Observer                   # what are u want
-    > php terminal make observer Test/TestObserver
-    
-    # Middleware                   # what are u want
-    > php terminal make middleware Test/Test
-
-    # Database Migration          # what are u want
-    > php terminal make migration Users
-
-    # Database Seeder          # what are u want
-    > php terminal make seeder UsersSeeder
-    
-
-
-    # Database Migrator:
-    php terminal db migrate // output: just add/modify after changes columns.
-    php terminal db migrate --fresh // output: reset table and write all columns.
-    php terminal db migrate --fresh --seed // output: reset table and seed it.
-    
-    # Module Migrate
-    php terminal db migrate --module=blog // and other parameters can be use.
-
-    # Database Seeder:
-    php terminal db seed // output: seed all seeders.
-    
-    # Database Backup and Restore:
-    php terminal db backup /* optional parameters */ db=database_connection_key
-    // output: backup db to /database/backups/{dbname}...
-    php terminal db restore /* optional parameters */ db=database_connection_key
-
-    
-    # Create Module
-    php terminal module create blog
-    // Module has self cotnroller, middlewares, migrations, models, observers, requests, routes and views.
-
-    # make asset for module.
-    php terminal make model|migration|controller|etc. --module=blog
-
-    #for example
-    php terminal make controller TestController --resource --module=blog
-
-    # cache delete
-    php terminal cache clear sessions|caches|views
-
-    # clear terminal
-    php terminal clear
-    
-
-    # Help for modules
-    php terminal help
+'crypt' => ['key' => 'your-key', 'salt' => 'your-salt'],
 ```
 
-## 9. Csrf
+Regenerate:
+
+```bash
+php terminal security key --regen
+```
+
+---
+
+## 13. Config
+
 ```php
-    // Usage:
-    Csrf::csrf(); // Output: ready csrf input
-    Csrf::get(); // Output: random_csrf_string
-    Csrf::set(); // Random/Renew set token
-    Csrf::unset(); // Destroy csrf token
-    Csrf::remainTimeOut(); // How much seconds left for change csrf token
+Config::get('app');              // returns entire config/app.php array
+Config::get('app.debug');        // returns a single key (dot notation)
+Config::set('app', [...]);       // overwrite the entire file
+config('app.debug');             // shortcut for Config::get()
 ```
 
-## 10. Language
+**config/app.php**
+
 ```php
-    // Usage:
-    
-    // Dir tree:
-    tr -> 
-        lang.php // return array
-        auth.php // return array
-    en -> 
-        lang.php // return array
-        auth.php // return array
-
-    // if you want change locale
-    Lang::locale('tr');
-    
-    // if you wanna get a parameter
-    Lang::get('lang.test', ['id' => 1, 'test' => 'hey']);
-    Lang::get('auth.wrong-password');
-
-    // How i select default lang? (if not exists in lang list browser language select default)
-    config -> 
-            app.php ->
-                    lang => 'tr'
-
-    // get lang list
-    print_r(Lang::list());
+return [
+    'debug'        => true,
+    'force-https'  => false,
+    'x-powered-by' => false,
+    'lang'         => 'en',
+    'public'       => '/public',
+    'crypt'        => ['key' => '...', 'salt' => '...'],
+    'error'        => ['logging' => true, 'callback' => null],
+    'analyze'      => false,   // enable query analyzer (DbCollector)
+    'pagination'   => ['default-view' => 'partials.pagination'],
+];
 ```
 
-## 11. Crypter
+**database/connections.php**
+
 ```php
+$databases = [
+    'local' => ['mysql:host=localhost;dbname=mydb;charset=utf8mb4', 'root', ''],
+    // Multiple connections:
+    'logs'  => ['mysql:host=localhost;dbname=logs;charset=utf8mb4', 'root', ''],
+];
 
-    # Attention!
-    You must change your crypt key.
-
-    config
-        -> app.php
-            -> 
-                'crypt'    => [
-                    'key'  => 'cryptkey',
-                    'salt' => 'ThisSaltIsSecret'
-                ]
-
-    # Usage:
-
-    $encode = Crypter::encode('test'); // result: {test_hashed_code}
-    $decode = Crypter::decode($encode); // result: test
-
-    $encodeArray = Crypter::encodeArray(['test', 'test2']);
-    $decodeArray = Crypter::decodeArray($encodeArray);
+// Or create programmatically:
+MySQLcreateDatabase('localhost', 'mydb', 'root', 'pass', 'local');
 ```
 
+---
 
-## 12. Config
+## 14. Terminal
+
+```bash
+# Scaffolding
+php terminal make controller PostController
+php terminal make controller PostController --resource    # generates all 7 resource methods
+php terminal make controller PostController --module=blog
+php terminal make model Post --table=posts
+php terminal make migration CreatePostsTable
+php terminal make seeder PostsSeeder
+php terminal make observer PostObserver
+php terminal make middleware AuthMiddleware
+php terminal make request StorePostRequest
+
+# Database
+php terminal db migrate
+php terminal db migrate --fresh
+php terminal db migrate --fresh --seed
+php terminal db migrate --module=blog
+php terminal db migrate --all             # include all modules
+php terminal db seed
+php terminal db backup
+php terminal db backup --compress
+php terminal db restore
+
+# Modules
+php terminal module create blog
+
+# Cache
+php terminal cache clear views
+php terminal cache clear sessions
+
+# Security
+php terminal security key --regen         # regenerate crypt key + salt
+
+# Release
+php terminal release make --name=v1.2 --minify
+
+# Dev server
+php terminal run
+php terminal run --host=127.0.0.1 --port=8080
+
+# Help
+php terminal help
+```
+
+---
+
+## 15. API
+
 ```php
-    Config::get('app'); // return all config
-    Config::get('app.title'); // return in app config title index's element
-    Config::set('app', [
-        'title' => 'test'
-    ]); // update config
+// route/api.php
+Route::get('/user', fn() => Response::json(['user' => Auth::user()]));
+Route::post('/posts', [PostController::class, 'store'])->noCSRF();
 ```
 
-## 13. Alerts
+Authenticate via request header:
+
+```
+Auth-Token: {api_token}
+```
+
+The token is matched against the `api_token` column in the `users` table.
+
+---
+
+## 16. Helper Methods
+
 ```php
-    // Alerts is show just one time, when you refresh your page Alerts is gone.
+// Paths
+base_path('/config/app.php');   // absolute path from project root
+public_path('/images');         // absolute path to public directory
+public_dir('/images');          // same — returns real filesystem path
+asset('/assets/app.css');       // full URL with ?v= cache-busting (filemtime)
 
-    # Usage:
-    Alerts::danger('text');
-    Alerts::success('text');
-    Alerts::info('text');
-    Alerts::warning('text');
-    
-    // if you wanna use like chain
-    Alerts::danger('text')::success('text')::info('text')::warning('text');
+// HTTP / Navigation
+redirect('/login');             // Location header + die
+back();                         // redirect to HTTP_REFERER
+back('?saved=1');               // redirect to REFERER with suffix
+refresh();                      // Refresh:0 header + die
+abort(404);                     // abort with HTTP status code
+abort(403, 'Forbidden');        // abort with message (JSON on AJAX)
 
-    // get alerts
-    Alerts::get(); // output: Array ([0] => ('success', 'text'), [1] => ('danger', 'text'))
+// Request
+uri();                          // current URI path (strips script name)
+method();                       // HTTP method (reads _method override from POST)
+ip();                           // client IP (checks X-Forwarded-For, HTTP_CLIENT_IP)
+request('field');               // $_REQUEST['field'] ?? false
+request();                      // full $_REQUEST array
+request('field', 'value');      // set $_REQUEST['field'] = 'value'
+getQuery(['page' => 2]);        // current query string merged with additions — returns string
+getQuery(['page' => 2], ['sort']); // merge additions, remove 'sort' key
+getQuery([], [], false);        // returns array instead of string
 
-    // unset alerts
-    Alerts::unset();
+// Response
+Response::json(['key' => 'value']);   // sets Content-Type: application/json and echoes
+
+// View / Route shortcuts
+view('posts.index', compact('posts'));
+route('posts.show', ['id' => 1]);
+csrf();
+_l('lang.key', ['name' => 'Ali']);
+config('app.debug');
+
+// HTML helpers
+e($value);             // htmlspecialchars; returns '-' if empty (with $emptycheck = true)
+inputMethod('PATCH');  // <input type="hidden" name="_method" value="PATCH">
+
+// Globals
+globals('myKey');              // read $GLOBALS['myKey']
+globals('myKey', $value);      // write $GLOBALS['myKey']
+
+// Browser detection
+$b = getBrowser();
+// ['name' => 'Google Chrome', 'version' => '...', 'platform' => 'windows', ...]
+
+// Date
+Date::now();                           // current datetime string
+Date::timestamp();                     // current unix timestamp
+Date::format(time(), 'd.m.Y H:i');
+Date::setLocale('Europe/Istanbul');
+
+// File
+File::upload('/uploads', $_FILES['photo'], [
+    'accept' => ['jpg', 'png', 'webp'],
+    'size'   => 5 * 1024 * 1024,       // max bytes
+]);
+File::upload('/uploads', $_FILES['photos']);      // multiple file input → array of paths
+File::save('/uploads', 'https://example.com/image.jpg');  // download remote file
+File::resizeImage('photo.jpg', ['width' => 800, 'height' => 600, 'desired_sizes' => true], 'out.jpg');
+File::convertImage('photo.jpg', 'webp');
+File::delete('uploads/photo.jpg');
 ```
 
-```html
-    <!-- shown alerts example bootstrap -->
-    <?php foreach(Alerts::get() as $alert): ?>
-        <div class="alert alert-{{ $alert[0] }}">
-            {{ $alert[0] }}: {{ $alert[1] }}
-        </div>
-    <?php endforeach; ?>
-```
+---
 
-## 14. Validator
+## 17. AutoSSL
+
+Implements the ACME v2 protocol (Let's Encrypt). Supports `http-01` and `dns-01` challenges.
+
 ```php
-    // In array validate values.
-    // Current: type, required, max, min, same, email, unique, exists.
-    
-    // Unique ussage: 
-    # unique:table_name;key:column_name // key is optional, if you not add key parameter get request key name.
+use zFramework\Core\Helpers\AutoSSL;
 
-    # exists:table_name;key:column_name // key is optional, if you not add key parameter get request key name.
-    
-    // Unique Example: 'email' => ["unique:" . User::class . ";key:email"]
-    // Exists Example: 'email' => ["exists:" . User::class . ";key:email"]
+$ssl = new AutoSSL(AutoSSL::PROD);
+// On Windows with custom OpenSSL binary:
+$ssl = new AutoSSL(AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');
 
-    Validator::validate($_REQUEST, [
-        'test1' => ['type:string', 'required', 'max:10', 'min:5', 'same:test2'],
-        'test2' => ['same:test1'],
-    ]);
-```
-##  15. Middleware
-```php
-    # App\Middlewares\Auth.php
-    # Validate first and go on.
-    
-    namespace App\Middlewares;
-    class Auth
-    {
-        public function __construct()
-        {
-            if (Auth::check()) return true;
-        }
-    
-        public function error()
-        {
-            abort(401);
-        }
-    }
-
-    // Usage:
-    Middleware::middleware([Auth::class, Guest::class]); #              # output: false
-    Middleware::middleware([Auth::class]); // if you are logged in      # output: true 
-    Middleware::middleware([Guest::class]); // if you are not logged in # output: true 
-    
-    Middleware::middleware([Auth::class, Guest::class], function($declined) {
-        print_r($declined);
-    }); // if you are logged in     # output: Array ('Guest::class')
-        // if you are not logged in # output: Array ('Auth::class')
+// Staging (for testing):
+$ssl = new AutoSSL(AutoSSL::STAGING);
 ```
 
-## 16. Cache
-```php
-    // Parameters: cache name, what it storage, seconds type timeout
-    $users = Cache::cache('users', function() {
-        return (new User)->get();
-    }, (10 * 60));
+### Account Management
 
-    print_r($users);
+```php
+$ssl->ensureAccount();   // creates ACME account if none exists
+$ssl->unlinkAccount();   // delete local account files
 ```
 
-## 17. API
+### Listing & Auto-renew
+
 ```php
-    # route/api.php
-    Route::get('/test', function () {
-        echo "API Page / user_id: " . Auth::id();
-    });
-    // example: url: "http://localhost/api/v1"; headers: Auth-Token: {user_api_token} (user logged in.)
+$ssl->list();                    // list all locally tracked certificates
+$ssl->checkSSL('example.com');   // check days remaining on a certificate
+$ssl->renewAll();                // renew all certs with less than 20 days remaining
 ```
 
-## 18. Development
+### http-01 (automatic, no wildcard)
+
+The framework places the challenge file into `.well-known/acme-challenge/` automatically.
+
 ```php
-    // Database connections
-    # Folder: database/connections.php
-    
-    # before
-    $databases = [
-        'test' => ['mysql:host=localhost;dbname=test;charset=utf8mb4', 'root', '123123'],
-    ];
-
-    # add a database
-    $databases = [
-        'test'   => ['mysql:host=localhost;dbname=test;charset=utf8mb4', 'root', '123123'],
-        'test_2' => ['mysql:host=localhost;dbname=test_2;charset=utf8mb4', 'root', '123123'],
-    ];
-
-    # use options
-    $databases = [
-        'test' => ['mysql:host=localhost;dbname=test;charset=utf8mb4', 'root', '123123', 'options' => [
-            [\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION] // for try catch PDOException
-        ],
-        'test_2' => ['mysql:host=localhost;dbname=test_2;charset=utf8mb4', 'root', '123123'],
-    ]];
-    
-    
-    # Folder config/app.php
-    # DEBUG MODE and Error Logging
-
-    // debug mode is come default is true.
-    'debug' => true|false
-    // debug mode is for error page to abort
-
-
-    // Default error log dir in; zFramework/bootstrap.php
-    'error' => [
-        'logging'  => true|false,
-        'callback' => \Closure
-    ],    
-    // 
-    
-    // Redirect https if come with http.
-    'force-https' => true|false
-    // 
-
-    # it is so secure. crypter make passwords or etc.
+$cert = $ssl->issue(['example.com', 'www.example.com'], 'http-01');
+// $cert → ['cert' => '...', 'ca_bundle' => '...', 'private' => '...']
 ```
 
-## 19. Helper Methods
+### dns-01 (supports wildcards)
+
+Requires manually adding TXT records to your DNS before finalizing.
+
 ```php
-    // main base path
-    base_path("optional url add");
-    
-    // Real Public path
-    public_dir("optional url add");
-  
-    // Public path
-    public_path("optional url add");
+$order   = $ssl->newOrder(['example.com', '*.example.com']);
+$records = $ssl->challenge($order['authorizations'], 'dns-01');
 
-    // Show host name
-    host();
+// $records is an array of challenges to create in DNS:
+// [['domain' => '_acme-challenge.example.com', 'value' => '...'], ...]
 
-    // set Asset
-    asset('/assets/style.css');
+// 1. Add each record as a TXT entry in your DNS
+// 2. Wait for propagation
+// 3. Notify ACME
 
-    // Redirect
-    redirect("URL");
+foreach ($records as $challenge)          $ssl->notifyChallenge($challenge);
+foreach ($order['authorizations'] as $a)  $ssl->challengeAuth($a['url']);
 
-    // Redirect to REFERER
-    back();
-
-    // Show current uri
-    uri();
-
-    // get current request method
-    method();
-
-    // show input method
-    inputMethod('GET|POST|PATCH|PUT|DELETE');
-
-    // Get Client IP
-    ip();
-
-    // Set http response code 200 to 500 and optional message.
-    abort(200, 'OK');
-
-    // get request
-    request('name');
-
-    // Response for Controllers or routes callbacks
-    Response::json([
-        'test' => 1
-    ]);
-
-    // show csrf input
-    csrf();
-
-    // Call view method easy way, it's same View::view() 
-    view(...., .....);
-
-    // shortcut for Lang::get()
-    _l(...);
-
-    // shortcut for Config::get()
-    config(...);
-
-    // File
-    
-    # Usage:
-    File::save('/uploads', 'http://images.com/image.jpg'); // uploads/**********.jpg
-
-    // For one
-    File::upload('/uploads', $_FILES['file'], [ // settings is optional
-        'accept' => ['jpg', 'jpeg', 'png'],
-        'size'   => 300000 # byte
-    ]); // return /uploads/image.ext
-
-    // For multip
-    File::upload('/uploads', $_FILES['files'], [ // settings is optional
-        'accept' => ['jpg', 'jpeg', 'png'],
-        'size'   => 300000 # byte
-    ]); // return array('/uploads/image.ext', '/uploads/image.ext');
-
-                                    # width, height, desired_sizes (Automaticly orianted width and height or desired size.)
-    File::resizeImage('image.png', ['width' => 50, 'height' => 50, 'desired_sizes' => true], 'new_name');
-
-    // Convert file.
-    File::convertImage('image.png', 'avif');
+$finalized = $ssl->finalize($order, ['example.com', '*.example.com']);
+$cert      = $ssl->getCertificate($order, $finalized['domainKey']);
+// $cert → ['certificate' => '...', 'ca_bundle' => '...', 'private' => '...']
 ```
 
-## 20. Run Project
+---
+
+## 18. cPanel
+
+Wraps the cPanel UAPI (port 2083, Bearer token auth).
+
 ```php
-    ....
-    // Default run host's ip and 80 port
-    > php terminal run (press enter)
-    
-    // with custom ip and port
-    > php terminal run --host=127.0.0.1 --port=2000 (press enter)
+use zFramework\Core\Helpers\cPanel\{API, Domain, Cron, Database, DatabaseUser, Email, Fileman, SSL};
+
+// Configure once (e.g. in a service provider or bootstrap file)
+API::$domain   = 'example.com';      // cPanel hostname
+API::$username = 'cpanel_user';      // cPanel account username
+API::$apiToken = 'TOKEN_STRING';     // cPanel → Security → Manage API Tokens
 ```
 
-## 21. AutoSSL (Lets Encrypt)
+### Domain & Subdomains
+
 ```php
-    // Constructor — choose STAGING (test) or PROD
-    $ssl = new AutoSSL(AutoSSL::STAGING);
-    $ssl = new AutoSSL(AutoSSL::PROD);
-
-    // Provide an OpenSSL config path if key generation fails (e.g. Windows/XAMPP)
-    $ssl = new AutoSSL(AutoSSL::STAGING, 'D:\xampp\apache\conf\openssl.cnf');
-
-    // Account management — constructor handles this automatically on first run
-    $ssl->ensureAccount(); // create and persist the ACME account KID
-    $ssl->unlinkAccount(); // reset account (ensureAccount must be called again)
-
-    // List issued domains / check live SSL / auto-renew
-    $ssl->list();                        // returns all issued domain directories
-    $ssl->checkSSL('domain.com');        // returns live certificate info
-    $ssl->renewAll();                    // renews certificates with less than 20 days left (wildcards skipped)
-
-    // http-01 — fully automatic in one call (no wildcard support)
-    $cert = $ssl->issue(['domain.com', 'www.domain.com'], 'http-01');
-    // $cert: ['cert' => '...', 'ca_bundle' => '...', 'private' => '...']
-
-    // dns-01 — two-step flow for wildcard and multi-domain certificates
-    // Step 1: open order and retrieve TXT record values
-    $order   = $ssl->newOrder(['domain.com', '*.domain.com']);
-    $records = $ssl->challenge($order['authorizations'], 'dns-01');
-    // $records: [['record' => '_acme-challenge.domain.com', 'value' => '...'], ...]
-    // Add every entry to DNS as a TXT record (same name, different values — add both)
-    // Wait for propagation: dig TXT _acme-challenge.domain.com +short
-
-    // Step 2: notify, validate, finalize, and download the certificate
-    foreach ($records as $c) $ssl->notifyChallenge($c);
-    foreach ($order['authorizations'] as $a) $ssl->challengeAuth($a['url']);
-    $fin  = $ssl->finalize($order, ['domain.com', '*.domain.com']);
-    $cert = $ssl->getCertificate($order, $fin['domainKey']);
-    // $cert: ['certificate' => '...', 'ca_bundle' => '...', 'private' => '...']
+Domain::list();                      // list all domains on the account
+Domain::addSubdomain('blog');        // creates blog.example.com
+Domain::deleteSubdomain('blog');
 ```
 
-## 22. cPanel
+### DNS Records
+
 ```php
-    use zFramework\Core\Helpers\cPanel\API;
-    use zFramework\Core\Helpers\cPanel\Database;
-    use zFramework\Core\Helpers\cPanel\DatabaseUser;
-    use zFramework\Core\Helpers\cPanel\Domain;
-    use zFramework\Core\Helpers\cPanel\Cron;
-    use zFramework\Core\Helpers\cPanel\Email;
-    use zFramework\Core\Helpers\cPanel\File;
-    use zFramework\Core\Helpers\cPanel\SSL;
+Domain::listDNSRecords('example.com');
 
-    API::$domain   = "domain.com";
-    API::$username = "cpanel_username";
-    API::$apiToken = "cpanel_api_token"; // from cpanel->manage tokens
+Domain::addDNSRecord('example.com', 'A',     '@',    '1.2.3.4');
+Domain::addDNSRecord('example.com', 'CNAME', 'www',  'example.com');
+Domain::addDNSRecord('example.com', 'MX',    '@',    'mail.example.com');
+Domain::addDNSRecord('example.com', 'TXT',   '@',    'v=spf1 include:_spf.google.com ~all');
+Domain::addDNSRecord('example.com', 'TXT',   '_acme-challenge', 'acme-token-here', ttl: 300);
 
+// $line is the line number returned by listDNSRecords
+Domain::editDNSRecord('example.com', $line, 'A', '@', '5.6.7.8');
+Domain::deleteDNSRecord('example.com', $line);
+```
 
+### Cron Jobs
 
+```php
+Cron::list();
+Cron::create('0 * * * *', '/usr/bin/php /home/user/public_html/terminal schedule');
+Cron::edit($lineKey, '0 */6 * * *', '/usr/bin/php /home/user/public_html/terminal schedule');
+Cron::delete($lineKey);
+```
+
+### Databases
+
+```php
+Database::list();
+Database::create('mydb');                       // creates user_mydb
+Database::rename('user_mydb', 'newname');
+Database::repair('user_mydb');
+Database::delete('user_mydb');
+Database::update_privileges();
+```
+
+### Database Users
+
+```php
+DatabaseUser::list();
+DatabaseUser::create('dbuser', 'password');     // creates user_dbuser
+DatabaseUser::setPassword('user_dbuser', 'newpassword');
+DatabaseUser::grantPrivileges('user_dbuser', 'user_mydb');                      // ALL PRIVILEGES
+DatabaseUser::grantPrivileges('user_dbuser', 'user_mydb', ['SELECT', 'INSERT']); // specific
+DatabaseUser::revokePrivileges('user_dbuser', 'user_mydb');
+DatabaseUser::delete('user_dbuser');
+```
+
+### Email Accounts
+
+```php
+Email::list();
+Email::create('info@example.com', 'password', quota: 500);   // quota in MB; 0 = unlimited
+Email::changePassword('info@example.com', 'newpassword');
+Email::delete('info@example.com');
+
+// Forwarders
+Email::listForwarders();
+Email::addForwarder('contact@example.com', 'info@example.com');
+Email::deleteForwarder('contact@example.com', 'info@example.com');
+```
+
+### File Manager
+
+```php
+Fileman::list('/public_html');
+Fileman::create_folder('/public_html/uploads');
+Fileman::upload('/public_html/uploads', [
+    'photo.jpg' => ['path' => '/tmp/uploaded.jpg', 'mime' => 'image/jpeg'],
+]);
+Fileman::delete_file('/public_html/old.php');
+```
+
+### SSL
+
+```php
+SSL::AutoSSLStatus();       // check if AutoSSL check is in progress
+SSL::StartAutoSSLCheck();   // trigger an immediate AutoSSL check
+SSL::install('example.com', $cert, $key, $caBundle);
 ```
