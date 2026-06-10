@@ -6,20 +6,31 @@ use zFramework\Core\Facades\Alerts;
 use zFramework\Core\Facades\Lang;
 use zFramework\Core\Facades\Response;
 use zFramework\Core\Helpers\Http;
+use zFramework\Core\Validator\Rule;
 
 class Validator
 {
+    private static array $ruleMap = [
+        'required' => Validator\Rules\Required::class,
+        'nullable' => Validator\Rules\Nullable::class,
+        'max'      => Validator\Rules\Max::class,
+        'min'      => Validator\Rules\Min::class,
+        'type'     => Validator\Rules\Type::class,
+        'email'    => Validator\Rules\Email::class,
+        'same'     => Validator\Rules\Same::class,
+        'exists'   => Validator\Rules\Exists::class,
+        'unique'   => Validator\Rules\Unique::class,
+    ];
 
-    static $errors = [];
     /**
-     * Validate a array
+     * Validate an array
      * @param array $data
      * @param array $validate
      * @param array $attributeNames
      * @param \Closure $callback
-     * @return string|array
+     * @return array
      */
-    public static function validate(?array $data = null, array $validate = [], array $attributeNames = [], ?\Closure $callback = null)
+    public static function validate(?array $data = null, array $validate = [], array $attributeNames = [], ?\Closure $callback = null): array
     {
         if (!$data) $data = $_REQUEST;
 
@@ -27,53 +38,48 @@ class Validator
         $statics = [];
 
         foreach ($validate as $key => $validateList) {
-            $value = @$data[$key];
+            $value = $data[$key] ?? null;
 
-            $length = -1;
-            $type   = null;
-            if (is_numeric($value) || $value === "0") {
-                $type   = 'integer';
-                $length = (int) $value;
-            } elseif (is_string($value)) {
-                $type   = 'string';
-                $length = @strlen($value);
-            } elseif (is_array($value)) {
-                $type   = 'array';
-                $length = count($value);
-            } elseif (is_object($value)) {
-                $type   = 'object';
-                $length = count((array) $value);
-            }
+            $typeRule     = preg_grep('/^type:/', $validateList);
+            $declaredType = $typeRule ? substr(reset($typeRule), 5) : null;
+
+            [$type, $length] = self::resolveTypeAndLength($value, $declaredType);
 
             $equivalent = null;
             $parameters = [];
 
-            foreach ($validateList as $validate) {
-                if (str_contains($validate, ':')) {
-                    preg_match_all('/([\w$.()]+):(?:"([^"]*)"|([^\s;]+))/', $validate, $m, PREG_SET_ORDER);
+            foreach ($validateList as $ruleString) {
+                if (str_contains($ruleString, ':')) {
+                    preg_match_all('/([\w$.()]+):(?:"([^"]*)"|([^\s;]+))/', $ruleString, $m, PREG_SET_ORDER);
                     $out = [];
                     foreach ($m as $match) $out[$match[1]] = isset($match[2]) && $match[2] !== '' ? $match[2] : $match[3];
                     $case       = array_key_first($out);
                     $equivalent = $out[$case];
                     unset($out[$case]);
                     foreach ($out as $param_key => $param) $parameters[$param_key] = $param;
-                } else $case = $validate;
+                } else $case = $ruleString;
 
-                if (self::{$case}(compact('value', 'equivalent', 'length', 'type', 'key', 'parameters', 'validateList', 'data') + ['required' => in_array('required', $validateList), 'nullable' => in_array('nullable', $validateList)])) {
+                $ruleData = compact('value', 'equivalent', 'length', 'type', 'key', 'parameters', 'validateList', 'data') + [
+                    'required' => in_array('required', $validateList),
+                    'nullable' => in_array('nullable', $validateList),
+                ];
+
+                $rule = self::resolveRule($case);
+
+                if ($rule->handle($ruleData)) {
                     $statics[$key] = $value;
                 } else {
-                    $errors[$key][$case] = (Lang::get("validator.attributes.$key") ?? ($attributeNames[$key] ?? $key)) . " " . Lang::get("validator.errors.$case", self::$errors);
+                    $errors[$key][$case] = (Lang::get("validator.attributes.$key") ?? ($attributeNames[$key] ?? $key)) . " " . Lang::get("validator.errors.$case", $rule->errors);
                     Alerts::danger($errors[$key][$case]);
                     unset($data[$key]);
                 }
             }
         }
 
-        self::$errors = [];
         if (count($errors)) {
             if (!$callback) {
                 if (Http::isAjax()) abort(400, Response::json($errors));
-                foreach ($errors as $key => $error_list) foreach ($error_list as $error) Alerts::danger($error);
+                foreach ($errors as $error_list) foreach ($error_list as $error) Alerts::danger($error);
                 back();
             } else $callback($errors, $statics);
         }
@@ -81,70 +87,45 @@ class Validator
         return $statics;
     }
 
-    public static function type($data)
+    /**
+     * Detects the type and comparable length of a value.
+     * If a type is explicitly declared in the rule list it takes priority over auto-detection.
+     * @param mixed $value The field value from the input data
+     * @param string|null $declared Explicit type declared via type:xxx rule, or null for auto-detection
+     * @return array{0: string|null, 1: int|float} [$type, $length]
+     */
+    private static function resolveTypeAndLength(mixed $value, ?string $declared): array
     {
-        if (!@strlen($data['value'])) return true;
-        if ($data['equivalent'] == $data['type']) return true;
-        self::$errors = ['now-type' => $data['type'], 'must-type' => $data['equivalent']];
-        return false;
+        if (is_array($value))  return ['array',  count($value)];
+        if (is_object($value)) return ['object', count((array) $value)];
+
+        $type = $declared ?? match(true) {
+            is_int($value)                              => 'integer',
+            is_float($value)                            => 'float',
+            preg_match('/^-?\d+$/', (string) $value)    => 'integer',
+            is_numeric($value)                          => 'float',
+            default                                     => 'string',
+        };
+
+        $length = match($type) {
+            'integer' => (int) $value,
+            'float'   => (float) $value,
+            default   => is_string($value) ? strlen($value) : 0,
+        };
+
+        return [$type, $length];
     }
 
-    public static function email($data)
+    /**
+     * Resolves a rule name to its Rule instance from the rule map.
+     * @param string $case Rule name (e.g. "required", "max", "exists")
+     * @return Rule
+     * @throws \Exception If the rule is not registered
+     */
+    private static function resolveRule(string $case): Rule
     {
-        if (!@strlen($data['value'])) return true;
-        if (filter_var($data['value'], FILTER_VALIDATE_EMAIL)) return true;
-        return false;
-    }
-
-    public static function required($data)
-    {
-        if (in_array('nullable', $data['validateList'])) return throw new \Exception('“required” cannot be used in a validation that is ”nullable”.');
-        if ($data['length'] > 0 || ($data['type'] == 'integer' && strlen($data['value']))) return true;
-        return false;
-    }
-
-    public static function nullable($data)
-    {
-        if (in_array('required', $data['validateList'])) return throw new \Exception('“nullable” cannot be used in a validation that is ”required”.');
-        return true;
-    }
-
-    public static function max($data)
-    {
-        if (!@strlen($data['value'])) return true;
-        if ($data['equivalent'] >= $data['length']) return true;
-        self::$errors = ['now-val' => $data['length'], 'max-val' => $data['equivalent']];
-        return false;
-    }
-
-    public static function min($data)
-    {
-        if (!@strlen($data['value'])) return true;
-        if ($data['length'] >= $data['equivalent']) return true;
-        self::$errors = ['now-val' => $data['length'], 'min-val' => $data['equivalent']];
-        return false;
-    }
-
-    public static function same($data)
-    {
-        if ($data['value'] === @$data['validateList'][$data['equivalent']]) return true;
-        self::$errors = ['attribute-name' => (Lang::get("validator.attributes." . $data['equivalent']) ?? $data['equivalent'])];
-        return false;
-    }
-
-    public static function exists($data)
-    {
-        $exists = (new $data['equivalent'])->whereRaw(($data['parameters']['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
-        if ($ex = @$data['parameters']['ex']) $exists->where('id', '!=', $ex);
-        if ($exists->count()) return true;
-        return false;
-    }
-
-    public static function unique($data)
-    {
-        $unique = (new $data['equivalent'])->whereRaw(($data['parameters']['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
-        if ($ex = @$data['parameters']['ex']) $unique->where('id', '!=', $ex);
-        if ($unique->count()) return false;
-        return true;
+        $class = self::$ruleMap[$case] ?? null;
+        if (!$class) throw new \Exception("Unknown validation rule: \"$case\"");
+        return new $class();
     }
 }
