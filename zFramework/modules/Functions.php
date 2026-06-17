@@ -376,11 +376,15 @@ function hl(mixed $v, int $d = 0): string
     if (is_bool($v))                return '<span class="b">' . ($v ? 'true' : 'false') . '</span>';
     if (is_int($v) || is_float($v)) return '<span class="n">' . $v . '</span>';
     if (is_string($v))              return '<span class="s">"' . htmlspecialchars($v) . '"</span>';
+    if ($v instanceof \Closure)     return '<span class="null">Closure</span>';
 
     if (is_array($v) || is_object($v)) {
         $id    = uniqid('dd');
         $items = is_array($v) ? $v : (array) $v;
+        $items = array_filter($items, fn($val) => !($val instanceof \Closure));
         $count = count($items);
+
+        if ($d >= 10) return '<span class="arr-label">' . (is_array($v) ? "array({$count})" : get_class($v) . "{{$count}}") . '</span> <span class="null">[depth limit]</span>';
         $label = is_array($v) ? "array({$count})" : get_class($v) . "{{$count}}";
 
         if (empty($items)) return '<span class="arr-label">' . $label . '</span> <span class="null">[]</span>';

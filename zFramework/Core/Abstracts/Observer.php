@@ -10,7 +10,7 @@ abstract class Observer
      * @param array $args
      * @return self|void
      */
-    public function router(string $function, array $args)
+    public function router(string $function, mixed $args = [])
     {
         $call = "on$function";
         if ($call && method_exists($this, $call)) return $this->$call($args);

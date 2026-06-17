@@ -4,7 +4,6 @@ namespace zFramework\Core\Facades;
 
 use ReflectionClass;
 use zFramework\Core\Facades\Analyzer\DbCollector;
-use zFramework\Core\Facades\DB\ModelResult;
 use zFramework\Core\Helpers\Date;
 use zFramework\Core\Traits\DB\OrMethods;
 use zFramework\Core\Traits\DB\RelationShips;
@@ -194,7 +193,7 @@ class DB
      * @param array $args
      * @return mixed
      */
-    private function trigger(string $name, array $args = []): mixed
+    private function trigger(string $name, mixed $args = []): mixed
     {
         if (!isset($this->observe)) return false;
         return call_user_func_array([new ($this->observe), 'router'], [$name, $args]);
@@ -246,9 +245,8 @@ class DB
     }
 
     /**
-     * Set Closures for rows and wrap each row in ModelResult.
-     * Enables both $row['key'] and $row->key / $row->relation() access.
-     * @return array<ModelResult>
+     * Set Closures for rows.
+     * @return array
      */
     public function setClosures(array $rows): array
     {
@@ -260,8 +258,6 @@ class DB
                 $rows[$key]['update'] = fn($sets) => $this->where($primary_key, $row[$primary_key])->update($sets);
                 $rows[$key]['delete'] = fn() => $this->where($primary_key, $row[$primary_key])->delete();
             }
-
-            $rows[$key] = new ModelResult($rows[$key]);
         }
         return $rows;
     }
@@ -717,7 +713,7 @@ class DB
      * get one row in rows
      * @return ModelResult|array
      */
-    public function first(): ModelResult|array
+    public function first(): array
     {
         return $this->limit(1)->get()[0] ?? [];
     }
@@ -725,7 +721,7 @@ class DB
     /**
      * Find row by primary key
      * @param string $value
-     * @return array 
+     * @return ModelResult|array
      */
     public function find(string $value): array
     {
@@ -863,7 +859,7 @@ class DB
     /**
      * Insert a row to database
      * @param array $sets
-     * @return array|int
+     * @return ModelResult|array|int
      */
     public function insert(array $sets = [], bool $just_insert = false): array|int
     {
