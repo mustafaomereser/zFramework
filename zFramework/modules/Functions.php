@@ -43,11 +43,19 @@ function public_path($add = null)
 // Get Run's server's host.
 function host()
 {
-    $protocol = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://";
-    $port = $_SERVER['SERVER_PORT'];
+    $host = $_SERVER['HTTP_X_FORWARDED_HOST']
+        ?? $_SERVER['HTTP_HOST']
+        ?? $_SERVER['SERVER_NAME'];
 
-    $dont_show_port = [80, 443];
-    return $protocol . $_SERVER['SERVER_NAME'] . (!empty($port) && !in_array($port, $dont_show_port) ? ":$port" : null);
+    $protocol = 'http';
+
+    if (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        || (!empty($_SERVER['HTTP_CF_VISITOR']) && str_contains($_SERVER['HTTP_CF_VISITOR'], 'https'))
+    ) $protocol = 'https';
+
+    return $protocol . '://' . $host;
 }
 
 // no cache public asset
