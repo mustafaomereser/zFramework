@@ -98,11 +98,12 @@ class Auth
 
     /**
      * Hash a plain password using the configured encode method.
-     * @param string $plain
-     * @return string
+     * @param null|string $plain
+     * @return string|bool
      */
-    public static function encodePassword(string $plain): string
+    public static function encodePassword(null|string $plain): string|bool
     {
+        if (is_null($plain)) return false;
         return match (self::$columns['passwordencode']) {
             'bcrypt' => password_hash($plain, PASSWORD_BCRYPT),
             'md5'    => md5($plain),
