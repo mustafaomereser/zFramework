@@ -11,7 +11,7 @@ class Auth
      * When you use ::user() method you must fill that and if you again use ::user() get from this parameter.
      */
     static $user     = null;
-
+    static $model;
     /**
      * API mode for api requests. (Cookie not work with apis)
      */
@@ -30,8 +30,9 @@ class Auth
 
     public static function init()
     {
-        self::$database_exists = isset($GLOBALS['databases']['connections'][(new User)->db]);
-        if ($columns = @(new User)->special_columns) self::$columns = $columns;
+        self::$model = (new User);
+        self::$database_exists = isset($GLOBALS['databases']['connections'][self::$model->db]);
+        if ($columns = @self::$model->special_columns) self::$columns = $columns;
         if (self::$database_exists && !self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
     }
 
@@ -58,7 +59,7 @@ class Auth
      */
     public static function token_login(string $token): bool
     {
-        return self::login((new User)->select('id, ' . self::$columns['password'])->where('api_token', $token)->first());
+        return self::login(self::$model->select('id, ' . self::$columns['password'])->where('api_token', $token)->first());
     }
 
     /**
@@ -91,7 +92,7 @@ class Auth
     public static function user()
     {
         if (!$user_id = (self::getMode())::get('auth-token')) return false;
-        if (self::$user == null) self::$user = (new User)->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
+        if (self::$user == null) self::$user = self::$model->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
         if (!@self::$user['id'] || !hash_equals((string) self::$user[self::$columns['password']], (string) (self::getMode())::get('auth-password'))) return self::logout();
         return self::$user;
     }
@@ -121,7 +122,7 @@ class Auth
     {
         if (self::check()) return false;
 
-        $user  = (new User)->select('id, api_token, ' . self::$columns['password']);
+        $user  = self::$model->select('id, api_token, ' . self::$columns['password']);
         $plain = $fields[self::$columns['password']] ?? null;
         unset($fields[self::$columns['password']]);
         foreach ($fields as $key => $value) $user->where($key, $value);

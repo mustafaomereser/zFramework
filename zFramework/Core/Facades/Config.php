@@ -46,6 +46,18 @@ class Config
     }
 
     /**
+     * Config is exists check.
+     * @param string $config
+     * @return bool
+     */
+    public static function exists(string $config): bool
+    {
+        $path = self::parseUrl($config)['path'];
+        if (file_exists($path)) return true;
+        return false;
+    }
+
+    /**
      * Get Config
      * @param string $config
      * @return string|array|object

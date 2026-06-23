@@ -1,0 +1,2 @@
+DB analyzer use just in SELECT mode.
+db migrator Primary key without auto increment and uuid
