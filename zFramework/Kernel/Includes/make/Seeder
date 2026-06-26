@@ -22,7 +22,11 @@ class {name}
         // ]); 
     }
 
-    public function destroy()
+    /**
+    * Destroy must be return $this.
+    * @return $this;
+    */
+    public function destroy() : self
     {
 
         // $this->user->prepare('TRUNCATE users');

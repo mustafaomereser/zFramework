@@ -75,7 +75,7 @@ class Route
      */
     public static function name(string $name)
     {
-        $name    = self::nameOrganize(@self::$groups['pre'] . "/$name");
+        $name    = self::nameOrganize(@self::$groups['name'] . "/$name");
         $old_key = @end(array_keys(self::$routes));
         self::$routes[$name] = array_pop(self::$routes);
         if (!is_null(self::$calledRoute) && @self::$calledRoute['name'] == $old_key) self::$calledRoute['name'] = $name;
@@ -309,12 +309,17 @@ class Route
 
     /**
      * Set prefix.
+     * URL prefix'i ile route adı (name) prefix'i ayrılabilir: $namePrefix verilirse route adları
+     * URL'den bağımsız bu değerden üretilir; verilmezse URL prefix'i ad olarak kullanılır (geriye dönük uyumlu).
+     * Örn: Route::pre('/devices', '/assets') -> URL /devices/*, route adı assets.* (call site'lar değişmeden URL sektöre göre değişebilir).
      * @param string $prefix
+     * @param string|null $namePrefix
      * @return self
      */
-    public static function pre(string $prefix)
+    public static function pre(string $prefix, ?string $namePrefix = null)
     {
-        self::$add_groups['pre'] = @self::$groups['pre'] . $prefix;
+        self::$add_groups['pre']  = @self::$groups['pre'] . $prefix;
+        self::$add_groups['name'] = @self::$groups['name'] . ($namePrefix ?? $prefix);
         return new self();
     }
 

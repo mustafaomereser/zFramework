@@ -1,2 +1,9 @@
 DB analyzer use just in SELECT mode.
 db migrator Primary key without auto increment and uuid
+view::class incelenecek ve style içerisinde @page ve @media kullanımı olduğunda view direktifi sayılmayacak
+
+
+        if (Http::isAjax()) abort(500, 'Beklenmedik bir hata oluştu. Bu mesajı görüyorsanız yöneticiye otomatik olarak bilgilendirme yapılmıştır. Sorun uzun süre devam ederse lütfen yöneticiyle iletişime geçiniz.');
+        abort(500, 'Beklenmedik bir hata oluştu, devam ederse lütfen yönetici ile iletişime geçiniz.');
+
+debug false iken lak diye gelen mesajı dümdüz basıyor bu olmamalı productionda böyle bilgileri basmamalı düzenlenecek.
