@@ -267,11 +267,58 @@ class View
     }
 
     /**
+     * CSS at-rules that may appear inside a <style> block.
+     * These are stylesheet syntax, not view directives.
+     */
+    private const CSS_AT_RULES = [
+        'charset', 'color-profile', 'container', 'counter-style', 'document', 'font-face',
+        'font-feature-values', 'font-palette-values', 'import', 'keyframes', 'layer',
+        'media', 'namespace', 'page', 'property', 'scope', 'starting-style', 'supports',
+        'viewport', '-webkit-keyframes', '-moz-keyframes', '-ms-keyframes', '-o-keyframes',
+    ];
+
+    /**
+     * Placeholder that stands in for the "@" of a CSS at-rule during parsing.
+     */
+    private const CSS_AT_PLACEHOLDER = '___ZF_CSS_AT___';
+
+    /**
+     * Mask the "@" of every CSS at-rule inside <style> blocks.
+     *
+     * Without this, "@media (max-width: 600px)" or "@page { margin: 0 }" is fair
+     * game for any pass matching "@word" - most notably customDirectives(), whose
+     * pattern makes the argument list optional, so a directive registered as
+     * "media" or "page" would rewrite the stylesheet.
+     *
+     * Only the "@" is replaced, so {{ $var }} and real directives keep working
+     * inside <style>.
+     */
+    private static function maskCssAtRules(): void
+    {
+        $rules = implode('|', array_map(fn($rule) => preg_quote($rule, '/'), self::CSS_AT_RULES));
+
+        self::$view = preg_replace_callback(
+            '/<style\b[^>]*>[\s\S]*?<\/style>/i',
+            fn($block) => preg_replace('/@(?=(?:' . $rules . ')\b)/i', self::CSS_AT_PLACEHOLDER, $block[0]),
+            self::$view
+        );
+    }
+
+    /**
+     * Restore the "@" of masked CSS at-rules once all passes are done.
+     */
+    private static function unmaskCssAtRules(): void
+    {
+        self::$view = str_replace(self::CSS_AT_PLACEHOLDER, '@', self::$view);
+    }
+
+    /**
      * Run all parse passes on the current view.
      */
     private static function parse(): void
     {
         self::parseIncludes();
+        self::maskCssAtRules();
         self::parsePHP();
         self::parseVariables();
         self::parseForEach();
@@ -286,6 +333,7 @@ class View
         self::parseJSON();
         self::parseDump();
         self::parseDd();
+        self::unmaskCssAtRules();
     }
 
     /**
