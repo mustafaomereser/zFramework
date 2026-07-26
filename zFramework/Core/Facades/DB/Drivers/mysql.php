@@ -182,6 +182,9 @@ class mysql
             case 'select':
                 $select = $this->getSelect();
                 $select = strlen($select ?? '') ? $select : (count($this->parent->guard ?? []) ? "$table." . implode(", $table.", $this->parent->columns()) : "$table.*");
+                # Appended rather than merged into select() so an explicit select() call
+                # cannot drop the ranking column, and vice versa. See DB::withRealOrder().
+                if ($realOrder = $this->parent->buildQuery['realOrder'] ?? null) $select .= ", $realOrder";
                 $type   = "SELECT $select FROM";
                 break;
 

@@ -226,6 +226,7 @@ class DB
             'limit'        => [],
             'having'       => [],
             'sets'         => "",
+            'realOrder'    => null,
             'fetchType'    => \PDO::FETCH_ASSOC
         ];
         return $this;
@@ -702,6 +703,40 @@ class DB
         return $this;
     }
 
+    /**
+     * Select the row's position in the table's default order as an extra column.
+     *
+     * Once a list is sorted by the user, the per-page counter ($list['start']++)
+     * says nothing about where a row actually sits. This adds an index-only
+     * correlated count over the primary key:
+     *
+     *   (SELECT COUNT(*) FROM posts zf_ro WHERE zf_ro.id >= posts.id) AS real_order
+     *
+     * Only the primary key index is read, never the table data, so on a page of
+     * 20 rows the cost stays in the millisecond range.
+     *
+     * The subquery repeats no WHERE clause on purpose: the number is the row's
+     * position in the whole table, not within the current filter. Ranking inside
+     * a filter would mean duplicating every condition into the subquery.
+     *
+     * Example:
+     *   $list = (new Posts)->withRealOrder()->paginate(20);
+     *   // in the view: $item['real_order']
+     *
+     * @param string $as         column name to read in the view
+     * @param string $direction  DESC (default, matching "newest first") or ASC
+     * @return self
+     */
+    public function withRealOrder(string $as = 'real_order', string $direction = 'DESC'): self
+    {
+        if (!$primary = $this->getPrimary()) throw new \Exception("withRealOrder() needs a primary key on `{$this->table}`.");
+
+        $comparison = strtoupper(trim($direction)) === 'ASC' ? '<=' : '>=';
+        $this->buildQuery['realOrder'] = "(SELECT COUNT(*) FROM {$this->table} zf_ro WHERE zf_ro.{$primary} {$comparison} {$this->table}.{$primary}) AS {$as}";
+
+        return $this;
+    }
+
     #endregion
 
     #region CRUD Proccesses
@@ -806,6 +841,9 @@ class DB
 
         if (!isset($row_count)) {
             $snapshot = $this->buildQuery;
+
+            # The ranking subquery would run once per counted row for nothing.
+            $this->buildQuery['realOrder'] = null;
 
             if (!empty($this->buildQuery['groupBy']) || !empty($this->buildQuery['having'])) {
                 // exists GROUP BY or HAVING subquery
