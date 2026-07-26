@@ -25,6 +25,11 @@ class DB
     public $cache_dir;
 
     /**
+     * Operators that carry their own null semantics, so they take no bound value.
+     */
+    private const NULL_OPERATORS = ['IS NULL', 'IS NOT NULL'];
+
+    /**
      * Options parameters
      */
     public $table;
@@ -606,6 +611,12 @@ class DB
             $operator = $data[1];
             $value    = $data[2];
         }
+
+        # A null value is only meaningful next to a null-aware operator. Everywhere else
+        # the builder skips both the bind and the placeholder, emitting "WHERE key = LIMIT 1"
+        # (SQLSTATE 42000 / 1064) far away from the code that leaked the null.
+        if ($value === null && !in_array(strtoupper(trim($operator)), self::NULL_OPERATORS, true))
+            throw new \InvalidArgumentException("DB: `$key` was given a null value with the `$operator` operator. For a null check write where('$key', 'IS NULL', null); otherwise fix the null leaking into the query.");
 
         return compact('key', 'operator', 'value', 'prev');
     }
