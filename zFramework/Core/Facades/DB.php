@@ -77,8 +77,13 @@ class DB
             $GLOBALS['databases']['connections'][$this->db]         = $connection;
         }
 
-        $this->driver  = $GLOBALS['databases']['connected'][$this->db]['driver'];
-        $this->builder = (new ("\zFramework\Core\Facades\DB\Drivers\\$this->driver")($this));
+        $this->driver = $GLOBALS['databases']['connected'][$this->db]['driver'];
+
+        # One builder per connection instead of one per DB instance. The builder is
+        # stateless apart from its owner, and every `new Model` used to construct its
+        # own - each of which asked the server for the database name again.
+        # setParent() re-points the shared instance right before it is used.
+        $this->builder = $GLOBALS['databases']['builders'][$this->db] ??= (new ("\zFramework\Core\Facades\DB\Drivers\\$this->driver")($this));
         $this->dbname  = $GLOBALS['databases']['connected'][$this->db]['name'];
 
         if (isset($new_connection)) $this->tables();
@@ -127,7 +132,7 @@ class DB
     {
         $data = json_decode(@file_get_contents($this->cache_dir . "/" . $this->dbname . "/scheme.json"), true) ?? false;
         if (!$data) {
-            $data = $this->builder->tables();
+            $data = $this->builder->setParent($this)->tables();
             file_put_contents2($this->cache_dir . "/" . $this->dbname . "/scheme.json", json_encode($data, JSON_UNESCAPED_UNICODE));
         }
         $GLOBALS['DB'][$this->dbname] = $data;
@@ -975,7 +980,7 @@ class DB
     public function buildSQL(string $type = 'select'): string
     {
         if (!$this->builder) $this->connection();
-        $sql = $this->builder->build($type);
+        $sql = $this->builder->setParent($this)->build($type);
 
         if ($this->sqlDebug) {
             $debug_sql   = $this->debugSQL($sql);

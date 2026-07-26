@@ -8,7 +8,10 @@ class sqlsrv extends mysql
     public function __construct($parent)
     {
         $this->parent = $parent;
-        $GLOBALS['databases']['connected'][$this->parent->db]['name'] = $GLOBALS['databases']['connections'][$this->parent->db]->query('SELECT DB_NAME()')->fetchColumn();
+
+        # Ask the server for its database name once per connection, not once per builder.
+        if (!isset($GLOBALS['databases']['connected'][$this->parent->db]['name']))
+            $GLOBALS['databases']['connected'][$this->parent->db]['name'] = $GLOBALS['databases']['connections'][$this->parent->db]->query('SELECT DB_NAME()')->fetchColumn();
     }
 
     /**

@@ -8,7 +8,25 @@ class mysql
     public function __construct($parent)
     {
         $this->parent = $parent;
-        $GLOBALS['databases']['connected'][$this->parent->db]['name'] = $GLOBALS['databases']['connections'][$this->parent->db]->query('SELECT DATABASE()')->fetchColumn();
+
+        # Ask the server for its database name once per connection, not once per builder.
+        if (!isset($GLOBALS['databases']['connected'][$this->parent->db]['name']))
+            $GLOBALS['databases']['connected'][$this->parent->db]['name'] = $GLOBALS['databases']['connections'][$this->parent->db]->query('SELECT DATABASE()')->fetchColumn();
+    }
+
+    /**
+     * Point the shared builder at the DB instance that is about to use it.
+     *
+     * One builder is reused per connection, so its owner has to be refreshed
+     * right before every build() / tables() call.
+     *
+     * @param object $parent
+     * @return self
+     */
+    public function setParent($parent): self
+    {
+        $this->parent = $parent;
+        return $this;
     }
 
     /**
