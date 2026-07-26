@@ -626,21 +626,24 @@ class Posts
 |---|---|
 | `primary` | INT AUTO_INCREMENT PRIMARY KEY |
 | `primary:noincrement` | PRIMARY KEY without AUTO_INCREMENT (aliases: `noai`, `false`) |
-| `bigint` / `bigint:N` | BIGINT |
-| `int` / `int:N` | INT |
+| `bigint` | BIGINT |
+| `int` | INT |
 | `smallint` | SMALLINT |
 | `tinyint` | TINYINT |
+| `bool` | TINYINT(1) |
 | `varchar` / `varchar:N` | VARCHAR(255) / VARCHAR(N) |
 | `char` / `char:N` | CHAR(50) / CHAR(N) |
 | `uuid` | CHAR(36) — textual uuid |
 | `text` | TEXT |
 | `longtext` | LONGTEXT |
-| `decimal` / `float` | DECIMAL / FLOAT |
+| `json` | JSON |
+| `decimal` / `float` / `real` | DECIMAL / FLOAT / REAL |
 | `date` / `datetime` / `time` | DATE / DATETIME / TIME |
 | `required` | NOT NULL |
 | `nullable` | NULL |
 | `default:VALUE` | DEFAULT VALUE — use `default:NULL` for null default |
 | `default:(EXPRESSION)` | DEFAULT (EXPRESSION) verbatim — MySQL 8.0.13+ expression default, e.g. `default:(UUID())` |
+| `onupdate` | appends ON UPDATE CURRENT_TIMESTAMP — place it **after** a `default:` option, it extends that clause |
 | `unique` | UNIQUE KEY |
 | `unique:group_name` | composite UNIQUE (groups columns with the same name) |
 | `index` | INDEX |
