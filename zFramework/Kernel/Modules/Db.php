@@ -201,7 +201,9 @@ class Db
                     $switch = explode(':', $parameter);
                     switch ($switch[0]) {
                         case 'primary':
-                            $data['index'] = " PRIMARY KEY AUTO_INCREMENT ";
+                            # `primary`             -> PRIMARY KEY AUTO_INCREMENT (default)
+                            # `primary:noincrement` -> PRIMARY KEY only, for uuid/char/natural keys
+                            $data['index'] = " PRIMARY KEY " . (in_array(strtolower($switch[1] ?? ''), ['noincrement', 'noai', 'false']) ? null : "AUTO_INCREMENT ");
                             break;
 
                         case 'required':
@@ -239,6 +241,12 @@ class Db
 
                         case 'json':
                             $data['type'] = " JSON ";
+                            break;
+
+                        # Canonical 36-char textual uuid. Pair with `primary:noincrement`
+                        # and `default:(UUID())` for a self-populating uuid key.
+                        case 'uuid':
+                            $data['type'] = " CHAR(36) ";
                             break;
                         # String: end
 
@@ -292,7 +300,10 @@ class Db
                         # Date: end
 
                         case 'default':
-                            $data['default'] = " DEFAULT" . ((isset($switch[1]) && strlen($switch[1])) ? (!in_array($switch[1], $MySQL_defines) ? ((is_numeric($switch[1]) ? " " . $switch[1] : " '" . addslashes($switch[1]) . "' ")) : (" " . $switch[1])) : ' NULL') . " ";
+                            # `default:(EXPRESSION)` passes through verbatim: MySQL 8.0.13+ requires
+                            # function defaults to be wrapped in parentheses, e.g. `default:(UUID())`.
+                            if (isset($switch[1]) && str_starts_with($switch[1], '(')) $data['default'] = " DEFAULT " . implode(':', array_slice($switch, 1)) . " ";
+                            else $data['default'] = " DEFAULT" . ((isset($switch[1]) && strlen($switch[1])) ? (!in_array($switch[1], $MySQL_defines) ? ((is_numeric($switch[1]) ? " " . $switch[1] : " '" . addslashes($switch[1]) . "' ")) : (" " . $switch[1])) : ' NULL') . " ";
                             break;
 
                         case 'charset':
@@ -304,6 +315,10 @@ class Db
                             break;
                     }
                 }
+
+                # AUTO_INCREMENT is integer-only. A `primary` on a uuid/char/date column
+                # would fail with 1063; drop the increment instead of breaking the migration.
+                if (isset($data['index']) && str_contains($data['index'], 'AUTO_INCREMENT') && !preg_match('/\b(TINYINT|SMALLINT|MEDIUMINT|INT|BIGINT)\b/i', $data['type'])) $data['index'] = " PRIMARY KEY ";
 
                 if ($fresh || $migrate_force) $column_need_update = true;
                 else $column_need_update = !isset($last_migrate['tables'][$table]['columns'][$column]['data']) || $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
