@@ -93,7 +93,9 @@ class DB
         $e = $this->connection()->prepare($sql);
         $e->execute($data);
         $queryTime = microtime(true) - $queryTime;
-        if (!$this->ignoreAnalyze && config('app.analyze')) DbCollector::analyze($this, $sql, $data, $queryTime);
+        # Analyzer runs on SELECT only: EXPLAIN on write statements costs an extra
+        # round-trip per query and produces nothing actionable.
+        if (!$this->ignoreAnalyze && config('app.analyze') && DbCollector::isSelect($sql)) DbCollector::analyze($this, $sql, $data, $queryTime);
         $this->reset();
         return $e;
     }

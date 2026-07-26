@@ -7,8 +7,20 @@ use zFramework\Core\Facades\DB;
 
 class DbCollector
 {
+    /**
+     * Is this statement a SELECT? (leading parentheses of an union/subquery allowed)
+     * The analyzer is scoped to SELECT: EXPLAIN on INSERT/UPDATE/DELETE costs a
+     * round-trip per query without producing an index suggestion.
+     */
+    public static function isSelect(string $sql): bool
+    {
+        return (bool) preg_match('/^\s*\(*\s*SELECT\b/i', $sql);
+    }
+
     public static function analyze(DB $db, string $sql, array $data, float $queryTime): void
     {
+        if (!self::isSelect($sql)) return;
+
         try {
             $executed = $db->debugSQL($sql, $data);
             $pdo      = $db->connection();
@@ -36,7 +48,7 @@ class DbCollector
                 self::walkExplain($root, $analysis);
             }
 
-            if (preg_match('/^\s*SELECT\b/i', $executed)) {
+            if (self::isSelect($executed)) {
                 $row = $pdo->query("EXPLAIN ANALYZE FORMAT=JSON $executed")->fetch(\PDO::FETCH_ASSOC);
                 if ($row) {
                     $plan = json_decode(current($row), true);
