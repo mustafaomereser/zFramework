@@ -77,8 +77,7 @@ class DB
         $this->dbname  = $GLOBALS['databases']['connected'][$this->db]['name'];
 
         if (isset($new_connection)) $this->tables();
-        $this->connection = $GLOBALS['databases']['connections'][$this->db];
-        return $this->connection;
+        return $this->connection = $GLOBALS['databases']['connections'][$this->db];
     }
 
     /**
@@ -962,6 +961,7 @@ class DB
      */
     public function buildSQL(string $type = 'select'): string
     {
+        if (!$this->builder) $this->connection();
         $sql = $this->builder->build($type);
 
         if ($this->sqlDebug) {
