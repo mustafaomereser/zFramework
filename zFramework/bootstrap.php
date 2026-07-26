@@ -7,6 +7,10 @@ if ($app_config['x-powered-by'] ?? true) header("X-Powered-By: zFramework v" . F
 // Initalize settings
 date_default_timezone_set('Europe/Istanbul');
 
+// zend ignore args disable and param max len increse
+ini_set('zend.exception_ignore_args', 0);
+ini_set('zend.exception_string_param_max_len', 100000);
+
 // Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
 if (!isset($cron_mode)) {
