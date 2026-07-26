@@ -1715,8 +1715,9 @@ function errorHandler($data)
         Config::get('app.error.callback')($error_log_file_name, $error_log);
     }
 
+    # Production: never leak the raw exception message to the client.
     if (!Config::get('app.debug')) {
-        if (Http::isAjax()) abort(500, $message);
+        if (Http::isAjax()) abort(500, 'Beklenmedik bir hata oluştu. Bu mesajı görüyorsanız yöneticiye otomatik olarak bilgilendirme yapılmıştır. Sorun uzun süre devam ederse lütfen yöneticiyle iletişime geçiniz.');
         abort(500, 'Beklenmedik bir hata oluştu, devam ederse lütfen yönetici ile iletişime geçiniz.');
     }
 
