@@ -456,16 +456,35 @@ class View
     }
 
     /**
+     * How deep @include may nest before it is treated as a circular include.
+     */
+    private const MAX_INCLUDE_DEPTH = 32;
+
+    /**
      * Parse @include('view.name') directives.
      * Example: @include('partials.header')
+     *
+     * Runs until no @include is left, because preg_replace_callback never
+     * re-scans what a callback returned: a partial pulled in by @include could
+     * not @include anything itself. Its directive stayed in the output as plain
+     * text and - worse - its file never reached the manifest, so editing it
+     * never invalidated the cache.
      */
     public static function parseIncludes(): void
     {
-        self::$view = preg_replace_callback('/@include\(\'(.*?)\'\)/', function ($viewName) {
-            $path                  = self::$config['views'] . '/' . self::parseViewName($viewName[1]);
-            self::$compiledFiles[] = $path;
-            return file_get_contents($path);
-        }, self::$view);
+        for ($depth = 0; $depth < self::MAX_INCLUDE_DEPTH; $depth++) {
+            $before = self::$view;
+
+            self::$view = preg_replace_callback('/@include\(\'(.*?)\'\)/', function ($viewName) {
+                $path                  = self::$config['views'] . '/' . self::parseViewName($viewName[1]);
+                self::$compiledFiles[] = $path;
+                return file_get_contents($path);
+            }, self::$view);
+
+            if (self::$view === $before) return;
+        }
+
+        throw new \RuntimeException('View: @include nested deeper than ' . self::MAX_INCLUDE_DEPTH . ' levels in `' . self::$view_name . '` - most likely a circular include.');
     }
 
     /**
