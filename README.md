@@ -625,12 +625,14 @@ class Posts
 | Option | SQL equivalent |
 |---|---|
 | `primary` | INT AUTO_INCREMENT PRIMARY KEY |
+| `primary:noincrement` | PRIMARY KEY without AUTO_INCREMENT (aliases: `noai`, `false`) |
 | `bigint` / `bigint:N` | BIGINT |
 | `int` / `int:N` | INT |
 | `smallint` | SMALLINT |
 | `tinyint` | TINYINT |
 | `varchar` / `varchar:N` | VARCHAR(255) / VARCHAR(N) |
 | `char` / `char:N` | CHAR(50) / CHAR(N) |
+| `uuid` | CHAR(36) — textual uuid |
 | `text` | TEXT |
 | `longtext` | LONGTEXT |
 | `decimal` / `float` | DECIMAL / FLOAT |
@@ -638,6 +640,7 @@ class Posts
 | `required` | NOT NULL |
 | `nullable` | NULL |
 | `default:VALUE` | DEFAULT VALUE — use `default:NULL` for null default |
+| `default:(EXPRESSION)` | DEFAULT (EXPRESSION) verbatim — MySQL 8.0.13+ expression default, e.g. `default:(UUID())` |
 | `unique` | UNIQUE KEY |
 | `unique:group_name` | composite UNIQUE (groups columns with the same name) |
 | `index` | INDEX |
@@ -645,6 +648,21 @@ class Posts
 | `charset:utf8mb4_general_ci` | per-column CHARACTER SET + COLLATE |
 | `timestamps` | adds `created_at DATETIME` + `updated_at DATETIME` |
 | `softDelete` | adds `deleted_at DATETIME NULL` |
+
+**Non auto-increment primary keys:**
+
+```php
+// uuid primary key, populated by MySQL itself
+'id'  => ['uuid', 'primary:noincrement', 'required', 'default:(UUID())'],
+
+// natural key (product code, iso code, slug ...)
+'code' => ['varchar:32', 'primary:noincrement', 'required'],
+```
+
+`AUTO_INCREMENT` only applies to integer columns, so a bare `primary` on a
+`uuid` / `char` / `varchar` column drops the increment automatically instead of
+failing the migration with error 1063. Writing `primary:noincrement` is still
+preferred — it states the intent.
 
 ```bash
 php terminal db migrate                   # apply pending migrations
