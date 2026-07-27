@@ -1786,15 +1786,47 @@ RoadRunner   : boot once, then handle only
 
 ### Running it
 
-```bash
-composer require spiral/roadrunner-http spiral/roadrunner-worker nyholm/psr7
-./vendor/bin/rr get-binary          # or download a release manually
+**1. PHP packages.** They are suggestions rather than requirements, because they
+need PHP 8.2 and `ext-sockets` while the framework itself runs on 8.1 — pulling
+them in by default would break installs on hosts that cannot run RoadRunner
+anyway.
 
+```bash
+composer require spiral/roadrunner-cli spiral/roadrunner-http spiral/roadrunner-worker nyholm/psr7
+```
+
+`spiral/roadrunner-cli` is what provides the `rr` helper below — without it
+there is no `get-binary` command.
+
+**2. The server binary.** RoadRunner itself is a single Go executable, not a PHP
+package. `get-binary` downloads the right build for your platform into the
+project root (`rr` on Linux/macOS, `rr.exe` on Windows, ~64 MB):
+
+```bash
+php zFramework/vendor/bin/rr get-binary
+```
+
+Note the path: this project sets `vendor-dir` to `zFramework/vendor/`, so it is
+not the usual `./vendor/bin/rr`. On Windows the file has no shebang, hence the
+leading `php`. Alternatively grab a release from
+[github.com/roadrunner-server/roadrunner](https://github.com/roadrunner-server/roadrunner/releases)
+and drop the binary in the project root yourself.
+
+The binary is gitignored — it is platform specific, so each machine fetches its
+own.
+
+**3. Run it.**
+
+```bash
 php terminal run roadrunner         # serve
 php terminal run roadrunner reset   # reload workers - run this after a deploy
 php terminal run roadrunner workers # pid, memory, requests served
 php terminal run roadrunner stop
 ```
+
+`run roadrunner` looks for the binary in the project root, then in
+`zFramework/vendor/bin/`, then on PATH, and tells you what is missing if it
+cannot find it or the PHP packages.
 
 Configuration is `.rr.yaml`; the worker is `zFramework/Kernel/worker.php`. Keep
 RoadRunner behind nginx in production and let nginx handle TLS and static files —
