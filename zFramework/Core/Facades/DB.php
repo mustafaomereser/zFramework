@@ -42,6 +42,12 @@ class DB
     private static array $schemeMtimes = [];
 
     /**
+     * Connections whose scheme has already been validated during this request.
+     * Cleared by Run::resetState() so a worker re-checks on the next one.
+     */
+    public static array $schemeChecked = [];
+
+    /**
      * Options parameters
      */
     public $table;
@@ -258,7 +264,7 @@ class DB
      */
     public function forgetScheme(): void
     {
-        unset($GLOBALS['DB'][$this->dbname], self::$schemeMtimes[$this->dbname]);
+        unset($GLOBALS['DB'][$this->dbname], self::$schemeMtimes[$this->dbname], self::$schemeChecked[$this->dbname]);
         GlobalCache::remove($this->schemeCacheKey());
         @unlink($this->cache_dir . "/" . $this->dbname . "/scheme.json");
     }
@@ -282,16 +288,26 @@ class DB
      */
     private function tables(): array
     {
+        # table() calls tables() on every call, so this runs dozens of times per
+        # request. Once the scheme has been validated for this connection, serve it
+        # without touching the filesystem again - a stat is cheap locally but not on
+        # the network filesystems shared hosting runs on.
+        #
+        # The check is per request, not per call: $schemeChecked is cleared by
+        # resetState(), so a long-running worker re-validates on the next request
+        # and a migration is still noticed.
+        if (isset($GLOBALS['DB'][$this->dbname], self::$schemeChecked[$this->dbname])) return $GLOBALS['DB'][$this->dbname];
+
         $path  = $this->cache_dir . "/" . $this->dbname . "/scheme.json";
         $mtime = @filemtime($path) ?: 0;
 
         # The scheme file's mtime validates every layer, so nothing has to announce
         # that the schema changed: a migration dropping the file, or anyone clearing
         # it by hand, invalidates the in-process copy and the APCu copy alike.
-        # filemtime() is a stat call - cheap enough to pay per lookup in exchange for
-        # never serving a scheme that no longer matches the database.
-        if (isset($GLOBALS['DB'][$this->dbname]) && (self::$schemeMtimes[$this->dbname] ?? -1) === $mtime)
+        if (isset($GLOBALS['DB'][$this->dbname]) && (self::$schemeMtimes[$this->dbname] ?? -1) === $mtime) {
+            self::$schemeChecked[$this->dbname] = true;
             return $GLOBALS['DB'][$this->dbname];
+        }
 
         $build = function () use ($path) {
             $data = json_decode(@file_get_contents($path), true) ?? false;
@@ -312,7 +328,8 @@ class DB
             $entry = GlobalCache::cache($key, $build);
         }
 
-        self::$schemeMtimes[$this->dbname] = $entry['mtime'] ?? 0;
+        self::$schemeMtimes[$this->dbname]  = $entry['mtime'] ?? 0;
+        self::$schemeChecked[$this->dbname] = true;
         $GLOBALS['DB'][$this->dbname]      = $entry['data'];
 
         return $entry['data'];

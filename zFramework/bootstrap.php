@@ -19,8 +19,10 @@ if ($app_config['debug'] ?? false) {
 // Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
 if (!isset($cron_mode)) {
+    // Read on demand: config/redis.php is only needed by the redis driver, and an
+    // include per request is not free on a network filesystem.
     $session_config = @include(BASE_PATH . "/config/session.php") ?: [];
-    $redis_config   = @include(BASE_PATH . "/config/redis.php") ?: [];
+    $redis_config   = ($session_config['driver'] ?? 'file') === 'redis' ? (@include(BASE_PATH . "/config/redis.php") ?: []) : [];
 
     if (($session_config['driver'] ?? 'file') === 'redis' && ($redis_config['enabled'] ?? false)) {
         // Sessions in Redis: every app server reads the same store, so a user is
@@ -61,7 +63,3 @@ spl_autoload_register(function ($class) {
     zFramework\Run::includer(BASE_PATH . "/$class.php");
     if (method_exists($class, 'init')) $class::init();
 });
-
-// APCu is shared by every PHP process on the machine, so two projects on the same
-// host would read each other's cache entries. Namespace them by install path.
-zFramework\Core\GlobalCache::$prefix = 'zf.' . substr(md5(BASE_PATH), 0, 8) . '.';

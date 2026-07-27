@@ -15,6 +15,12 @@ class GlobalCache
      */
     private static function getName(string $name)
     {
+        # APCu is shared by every PHP process on the machine, so two installations
+        # on one host would read each other's entries. Namespaced by install path,
+        # and resolved here rather than at boot so nothing is paid for by requests
+        # that never touch the cache.
+        if (self::$prefix === '') self::$prefix = 'zf.' . substr(md5(defined('BASE_PATH') ? BASE_PATH : __DIR__), 0, 8) . '.';
+
         return self::$prefix . $name;
     }
 
