@@ -1,17 +1,18 @@
 {
     "config": {
-        "vendor-dir": "zFramework/vendor/",
-        "allow-plugins": {
-            "spiral/composer-publish-plugin": true
-        }
+        "vendor-dir": "zFramework/vendor/"
     },
     "require": {
         "php": ">=8.1",
         "phpmailer/phpmailer": "^6.6",
-        "tedivm/jshrink": "~1.0",
-        "spiral/roadrunner-cli": "^2.6",
-        "spiral/roadrunner-http": "^3.5",
-        "spiral/roadrunner-worker": "^3.6",
-        "nyholm/psr7": "^1.8"
+        "tedivm/jshrink": "~1.0"
+    },
+    "suggest": {
+        "spiral/roadrunner-cli": "Run the application under RoadRunner (boot once, serve many). Needs PHP 8.2+ and ext-sockets.",
+        "spiral/roadrunner-http": "RoadRunner HTTP worker.",
+        "spiral/roadrunner-worker": "RoadRunner worker runtime.",
+        "nyholm/psr7": "PSR-7 implementation used by the RoadRunner worker.",
+        "ext-apcu": "Caches the table scheme and GlobalCache in shared memory.",
+        "ext-redis": "Shared sessions, cache and queue across servers (config/redis.php)."
     }
 }

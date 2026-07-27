@@ -145,16 +145,26 @@ class File
         $fullPath = public_dir($file);
         if (!file_exists($fullPath)) abort(404, 'File not exists.');
 
-        # Read into the signal rather than streaming with readfile()+exit: the
-        # response has to be something Run::begin() can hand back, and under a
-        # long-running worker exit would take the worker down with it.
-        throw new \zFramework\Core\ResponseSignal(200, [
+        $headers = [
             'Cache-Control'             => 'public',
             'Content-Type'              => 'application/octet-stream',
             'Content-Transfer-Encoding' => 'Binary',
             'Content-Length'            => (string) filesize($fullPath),
             'Content-Disposition'       => 'attachment; filename="' . basename($fullPath) . '"',
-        ], (string) file_get_contents($fullPath));
+        ];
+
+        # Under FPM keep streaming: readfile() sends the file in chunks, so a 2 GB
+        # download costs no more memory than a 2 KB one. The signal carries the
+        # body in a string, which is only acceptable where there is no choice.
+        if (PHP_SAPI !== 'cli') {
+            foreach ($headers as $name => $value) \zFramework\Core\Facades\Response::header($name, $value);
+            readfile($fullPath);
+            throw new \zFramework\Core\ResponseSignal();
+        }
+
+        # A long-running worker has to hand the response back rather than write it
+        # out, so here the file does go through memory.
+        throw new \zFramework\Core\ResponseSignal(200, $headers, (string) file_get_contents($fullPath));
     }
 
     /**
