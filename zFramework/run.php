@@ -70,12 +70,17 @@ class Run
      * Boot state - the route table, view binds, config, database connections - is
      * deliberately kept. That is the whole point of booting once.
      *
-     * Safe to call under FPM as well; it simply has nothing to gain there.
+     * Only runs under a CLI SAPI, which is where every long-running server lives.
+     * Under FPM there is nothing to reset and a stray call - from a module, a
+     * provider, application code - would only tear down state the request still
+     * needs, so it returns without doing anything.
      *
      * @return void
      */
     public static function resetState(): void
     {
+        if (PHP_SAPI !== 'cli') return;
+
         foreach (self::REQUEST_STATE as $class) if (method_exists($class, 'flushRequestState')) $class::flushRequestState();
 
         # Only ever holds the request currently being analysed.
