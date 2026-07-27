@@ -14,6 +14,16 @@ class Mail
     static $bcc     = [];
     static $sending = false;
 
+    /**
+     * Whether set() has run since the last state flush.
+     *
+     * init() is called once by the autoloader. In a long-running worker that is
+     * the only time it would ever run, so after flushRequestState() the mailer
+     * would be left unconfigured - $sending false, $mail null - and every mail
+     * from the second request on would fail. Both entry points re-init on this.
+     */
+    private static bool $booted = false;
+
     private static $security = [
         'tls' => PHPMailer::ENCRYPTION_STARTTLS,
         'ssl' => PHPMailer::ENCRYPTION_SMTPS
@@ -35,6 +45,17 @@ class Mail
         self::$cc      = [];
         self::$bcc     = [];
         self::$sending = false;
+        self::$booted  = false;
+    }
+
+    /**
+     * Configure the mailer if it is not configured yet.
+     *
+     * @return void
+     */
+    private static function boot(): void
+    {
+        if (!self::$booted) self::init();
     }
     /**
      * Initalize settings.
@@ -50,6 +71,7 @@ class Mail
      */
     public static function set(array $mailConfig)
     {
+        self::$booted  = true;
         self::$sending = $mailConfig['sending'] ?? false;
         if (!$mailConfig['sending']) return false;
 
@@ -152,8 +174,55 @@ class Mail
      * @param array $data
      * @return bool
      */
+    /**
+     * Send the mail, or hand it to the queue.
+     *
+     * An SMTP handshake plus delivery is 100-1000ms and it happens inside the
+     * request, holding a PHP worker the whole time. With config mail.queue on,
+     * the recipients and payload go to the queue instead and a worker sends it -
+     * the request returns immediately.
+     *
+     * Falls back to sending inline whenever the queue cannot take it (no Redis),
+     * so behaviour is correct either way.
+     *
+     * @param array $data
+     * @return bool
+     */
     public static function send(array $data): bool
     {
+        self::boot();
+
+        if (!self::$sending) throw new \Exception(_l('errors.mail.sending-is-false'));
+        if (!count(self::$toMail)) throw new \Exception(_l('errors.mail.must-set-a-mail'));
+
+        if (Config::get('mail.queue') && Redis::available('queue')) {
+            $queued = Queue::push([\zFramework\Core\Jobs\SendMail::class, 'handle'], [
+                'to'   => self::$toMail,
+                'cc'   => self::$cc,
+                'bcc'  => self::$bcc,
+                'data' => $data,
+            ]);
+
+            self::clearTo();
+            self::clearCc();
+            self::clearBcc();
+
+            if ($queued) return true;
+        }
+
+        return self::sendNow($data);
+    }
+
+    /**
+     * Send immediately, bypassing the queue. This is what the queue worker runs.
+     *
+     * @param array $data
+     * @return bool
+     */
+    public static function sendNow(array $data): bool
+    {
+        self::boot();
+
         if (!self::$sending) throw new \Exception(_l('errors.mail.sending-is-false'));
         if (!count(self::$toMail)) throw new \Exception(_l('errors.mail.must-set-a-mail'));
 

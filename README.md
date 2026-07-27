@@ -1005,8 +1005,34 @@ Mail::clearBcc();
 SMTP settings are configured in `config/mail.php`.
 
 **Do not make the user wait for it.** An SMTP handshake plus delivery is
-typically 100–1000 ms, and `send()` runs inside the request. Hand it to
-[`Defer`](#71-defer) instead:
+typically 100–1000 ms, and `send()` runs inside the request, holding a PHP
+worker for all of it.
+
+The fix is one config line:
+
+```php
+// config/mail.php
+'queue' => true,
+```
+
+`Mail::send()` then pushes the mail to the [queue](#82-queue) and returns; a
+worker delivers it:
+
+```bash
+php terminal queue work
+```
+
+Nothing else in your code changes. What does change is the return value —
+`true` now means *queued*, not *delivered*, so a failed delivery surfaces in
+the worker's output (and the error handler after `--tries` attempts) rather
+than as a `false` in the request.
+
+Requires Redis. Without it — shared hosting, local development — mails are
+sent inline exactly as before, so the same code runs in both places. To send
+inline while the queue is on, call `Mail::sendNow()` instead.
+
+If Redis is not an option, [`Defer`](#71-defer) at least gets the wait out of
+the user's way:
 
 ```php
 Defer::after(fn() => Mail::to($user['email'])->send([...]), 'welcome-mail');
