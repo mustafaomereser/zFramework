@@ -2,8 +2,68 @@
 
 namespace zFramework\Core\Traits\DB;
 
+/**
+ * Thrown by a relation method while it is being probed for eager loading.
+ *
+ * The probe needs to know which model, column and value a relation would query
+ * without letting it run the query. Relation methods return their result
+ * directly, so there is no relation object to inspect - unwinding with a signal
+ * is what stops them at the point where the intent is known.
+ */
+class EagerProbe extends \Exception
+{
+}
+
 trait RelationShips
 {
+    /**
+     * Relations queued by with(), resolved in one query each after get().
+     */
+    public array $eagerLoad = [];
+
+    /**
+     * Set while probing: receives the relation's intent instead of a result set.
+     */
+    private ?array $eagerProbe = null;
+
+    /**
+     * Queue relations to be eager loaded.
+     *
+     * Without this, reading $row['posts']() on every row of a list runs one
+     * query per row. with('posts') collects what each row would ask for, fires
+     * a single "WHERE fk IN (...)" for the whole page and hands each row its
+     * share.
+     *
+     *   (new User)->with('profile', 'posts')->paginate(20);
+     *   // in the view: $item['profile'], $item['posts'] - plain values, no call
+     *
+     * Relations that are not probeable (pivot, morph, through) stay lazy and
+     * keep working through their closure exactly as before.
+     *
+     * @param string ...$relations Method names on the model.
+     * @return self
+     */
+    public function with(string ...$relations): self
+    {
+        foreach ($relations as $relation) if (!in_array($relation, $this->eagerLoad, true)) $this->eagerLoad[] = $relation;
+        return $this;
+    }
+
+    /**
+     * Record what the relation currently being probed would query, then unwind.
+     *
+     * @param string $model
+     * @param string $column
+     * @param mixed  $value
+     * @param bool   $many
+     * @throws EagerProbe
+     */
+    private function eagerCapture(string $model, string $column, mixed $value, bool $many): void
+    {
+        $this->eagerProbe = compact('model', 'column', 'value', 'many');
+        throw new EagerProbe();
+    }
+
     /**
      * Base relation finder.
      *
@@ -36,6 +96,7 @@ trait RelationShips
      */
     public function hasMany(string $model, string $value, ?string $column = null): array
     {
+        if ($this->eagerProbe !== null) $this->eagerCapture($model, $column ?: $this->table . "_id", $value, true);
         return $this->findRelation($model, $value, $column)->get();
     }
 
@@ -53,6 +114,7 @@ trait RelationShips
      */
     public function hasOne(string $model, string $value, ?string $column = null): ?array
     {
+        if ($this->eagerProbe !== null) $this->eagerCapture($model, $column ?: $this->table . "_id", $value, false);
         return $this->findRelation($model, $value, $column)->first();
     }
 
@@ -72,6 +134,7 @@ trait RelationShips
     {
         $instance = new $model;
         if (!$column) $column = $instance->getPrimary();
+        if ($this->eagerProbe !== null) $this->eagerCapture($model, $column, $value, false);
         return $instance->where($column, $value)->first();
     }
 
@@ -399,7 +462,19 @@ trait RelationShips
     }
 
     /**
-     * Resolve eager loaded relations onto result set. Should be called inside get().
+     * Resolve eager loaded relations onto a result set. Called from get().
+     *
+     * Two passes per relation:
+     *
+     *   1. Probe every row. The relation method runs but is stopped by
+     *      EagerProbe the moment it states its intent, so nothing is queried -
+     *      this only costs a method call per row.
+     *   2. Group the intents by model+column, run one "WHERE column IN (...)"
+     *      per group, and hand each row its slice.
+     *
+     * A relation that never signals - pivot, morph and through relations do not
+     * probe - is left to run per row, exactly as it did before. Correct, just
+     * not batched.
      *
      * @param array &$results Reference to the fetched result set.
      * @return void
@@ -410,7 +485,48 @@ trait RelationShips
 
         foreach ($this->eagerLoad as $relation) {
             if (!method_exists($this, $relation)) continue;
-            foreach ($results as &$row) $row[$relation] = $this->{$relation}($row);
+
+            # Pass 1: what would each row ask for?
+            $intents  = [];
+            $fallback = [];
+
+            foreach ($results as $index => $row) {
+                $this->eagerProbe = [];
+                try {
+                    $this->{$relation}($row);
+                    $fallback[$index] = true;               // never probed: not batchable
+                } catch (EagerProbe) {
+                    $intents[$index] = $this->eagerProbe;
+                } finally {
+                    $this->eagerProbe = null;
+                }
+            }
+
+            # Pass 2: one query per model+column pair.
+            $groups = [];
+            foreach ($intents as $index => $intent) {
+                $key = $intent['model'] . '|' . $intent['column'];
+                $groups[$key]['model']          = $intent['model'];
+                $groups[$key]['column']         = $intent['column'];
+                $groups[$key]['many']           = $intent['many'];
+                $groups[$key]['values'][$index] = $intent['value'];
+            }
+
+            foreach ($groups as $group) {
+                $wanted = array_values(array_unique(array_filter($group['values'], fn($v) => $v !== null && $v !== '')));
+
+                $related = [];
+                if ($wanted) foreach ((new $group['model'])->whereIn($group['column'], $wanted)->get() as $row)
+                    $related[(string) $row[$group['column']]][] = $row;
+
+                foreach ($group['values'] as $index => $value) {
+                    $matches = $related[(string) $value] ?? [];
+                    $results[$index][$relation] = $group['many'] ? $matches : ($matches[0] ?? null);
+                }
+            }
+
+            # Relations that could not be probed keep their per-row behaviour.
+            foreach (array_keys($fallback) as $index) $results[$index][$relation] = $this->{$relation}($results[$index]);
         }
     }
 

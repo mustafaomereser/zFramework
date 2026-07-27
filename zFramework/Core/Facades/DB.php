@@ -16,6 +16,11 @@ class DB
     use OrMethods;
 
     public $db;
+
+    /**
+     * Connection name the caller asked for, defined or not. Only used for errors.
+     */
+    private ?string $requestedDb = null;
     public $dbname;
     public $connection = null;
     private $driver;
@@ -56,6 +61,9 @@ class DB
         $this->cache_dir = $storage_path . "/db";
 
         if (!$db) $db = array_keys($GLOBALS['databases']['connections'])[0] ?? null;
+
+        # Kept even when the name is unknown, so the error can name what was asked for.
+        $this->requestedDb = $db;
         if (isset($GLOBALS['databases']['connections'][$db])) $this->db = $db;
 
         $this->connection();
@@ -69,13 +77,24 @@ class DB
     public function connection(): object|bool
     {
         if ($this->connection !== null) return $this->connection;
-        if ($this->table && !isset($GLOBALS['databases']['connections'][$this->db])) return false;
+
+        # Unknown connection name: bail out before handing a null key to PDO. The
+        # caller gets a named error from requireBuilder() at query time instead.
+        if (!isset($GLOBALS['databases']['connections'][$this->db])) return false;
         if (!isset($GLOBALS['databases']['connected'][$this->db])) {
             try {
                 $parameters = $GLOBALS['databases']['connections'][$this->db];
                 $connection = new \PDO($parameters[0], $parameters[1], ($parameters[2] ?? null));
                 foreach ($parameters['options'] ?? [] as $option) $connection->setAttribute($option[0], $option[1]);
             } catch (\Throwable $err) {
+                # The database is unreachable - that is the server's problem, not the
+                # request's. Answering 503 + Retry-After lets a load balancer's health
+                # check pull this node out and put it back once it recovers; the plain
+                # error page this used to emit carried a 200 and read as healthy.
+                if (!headers_sent()) {
+                    http_response_code(503);
+                    header('Retry-After: 5');
+                }
                 die(errorHandler($err));
             }
 
@@ -146,6 +165,24 @@ class DB
     }
 
     /**
+     * Make sure a builder exists, or say why it does not.
+     *
+     * connection() returns false for a connection name that is not in
+     * database/connections.php, which used to leave $builder null and surface
+     * three frames later as "Call to a member function build() on null".
+     *
+     * @return void
+     */
+    private function requireBuilder(): void
+    {
+        if (!$this->builder) $this->connection();
+        if ($this->builder) return;
+
+        $known = implode(', ', array_keys($GLOBALS['databases']['connections'] ?? [])) ?: 'none';
+        throw new \RuntimeException("DB: connection `" . ($this->db ?? $this->requestedDb ?? 'null') . "` is not defined in database/connections.php (defined: $known).");
+    }
+
+    /**
      * Forget this connection's table scheme on every layer it is held.
      *
      * Call it after the schema itself changes - migrations do. Dropping only the
@@ -195,6 +232,7 @@ class DB
         $build = function () use ($path) {
             $data = json_decode(@file_get_contents($path), true) ?? false;
             if (!$data) {
+                $this->requireBuilder();
                 $data = $this->builder->setParent($this)->tables();
                 file_put_contents2($path, json_encode($data, JSON_UNESCAPED_UNICODE));
                 clearstatcache(true, $path);
@@ -826,6 +864,14 @@ class DB
     {
         $rows = $this->run()->fetchAll($this->buildQuery['fetchType']);
         if ($this->setClosures) $rows = $this->setClosures($rows);
+
+        # After setClosures, so an eager loaded relation replaces its closure with
+        # the value itself - $item['posts'] instead of $item['posts']().
+        if ($this->eagerLoad) {
+            $this->loadRelations($rows);
+            $this->eagerLoad = [];
+        }
+
         return $rows;
     }
 
@@ -1094,7 +1140,7 @@ class DB
      */
     public function buildSQL(string $type = 'select'): string
     {
-        if (!$this->builder) $this->connection();
+        $this->requireBuilder();
         $sql = $this->builder->setParent($this)->build($type);
 
         if ($this->sqlDebug) {
