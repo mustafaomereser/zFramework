@@ -219,7 +219,7 @@ class Run
                 # cache stale, and the route files are loaded normally instead. Costs
                 # one stat() per source file; turn it off in production, where the
                 # deploy script rebuilds the cache anyway.
-                if ($route_config['auto-check'] ?? true) {
+                if ($route_config['auto-check'] ?? false) {
                     foreach ($compiled['files'] ?? [] as $source => $mtime) {
                         if (!file_exists($source) || filemtime($source) !== $mtime) {
                             $cached = false;
@@ -243,7 +243,7 @@ class Run
                 # one is `php terminal route cache` - otherwise an application with a
                 # closure route (which can never be cached) would rebuild the whole
                 # table, discover that, and throw it away on every single request.
-                if ($cache_vardi && \zFramework\Core\Route::$caching && ($route_config['auto-check'] ?? true))
+                if ($cache_vardi && \zFramework\Core\Route::$caching && ($route_config['auto-check'] ?? false))
                     \zFramework\Core\Route::writeCache($route_cache, \zFramework\Core\Route::sources(array_values(array_diff(self::$included, $before))));
             }
 

@@ -13,6 +13,15 @@ return [
     # Note that route/dynamic/ is never cached regardless of this setting.
     'caching' => true,
 
+    # OFF by default, and deliberately so: it costs work on every request, while
+    # the cache it maintains only helps applications that can be cached at all.
+    # A single closure route makes the whole table uncacheable, so on many
+    # projects this would rebuild the table, discover the closure and throw the
+    # result away - forever, on every request.
+    #
+    # Turn it on once `php terminal route cache` succeeds, i.e. once every route
+    # is [Controller::class, 'method'].
+    #
     # Verify the cache against the route files it was built from and rebuild it
     # when any of them changed. Files and their directories are both watched, so
     # adding or deleting a route file is noticed too.
@@ -29,7 +38,7 @@ return [
     # express them as middleware so the route always exists and access is decided
     # per request.
     #
-    # Costs one stat() per route file per request. In production the deploy
-    # script rebuilds the cache, so this can be false there.
-    'auto-check' => true,
+    # Costs a stat per route file per request when a cache exists, and a full
+    # table rebuild per request when one cannot be written.
+    'auto-check' => false,
 ];
