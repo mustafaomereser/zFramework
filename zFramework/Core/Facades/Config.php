@@ -10,6 +10,12 @@ class Config
     static $path   = null;
     static $caches = [];
 
+    /**
+     * Compiled config for this request: array once loaded, false when there is no
+     * cache file, null before the first lookup.
+     */
+    private static array|false|null $compiled = null;
+
     public static function init()
     {
         self::$path = base_path('config');
@@ -64,6 +70,24 @@ class Config
      */
     public static function get(string $config, bool $returnbool = true)
     {
+        # Compiled cache (php terminal config cache): every config file merged into
+        # one array, so a request includes one file instead of a dozen and skips the
+        # per-lookup opcache_invalidate() below. Files with closures are left out of
+        # the compile and fall through to the normal path.
+        if (($compiled = self::compiled()) !== false) {
+            $parts = explode('.', $config);
+            $file  = array_shift($parts);
+
+            if (array_key_exists($file, $compiled)) {
+                $value = $compiled[$file];
+                # Same traversal as the uncached path below, including its quirk:
+                # a key that does not exist is skipped rather than failing, so the
+                # level above is what comes back. Callers depend on that.
+                foreach ($parts as $key) if (isset($value[$key])) $value = $value[$key];
+                return $value;
+            }
+        }
+
         $data = self::parseUrl($config);
         if ($data === false) return $returnbool ? false : $config;
         $cache_name = str_replace('/', '.', $data['find']);
@@ -75,6 +99,39 @@ class Config
 
         if (isset($data['args'])) foreach (explode('.', $data['args']) as $key) if (isset($config[$key])) $config = $config[$key];
         return $config;
+    }
+
+    /**
+     * Where the compiled config lives.
+     * @return string
+     */
+    public static function cachePath(): string
+    {
+        return FRAMEWORK_PATH . '/storage/config.cache.php';
+    }
+
+    /**
+     * Load the compiled config once per request. false when there is none.
+     * @return array|false
+     */
+    private static function compiled(): array|false
+    {
+        if (self::$compiled !== null) return self::$compiled;
+        if (!defined('FRAMEWORK_PATH') || !is_file($path = self::cachePath())) return self::$compiled = false;
+
+        $data = include $path;
+        return self::$compiled = is_array($data) ? $data : false;
+    }
+
+    /**
+     * Drop the compiled config, in memory and on disk.
+     * @return void
+     */
+    public static function clearCache(): void
+    {
+        self::$compiled = null;
+        self::$caches   = [];
+        if (defined('FRAMEWORK_PATH')) @unlink(self::cachePath());
     }
 
     /**
@@ -93,6 +150,11 @@ class Config
             foreach ($sets as $key => $set) $data[$key] = $set;
         } else $data = $sets;
 
-        return file_put_contents2($path, "<?php \nreturn " . var_export($data, true) . ";");
+        $written = file_put_contents2($path, "<?php \nreturn " . var_export($data, true) . ";");
+
+        # A compiled cache would keep serving what was just overwritten.
+        if ($written !== false) self::clearCache();
+
+        return $written;
     }
 }
