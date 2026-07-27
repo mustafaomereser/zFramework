@@ -32,28 +32,19 @@ class Route
         # on request state live, and a cache would freeze them at build time.
         Run::includer(BASE_PATH . '/route', true, false, '.php', BASE_PATH . '/route/dynamic');
 
-        $sources = self::sources(array_values(array_diff(Run::$included, $before)));
+        $sources = RouteFacade::sources(array_values(array_diff(Run::$included, $before)));
         $total   = count(RouteFacade::$routes);
-        $blocked = [];
-
-        foreach (RouteFacade::$routes as $key => $route) {
-            # var_export() cannot write a closure, so a route handled by one - or
-            # guarded by a middleware failure closure - cannot be part of the table.
-            # Reported by name instead of silently dropped: half a cached table is
-            # worse than none, because the missing half 404s.
-            if ($route['callback'] instanceof \Closure) $blocked[] = "$key (closure handler)";
-            elseif (($route['groups']['middlewares'][1] ?? null) instanceof \Closure) $blocked[] = "$key (closure in middleware fallback)";
-        }
+        $blocked = RouteFacade::cacheBlockers();
 
         if (count($blocked)) {
             Terminal::text("[color=red]Cannot cache: " . count($blocked) . " of $total route(s) use a closure.[/color]");
-            foreach ($blocked as $name) Terminal::text("[color=yellow]-> {$name}[/color]");
+            foreach ($blocked as $name => $reason) Terminal::text("[color=yellow]-> {$name}[/color] [color=dark-gray]($reason)[/color]");
             Terminal::text("[color=dark-gray]Replace them with [Controller::class, 'method'] and run this again.[/color]");
             return;
         }
 
         $path = "$storage_path/routes.cache.php";
-        file_put_contents2($path, "<?php \nreturn " . var_export(['files' => $sources, 'routes' => RouteFacade::$routes], true) . ";");
+        if (!RouteFacade::writeCache($path, $sources)) return Terminal::text("[color=red]Could not write $path - check permissions.[/color]");
 
         Terminal::text("[color=green]Routes cached:[/color] $total route(s) from " . count($sources) . " source(s) -> $path");
         Terminal::text("[color=dark-gray]Run `php terminal route clear` after changing a route file.[/color]");
@@ -65,35 +56,6 @@ class Route
         Terminal::text("[color=dark-gray]or into route/dynamic/ which is never cached.[/color]");
 
         if (is_dir(BASE_PATH . '/route/dynamic')) Terminal::text("[color=green]route/dynamic/ found - those files stay dynamic.[/color]");
-    }
-
-    /**
-     * Files whose modification time decides whether the cache is still current.
-     *
-     * The directories are watched alongside the files: a directory's mtime
-     * changes when a route file is added or removed, which no per-file mtime
-     * would reveal.
-     *
-     * @param array $included Paths included while the routes were being collected.
-     * @return array path => mtime
-     */
-    private static function sources(array $included): array
-    {
-        $dynamic = str_replace('\\', '/', BASE_PATH . '/route/dynamic');
-        $sources = [];
-
-        foreach ($included as $file) {
-            $file = str_replace('\\', '/', $file);
-
-            # Only route definitions matter here. route/dynamic is never cached, so
-            # editing it cannot make the cache stale.
-            if (!strstr($file, '/route/') || strstr($file, $dynamic)) continue;
-
-            if (is_file($file)) $sources[$file] = filemtime($file);
-            if (is_dir($dir = dirname($file))) $sources[$dir] = filemtime($dir);
-        }
-
-        return $sources;
     }
 
     /**

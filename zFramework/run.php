@@ -119,14 +119,22 @@ class Run
                 if ($cached) \zFramework\Core\Route::$routes = $compiled['routes'] ?? $compiled;
             }
 
+            $before = self::$included;
             self::initProviders()::findModules(base_path('/modules'))::loadModules($cached);
-            if (!$cached) self::includer(BASE_PATH . '/route');
 
-            # route/dynamic is never cached and always runs. A cached table is a
-            # snapshot: a route declared inside `if (Auth::check())` is frozen as it
-            # was when the cache was built, which is wrong for anything that varies
-            # per request. Such definitions belong here so they are re-evaluated.
-            if ($cached) self::includer(BASE_PATH . '/route/dynamic');
+            if (!$cached) {
+                # Cacheable routes first, on their own, so the table written below
+                # holds exactly what a CLI `route cache` would have produced.
+                self::includer(BASE_PATH . '/route', true, false, '.php', BASE_PATH . '/route/dynamic');
+
+                if (\zFramework\Core\Route::$caching && ($route_config['auto-check'] ?? true))
+                    \zFramework\Core\Route::writeCache($route_cache, \zFramework\Core\Route::sources(array_values(array_diff(self::$included, $before))));
+            }
+
+            # route/dynamic is never cached and always runs - loaded after the write
+            # above so it stays out of the table. Definitions that depend on request
+            # state belong here; a cached table would freeze them.
+            self::includer(BASE_PATH . '/route/dynamic');
 
             # Every route is registered by now: resolve the request once, then run it.
             \zFramework\Core\Route::match();

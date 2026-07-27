@@ -192,6 +192,98 @@ class Route
     }
 
     /**
+     * The route table, if it can be written to a cache file.
+     *
+     * var_export() cannot write a closure, and a half-written table is worse than
+     * none: the missing half would 404. So one closure anywhere means no cache.
+     *
+     * @return array|false The routes, or false naming nothing - see cacheBlockers().
+     */
+    public static function compilable(): array|false
+    {
+        return count(self::cacheBlockers()) ? false : self::$routes;
+    }
+
+    /**
+     * Routes that cannot be cached, keyed by route name with the reason.
+     *
+     * @return array
+     */
+    public static function cacheBlockers(): array
+    {
+        $blockers = [];
+
+        foreach (self::$routes as $key => $route) {
+            if (($route['callback'] ?? null) instanceof \Closure) $blockers[$key] = 'closure handler';
+            elseif (($route['groups']['middlewares'][1] ?? null) instanceof \Closure) $blockers[$key] = 'closure in middleware fallback';
+        }
+
+        return $blockers;
+    }
+
+    /**
+     * Files whose modification time decides whether a cache is still current.
+     *
+     * Directories are watched alongside files: a directory's mtime changes when a
+     * route file is added or removed, which no per-file mtime would reveal.
+     * route/dynamic is skipped - it never enters the cache, so editing it cannot
+     * make one stale.
+     *
+     * @param array $included Paths included while routes were being collected.
+     * @return array path => mtime
+     */
+    public static function sources(array $included): array
+    {
+        $dynamic = str_replace('\\', '/', BASE_PATH . '/route/dynamic');
+        $sources = [];
+
+        foreach ($included as $file) {
+            $file = str_replace('\\', '/', $file);
+            if (!strstr($file, '/route/') || strstr($file, $dynamic)) continue;
+
+            if (is_file($file)) $sources[$file] = filemtime($file);
+            if (is_dir($dir = dirname($file))) $sources[$dir] = filemtime($dir);
+        }
+
+        return $sources;
+    }
+
+    /**
+     * Write the route table to a cache file, atomically.
+     *
+     * Written to a temporary file and renamed into place, so a request reading the
+     * cache never sees a half-written one, and two requests racing to refresh it
+     * end up with the same table either way.
+     *
+     * @param string $path
+     * @param array  $sources
+     * @return bool
+     */
+    public static function writeCache(string $path, array $sources): bool
+    {
+        $routes = self::compilable();
+        if ($routes === false) return false;
+
+        $temporary = $path . '.' . getmypid() . '.tmp';
+        $content   = "<?php \nreturn " . var_export(['files' => $sources, 'routes' => $routes], true) . ";";
+
+        if (!is_dir($directory = dirname($path))) @mkdir($directory, 0755, true);
+        if (@file_put_contents($temporary, $content) === false) return false;
+
+        if (!@rename($temporary, $path)) {
+            @unlink($temporary);
+            return false;
+        }
+
+        # Without this the old table survives in shared memory wherever
+        # opcache.validate_timestamps is off - which is the recommended production
+        # setting, so the refresh would appear to do nothing.
+        if (function_exists('opcache_invalidate')) opcache_invalidate($path, true);
+
+        return true;
+    }
+
+    /**
      * Split a url into comparable segments.
      *
      * Empty segments are dropped so "/panel//urunler/" and "/panel/urunler" are

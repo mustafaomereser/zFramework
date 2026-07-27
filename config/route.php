@@ -13,18 +13,23 @@ return [
     # Note that route/dynamic/ is never cached regardless of this setting.
     'caching' => true,
 
-    # Verify the cache against the route files it was built from, and ignore it
+    # Verify the cache against the route files it was built from and rebuild it
     # when any of them changed. Files and their directories are both watched, so
     # adding or deleting a route file is noticed too.
     #
-    # This makes a stale cache harmless: edit a route, the change takes effect
-    # immediately, no `route clear` needed. The cache stays unused until
-    # `php terminal route cache` is run again - it is NOT rebuilt automatically,
-    # and that is deliberate: building it from a web request would freeze
-    # whatever was true for that one request (its user, its tenant) into a table
-    # served to everybody.
+    # Edit a route and the next request rebuilds the table by itself - no
+    # `route clear`, no stale routes. The write is atomic (temp file + rename),
+    # so concurrent requests cannot read a half-written table.
     #
-    # Costs one stat() per route file per request. Leave it on in development.
-    # In production the deploy script rebuilds the cache, so it can be false.
+    # ONE ASSUMPTION: a route must be declared unconditionally, or under a
+    # condition that is the same for every request. A route wrapped in something
+    # request-dependent - if (Auth::check()), a tenant flag - would be captured
+    # as it was for whichever request happened to trigger the rebuild, and then
+    # served to everyone. Put those in route/dynamic/ (never cached) or, better,
+    # express them as middleware so the route always exists and access is decided
+    # per request.
+    #
+    # Costs one stat() per route file per request. In production the deploy
+    # script rebuilds the cache, so this can be false there.
     'auto-check' => true,
 ];
