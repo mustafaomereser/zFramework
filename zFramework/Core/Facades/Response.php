@@ -83,6 +83,11 @@ class Response
     {
         self::$addinationals = [];
         self::$headers       = [];
+
+        # http_response_code() is process-wide, not request-wide. In a worker a 404
+        # set by one request stays set, and every later response carries it - the
+        # body is right, the status is somebody else's.
+        if (PHP_SAPI === 'cli') http_response_code(200);
     }
 
     /**

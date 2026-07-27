@@ -102,13 +102,34 @@ class Run
     }
 
     /**
-     * @param bool $skipRoutes Route files are already in the cache; callbacks still run.
+     * Load module route files.
+     *
+     * @param bool $skipRoutes Routes are already in the cache.
      */
     public static function loadModules(bool $skipRoutes = false)
     {
         foreach (self::$modules as $module) {
             if (!$module['status']) continue;
             if (!$skipRoutes) self::includer($module['path'] . "/route");
+        }
+        return new self();
+    }
+
+    /**
+     * Run each module's callback.
+     *
+     * Called per request, not at boot. Module callbacks register menu entries,
+     * view data and the like - things built from the current request, down to the
+     * host in a url. Running them once at boot would freeze the first request's
+     * values into every later response, which is exactly how a booted-once server
+     * ends up serving links pointing at the wrong host.
+     *
+     * @return self
+     */
+    public static function runModuleCallbacks()
+    {
+        foreach (self::$modules as $module) {
+            if (!$module['status']) continue;
             if (isset($module['callback'])) $module['callback']();
         }
         return new self();
@@ -167,8 +188,6 @@ class Run
                 'suffix'  => ''
             ] + Config::get('view'));
             #
-
-            self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
 
             # Compiled route table (php terminal route cache): skips parsing and
             # executing every route file, which on a large project is the single
@@ -229,6 +248,16 @@ class Run
         ob_start();
 
         try {
+            # Global middlewares run here, not at boot: the file executes them
+            # rather than just declaring them, so booting once would have meant
+            # running them once - the language middleware would resolve the first
+            # visitor's locale and every later request would inherit it.
+            self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
+
+            # Same reasoning: module callbacks build menus and view data from the
+            # current request.
+            self::runModuleCallbacks();
+
             # Back to the booted table, then route/dynamic on top: those definitions
             # depend on request state, so they are re-evaluated every time and never
             # accumulate. A cached table could not hold them at all.

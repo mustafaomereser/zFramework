@@ -4,16 +4,29 @@ server:
   command: "php zFramework/Kernel/worker.php"
   relay: pipes
 
+# `run roadrunner reset|workers|stop` talk to the running server over this.
+# Without it those commands have no way in. Localhost only.
+rpc:
+  listen: tcp://127.0.0.1:6001
+
 http:
   # Keep RoadRunner behind nginx in production and let nginx do TLS, static
   # files and health checks - the same vhost as with FPM, with proxy_pass
   # instead of fastcgi_pass. Bind to 0.0.0.0 only while developing.
   address: 127.0.0.1:8080
 
-  # Served by RoadRunner directly, without waking a PHP worker.
+  # static is a middleware, not just a config block - listing it here is what
+  # actually enables it. Without this every asset request wakes a PHP worker and
+  # comes back 404.
+  middleware: ["static"]
+
+  # Assets served by RoadRunner directly. Path is relative to where `rr serve`
+  # runs, which is the project root.
   static:
-    dir: "public_html"
+    dir: "./public_html"
     forbid: [".php", ".htaccess", ".env"]
+    calculate_etag: true
+    weak: false
 
   pool:
     # Roughly cores x 2. Far fewer than FPM needs, because a worker is not

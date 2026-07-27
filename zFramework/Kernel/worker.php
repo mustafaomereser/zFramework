@@ -26,6 +26,28 @@ ini_set('display_errors', 'stderr');
 define('BASE_PATH', dirname(__DIR__, 2));
 define('PUBLIC_DIR', BASE_PATH . '/public_html');
 
+# Tells the rest of the framework this CLI process serves HTTP and must survive.
+# config/app.php's error callback checks it before calling die(), which would
+# otherwise take the worker down on the first handled error.
+define('ZF_WORKER', true);
+
+# Boot reads $_SERVER in places (helpers building urls, providers). Under CLI it
+# holds the worker's own script path, which would make script_name() derive urls
+# from "zFramework/Kernel" - so these are assigned, not merged: += would keep
+# CLI's values and every generated url would be wrong.
+$_SERVER = array_merge($_SERVER, [
+    'REQUEST_URI'     => '/',
+    'REQUEST_METHOD'  => 'GET',
+    'SERVER_NAME'     => 'localhost',
+    'HTTP_HOST'       => 'localhost',
+    'SERVER_PROTOCOL' => 'HTTP/1.1',
+    'SCRIPT_NAME'     => '/index.php',
+    'PHP_SELF'        => '/index.php',
+    'DOCUMENT_ROOT'   => PUBLIC_DIR,
+    'QUERY_STRING'    => '',
+    'HTTPS'           => 'off',
+]);
+
 require BASE_PATH . '/zFramework/vendor/autoload.php';
 
 if (!class_exists(Worker::class)) {
@@ -53,30 +75,64 @@ $psr     = new PSR7Worker(Worker::create(), $factory, $factory, $factory);
 $populate = function (ServerRequestInterface $request): void {
     $uri = $request->getUri();
 
-    $_GET     = $request->getQueryParams();
-    $_POST    = is_array($parsed = $request->getParsedBody()) ? $parsed : [];
-    $_COOKIE  = $request->getCookieParams();
-    $_FILES   = $request->getUploadedFiles();
-    $_REQUEST = $_GET + $_POST;
+    $_GET    = $request->getQueryParams();
+    $_COOKIE = $request->getCookieParams();
+    $_FILES  = $request->getUploadedFiles();
 
-    $_SERVER = array_merge($_SERVER, $request->getServerParams(), [
+    $parsed = $request->getParsedBody();
+    $_POST  = is_array($parsed) ? $parsed : [];
+
+    # RoadRunner only parses the body into getParsedBody() for form content types;
+    # a raw body (json, or a form the server did not recognise) arrives unparsed
+    # and $_POST would be empty - which reads as a missing CSRF token and answers
+    # 406 to every POST.
+    if (!count($_POST) && in_array(strtoupper($request->getMethod()), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        $raw  = (string) $request->getBody();
+        $type = strtolower($request->getHeaderLine('Content-Type'));
+
+        if (strlen($raw)) {
+            if (strstr($type, 'application/json')) $_POST = (array) json_decode($raw, true);
+            else parse_str($raw, $_POST);
+        }
+    }
+
+    $_REQUEST = $_POST + $_GET;
+
+    $host = $uri->getHost() . ($uri->getPort() ? ':' . $uri->getPort() : '');
+
+    $_SERVER = array_merge($_SERVER, $request->getServerParams());
+
+    foreach ($request->getHeaders() as $name => $values)
+        $_SERVER['HTTP_' . strtoupper(str_replace('-', '_', $name))] = implode(', ', $values);
+
+    # Assigned last so nothing from the CLI environment or RoadRunner's own server
+    # params can win. SCRIPT_NAME especially: script_name() takes its dirname to
+    # build urls, and the worker's path there would corrupt every one of them.
+    $_SERVER = array_merge($_SERVER, [
         'REQUEST_METHOD'  => $request->getMethod(),
         'REQUEST_URI'     => $uri->getPath() . ($uri->getQuery() ? '?' . $uri->getQuery() : ''),
         'QUERY_STRING'    => $uri->getQuery(),
-        'HTTP_HOST'       => $uri->getHost() . ($uri->getPort() ? ':' . $uri->getPort() : ''),
+        'HTTP_HOST'       => $host,
+        'SERVER_NAME'     => $uri->getHost(),
+        'SERVER_PORT'     => (string) ($uri->getPort() ?: ($uri->getScheme() === 'https' ? 443 : 80)),
         'HTTPS'           => $uri->getScheme() === 'https' ? 'on' : 'off',
         'SERVER_PROTOCOL' => 'HTTP/' . $request->getProtocolVersion(),
         'SCRIPT_NAME'     => '/index.php',
         'PHP_SELF'        => '/index.php',
+        'SCRIPT_FILENAME' => PUBLIC_DIR . '/index.php',
+        'DOCUMENT_ROOT'   => PUBLIC_DIR,
     ]);
-
-    foreach ($request->getHeaders() as $name => $values)
-        $_SERVER['HTTP_' . strtoupper(str_replace('-', '_', $name))] = implode(', ', $values);
 };
 
 while ($request = $psr->waitRequest()) {
     try {
         $populate($request);
+
+        # PHP emits its session cookie through header(), which does nothing under
+        # CLI - so the browser never learns the session id and every request would
+        # start a brand new session. Adopt the id the client sent, and hand it back
+        # on the response below.
+        session_id(!empty($_COOKIE[session_name()]) ? $_COOKIE[session_name()] : '');
 
         ob_start();
         zFramework\Run::handle();
@@ -86,6 +142,11 @@ while ($request = $psr->waitRequest()) {
         # header() does nothing. Status comes from the same place.
         $response = $factory->createResponse(Response::status());
         foreach (Response::headers() as [$name, $value]) $response = $response->withAddedHeader($name, $value);
+
+        # Send the session cookie ourselves, for the same reason it had to be read
+        # manually: PHP cannot emit it from here.
+        if (strlen($id = (string) session_id()) && ($_COOKIE[session_name()] ?? null) !== $id)
+            $response = $response->withAddedHeader('Set-Cookie', session_name() . '=' . $id . '; Path=/; HttpOnly; SameSite=Lax');
 
         $psr->respond($response->withBody($factory->createStream($body)));
     } catch (\Throwable $e) {

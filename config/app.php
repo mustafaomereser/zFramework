@@ -18,7 +18,9 @@ return [
         'stream'   => false,
 
         'callback' => function ($log_path, $log) {
-            if (PHP_SAPI === 'cli') die(zFramework\Kernel\Terminal::text("[color=red]-> unexcepted terminal error[/color][color=green] $log_path [/color]"));
+            # ZF_WORKER: a long-running HTTP worker also runs under the CLI SAPI, and
+            # die() there would kill the worker rather than end the request.
+            if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) die(zFramework\Kernel\Terminal::text("[color=red]-> unexcepted terminal error[/color][color=green] $log_path [/color]"));
         }
     ],
 
