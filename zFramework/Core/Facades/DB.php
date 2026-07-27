@@ -84,6 +84,12 @@ class DB
         if (!isset($GLOBALS['databases']['connected'][$this->db])) {
             try {
                 $parameters = $GLOBALS['databases']['connections'][$this->db];
+
+                # connections[] is overwritten with the live PDO below, so the dsn and
+                # credentials are kept aside - reconnect() needs them to build a new
+                # handle after the server drops one.
+                $GLOBALS['databases']['dsn'][$this->db] ??= $parameters;
+
                 $connection = new \PDO($parameters[0], $parameters[1], ($parameters[2] ?? null));
                 foreach ($parameters['options'] ?? [] as $option) $connection->setAttribute($option[0], $option[1]);
             } catch (\Throwable $err) {
@@ -126,8 +132,23 @@ class DB
     {
         $data = count($data) ? $data : $this->buildQuery['data'] ?? [];
         $queryTime = microtime(true);
-        $e = $this->connection()->prepare($sql);
-        $e->execute($data);
+
+        try {
+            $e = $this->connection()->prepare($sql);
+            $e->execute($data);
+        } catch (\PDOException $exception) {
+            # Under FPM a dropped connection is somebody else's problem: the next
+            # request opens a new one. A long-running worker keeps the same handle
+            # for hours, and MySQL closes it after wait_timeout - so the first query
+            # after an idle spell fails with "server has gone away". Reconnect and
+            # run it once more; anything else is a real error and is re-thrown.
+            if (!$this->connectionLost($exception)) throw $exception;
+
+            $this->reconnect();
+            $e = $this->connection()->prepare($sql);
+            $e->execute($data);
+        }
+
         $queryTime = microtime(true) - $queryTime;
         # Analyzer runs on SELECT only (EXPLAIN on a write costs a round-trip and
         # suggests nothing) and never without debug: EXPLAIN ANALYZE re-executes the
@@ -162,6 +183,48 @@ class DB
     private function schemeCacheKey(): string
     {
         return "db.scheme.{$this->db}.{$this->dbname}";
+    }
+
+    /**
+     * Is this exception a dropped connection rather than a bad query?
+     *
+     * @param \PDOException $exception
+     * @return bool
+     */
+    private function connectionLost(\PDOException $exception): bool
+    {
+        # 2006 MySQL server has gone away, 2013 lost connection during query.
+        if (in_array((int) ($exception->errorInfo[1] ?? 0), [2006, 2013], true)) return true;
+
+        $message = strtolower($exception->getMessage());
+        foreach (['server has gone away', 'lost connection', 'broken pipe', 'no connection to the server', 'connection was killed'] as $needle)
+            if (strstr($message, $needle)) return true;
+
+        return false;
+    }
+
+    /**
+     * Drop the connection so the next connection() call opens a fresh one.
+     *
+     * The builder is dropped with it: it was constructed against the dead handle
+     * and cached per connection.
+     *
+     * @return void
+     */
+    private function reconnect(): void
+    {
+        unset(
+            $GLOBALS['databases']['connected'][$this->db],
+            $GLOBALS['databases']['builders'][$this->db]
+        );
+
+        # connections[] holds the live PDO once connected; clearing it makes
+        # connection() rebuild from the original dsn/credentials.
+        if (isset($GLOBALS['databases']['connections'][$this->db]) && $GLOBALS['databases']['connections'][$this->db] instanceof \PDO)
+            $GLOBALS['databases']['connections'][$this->db] = $GLOBALS['databases']['dsn'][$this->db] ?? $GLOBALS['databases']['connections'][$this->db];
+
+        $this->connection = null;
+        $this->builder    = null;
     }
 
     /**
