@@ -3,6 +3,7 @@
 namespace zFramework\Core\Facades;
 
 use ReflectionClass;
+use zFramework\Core\GlobalCache;
 use zFramework\Core\Facades\Analyzer\DbCollector;
 use zFramework\Core\Helpers\Date;
 use zFramework\Core\Traits\DB\OrMethods;
@@ -28,6 +29,12 @@ class DB
      * Operators that carry their own null semantics, so they take no bound value.
      */
     private const NULL_OPERATORS = ['IS NULL', 'IS NOT NULL'];
+
+    /**
+     * scheme.json mtime behind each in-process scheme copy, keyed by database name.
+     * Kept out of $GLOBALS['DB'] because that array is read directly elsewhere.
+     */
+    private static array $schemeMtimes = [];
 
     /**
      * Options parameters
@@ -103,9 +110,14 @@ class DB
         $e = $this->connection()->prepare($sql);
         $e->execute($data);
         $queryTime = microtime(true) - $queryTime;
-        # Analyzer runs on SELECT only: EXPLAIN on write statements costs an extra
-        # round-trip per query and produces nothing actionable.
-        if (!$this->ignoreAnalyze && config('app.analyze') && DbCollector::isSelect($sql)) DbCollector::analyze($this, $sql, $data, $queryTime);
+        # Analyzer runs on SELECT only (EXPLAIN on a write costs a round-trip and
+        # suggests nothing) and never without debug: EXPLAIN ANALYZE re-executes the
+        # query, so leaving this on in production doubles the cost of every SELECT.
+        # `app.analyze` may also be a rate - 0.01 analyses 1% of queries.
+        if (!$this->ignoreAnalyze && config('app.debug') && DbCollector::isSelect($sql)) {
+            $rate = (float) config('app.analyze');
+            if ($rate > 0 && ($rate >= 1 || (mt_rand() / mt_getrandmax()) < $rate)) DbCollector::analyze($this, $sql, $data, $queryTime);
+        }
         $this->reset();
         return $e;
     }
@@ -125,18 +137,83 @@ class DB
     }
 
     /**
+     * Cache key holding a connection's table scheme in APCu.
+     * @return string
+     */
+    private function schemeCacheKey(): string
+    {
+        return "db.scheme.{$this->db}.{$this->dbname}";
+    }
+
+    /**
+     * Forget this connection's table scheme on every layer it is held.
+     *
+     * Call it after the schema itself changes - migrations do. Dropping only the
+     * json file is not enough: within the same process $GLOBALS['DB'] would keep
+     * serving the pre-migration scheme, which is exactly what a seeder running
+     * right after a migration would read.
+     *
+     * @return void
+     */
+    public function forgetScheme(): void
+    {
+        unset($GLOBALS['DB'][$this->dbname], self::$schemeMtimes[$this->dbname]);
+        GlobalCache::remove($this->schemeCacheKey());
+        @unlink($this->cache_dir . "/" . $this->dbname . "/scheme.json");
+    }
+
+    /**
      * Set all tables informations in database.
+     *
+     * Three layers, cheapest first:
+     *   1. $GLOBALS['DB'] - within this request. table() calls tables() on every
+     *      call, so without this the scheme was re-read from disk each time.
+     *   2. APCu (GlobalCache) - across requests, no disk read, no json_decode.
+     *   3. scheme.json on disk, and finally the server itself.
+     *
+     * The APCu entry carries the scheme file's mtime. Migrations delete that file
+     * (see Kernel/Modules/Db.php), and a CLI migration cannot clear the FPM
+     * process's APCu, so comparing mtime is what keeps a stale scheme from
+     * surviving a migration. filemtime() is a stat call - orders of magnitude
+     * cheaper than reading and decoding the file.
+     *
      * @return array
      */
     private function tables(): array
     {
-        $data = json_decode(@file_get_contents($this->cache_dir . "/" . $this->dbname . "/scheme.json"), true) ?? false;
-        if (!$data) {
-            $data = $this->builder->setParent($this)->tables();
-            file_put_contents2($this->cache_dir . "/" . $this->dbname . "/scheme.json", json_encode($data, JSON_UNESCAPED_UNICODE));
+        $path  = $this->cache_dir . "/" . $this->dbname . "/scheme.json";
+        $mtime = @filemtime($path) ?: 0;
+
+        # The scheme file's mtime validates every layer, so nothing has to announce
+        # that the schema changed: a migration dropping the file, or anyone clearing
+        # it by hand, invalidates the in-process copy and the APCu copy alike.
+        # filemtime() is a stat call - cheap enough to pay per lookup in exchange for
+        # never serving a scheme that no longer matches the database.
+        if (isset($GLOBALS['DB'][$this->dbname]) && (self::$schemeMtimes[$this->dbname] ?? -1) === $mtime)
+            return $GLOBALS['DB'][$this->dbname];
+
+        $build = function () use ($path) {
+            $data = json_decode(@file_get_contents($path), true) ?? false;
+            if (!$data) {
+                $data = $this->builder->setParent($this)->tables();
+                file_put_contents2($path, json_encode($data, JSON_UNESCAPED_UNICODE));
+                clearstatcache(true, $path);
+            }
+            return ['mtime' => @filemtime($path) ?: 0, 'data' => $data];
+        };
+
+        $key   = $this->schemeCacheKey();
+        $entry = GlobalCache::cache($key, $build);
+
+        if (($entry['mtime'] ?? -1) !== $mtime) {
+            GlobalCache::remove($key);
+            $entry = GlobalCache::cache($key, $build);
         }
-        $GLOBALS['DB'][$this->dbname] = $data;
-        return $data;
+
+        self::$schemeMtimes[$this->dbname] = $entry['mtime'] ?? 0;
+        $GLOBALS['DB'][$this->dbname]      = $entry['data'];
+
+        return $entry['data'];
     }
 
     /**

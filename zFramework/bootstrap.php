@@ -44,3 +44,7 @@ spl_autoload_register(function ($class) {
     zFramework\Run::includer(BASE_PATH . "/$class.php");
     if (method_exists($class, 'init')) $class::init();
 });
+
+// APCu is shared by every PHP process on the machine, so two projects on the same
+// host would read each other's cache entries. Namespace them by install path.
+zFramework\Core\GlobalCache::$prefix = 'zf.' . substr(md5(BASE_PATH), 0, 8) . '.';

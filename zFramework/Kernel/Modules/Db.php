@@ -408,6 +408,14 @@ class Db
             #endregion
 
             Terminal::text("[color=green]`" . self::$dbname . ".$table` migrate complete.[/color]");
+
+            # The table just changed shape, so every cached copy of the scheme is stale.
+            # This has to happen BEFORE the seeder runs: seeders go through the model
+            # layer and would otherwise write against the pre-migration column list.
+            # (The APCu drop only reaches this CLI process - apcu.enable_cli is off by
+            # default - but web processes are covered by the mtime check in DB::tables().)
+            self::$db->forgetScheme();
+
             if ($fresh && in_array('oncreateSeeder', get_class_methods($class))) {
                 Terminal::text("\n[color=green]`" . self::$dbname . ".$table` Oncreate seeder.[/color]");
                 Terminal::text("-> [color=green]Seeding.[/color]", true);
@@ -415,7 +423,6 @@ class Db
                 Terminal::text("-> [color=green]Seeded.[/color]", true);
             }
 
-            @unlink(self::$db->cache_dir . "/" . self::$dbname . "/scheme.json");
             file_put_contents2(self::$db->cache_dir . "/" . self::$dbname . "/last-migrate.json", json_encode(['date' => date('Y-m-d H:i:s')] + $last_migrate, JSON_UNESCAPED_UNICODE));
         }
 
