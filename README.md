@@ -1651,6 +1651,52 @@ opcache is not optional: without it PHP recompiles every included file on every
 request. `validate_timestamps = 0` means PHP stops checking files for changes —
 reload PHP-FPM as part of your deploy, or code changes will not be picked up.
 
+### Compiled routes
+
+```bash
+php terminal route cache    # compile the route table
+php terminal route clear    # drop it - run after changing a route file
+php terminal route list     # show every registered route
+```
+
+Route files are parsed **and executed** on every request: with 1000 routes that
+is 1000 `Route::get()` calls before the one being served is even found. Caching
+the table replaces all of it with a single `include`.
+
+**A cached table is a snapshot.** Anything declared inside a condition that
+varies per request is frozen as it was when the cache was built — and no CLI
+process is logged in:
+
+```php
+if (Auth::check()) Route::get('/panel', [PanelController::class, 'index']);
+// cached as: not registered at all -> 404 for everyone, forever
+```
+
+Two ways out, in order of preference:
+
+**1. Move the decision to middleware.** The route always exists; access is
+decided per request. Works with caching and with any long-running setup:
+
+```php
+Route::middleware([Auth::class])->group(fn() => Route::get('/panel', [PanelController::class, 'index']));
+```
+
+**2. `route/dynamic/`** — never cached, always executed. For definitions that
+genuinely cannot be static (per-tenant feature flags, licence-dependent
+modules):
+
+```php
+// route/dynamic/tenant.php
+if (tenant()->hasFeature('reports')) Route::resource('/raporlar', ReportController::class);
+```
+
+The cached table and this directory are merged on every request, so the two mix
+freely.
+
+Routes handled by a closure cannot be cached — `var_export()` cannot write one.
+`route cache` refuses the whole table and names them rather than caching half of
+it, since the missing half would 404. Use `[Controller::class, 'method']`.
+
 ### Compiled config
 
 ```bash
@@ -1683,4 +1729,6 @@ still works — the disk path is simply used instead.
 - [ ] `database/connections.php` credentials outside version control
 - [ ] `error.stream` set once there is more than one app server, so errors land
       somewhere central instead of on each machine's disk
+- [ ] `php terminal route cache` and `config cache` run by the deploy script,
+      after the new code is in place
 - [ ] `php terminal db migrate` run before the new code goes live
