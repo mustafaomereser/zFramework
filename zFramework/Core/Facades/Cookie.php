@@ -111,13 +111,26 @@ class Cookie
      */
     public static function delete(string $key): bool
     {
-        return setcookie(self::keyparse($key), '', [
+        $name    = self::keyparse($key);
+        $options = [
             'expires'  => -1,
             'path'     => self::$options['path'],
             'domain'   => self::$options['domain'],
             'secure'   => self::$options['security'],
             'httponly' => self::$options['http_only'],
             'samesite' => self::$options['samesite'],
-        ]);
+        ];
+
+        unset($_COOKIE[$name]);
+
+        # Same reason as set(): setcookie() is a no-op under the CLI SAPI, so the
+        # expiry would never reach the browser and the cookie would survive - a
+        # logout that does not log anyone out.
+        if (PHP_SAPI === 'cli') {
+            Response::header('Set-Cookie', self::buildHeader($name, '', $options), false);
+            return true;
+        }
+
+        return setcookie($name, '', $options);
     }
 }
