@@ -59,7 +59,10 @@ Route::pre('/admin')->middleware([Auth::class])->group(function () {
 - [5. Validator](#5-validator)
 - [6. Middleware](#6-middleware)
 - [7. Mail](#7-mail)
+  - [7.1. Defer](#71-defer)
 - [8. Cache](#8-cache)
+  - [8.1. Redis](#81-redis)
+  - [8.2. Queue](#82-queue)
 - [9. Alerts](#9-alerts)
 - [10. Csrf](#10-csrf)
 - [11. Language](#11-language)
@@ -564,6 +567,35 @@ $tags = $post->tags();
 $author = $post->author();
 ```
 
+**Eager loading — `with()`**
+
+Calling a relation closure per row is one query per row. On a 20-row listing
+that is 20 extra queries; on a 100-row one, 100. `with()` collects what every
+row would ask for and answers all of them in a single query:
+
+```php
+$users = (new User)->with('profile', 'posts')->paginate(20);
+
+// in the view - a value, not a call
+foreach ($users['items'] as $user) {
+    echo $user['profile']['bio'];
+    foreach ($user['posts'] as $post) echo $post['title'];
+}
+```
+
+```
+without with() : SELECT users … + 20 × profile + 20 × posts   = 41 queries
+with()         : SELECT users … + WHERE user_id IN (…) × 2    =  3 queries
+```
+
+An eager loaded relation is replaced by its **value**, so `$user['posts']` is
+the array itself — no `()`. Rows with no match get `[]` for a to-many relation
+and `null` for a to-one.
+
+Works with `hasOne`, `hasMany` and `belongsTo`. Pivot, morph and through
+relations stay lazy and keep working through their closure exactly as before,
+so `with()` on one of those is harmless — just not batched.
+
 ---
 
 ### 2.3. Pivot Operations
@@ -970,6 +1002,47 @@ Mail::clearBcc();
 
 SMTP settings are configured in `config/mail.php`.
 
+**Do not make the user wait for it.** An SMTP handshake plus delivery is
+typically 100–1000 ms, and `send()` runs inside the request. Hand it to
+[`Defer`](#71-defer) instead:
+
+```php
+Defer::after(fn() => Mail::to($user['email'])->send([...]), 'welcome-mail');
+```
+
+---
+
+### 7.1. Defer
+
+Runs a closure **after the response has been sent**. The user gets the page
+immediately; the work happens with the connection already closed.
+
+```php
+Defer::after(fn() => Mail::to($user['email'])->send([...]), 'welcome-mail');
+Defer::after(fn() => (new Stats)->insert($row), 'stats');
+
+Defer::pending();   // is anything queued?
+```
+
+Jobs run in registration order once the route is done. Each is isolated: one
+throwing does not stop the others, it is passed to the error handler. Anything
+slower than a second is logged by label — that log is the signal it belongs in
+a real queue.
+
+**Know what this is not.** It is not a queue:
+
+- **The worker stays busy.** The wait is hidden from the user, not removed —
+  server capacity is unchanged, and the saturation is now harder to see.
+- **Nothing is persisted.** If the process dies after responding (deploy, FPM
+  recycle via `pm.max_requests`, a fatal, `request_terminate_timeout` — which
+  counts this time too) the job is gone. No retry, no trace.
+- **PHP-FPM only.** Under `php terminal run` the jobs still run, the user just
+  waits for them.
+
+So it fits work whose loss is survivable: stats, logs, cache warming. For work
+that must not be lost — mail, payment notifications — what you defer should
+eventually be a queue push rather than the task itself.
+
 ---
 
 ## 8. Cache
@@ -993,18 +1066,109 @@ GlobalCache::remove('site_stats');
 GlobalCache::clear();
 ```
 
-Requires the `apcu` PHP extension. Without it `GlobalCache::cache()` simply runs
-the closure every time, so code stays correct but uncached.
-
 **Which one to use.** `Cache` stores the value in the current user's session, so
 it is for data that belongs to *that* user. Using it for something shared —
 "top 20 products", a site-wide counter — means the query runs once per visitor
-and a copy is kept in every session file.
+and a copy is kept in every session file. Shared data belongs in `GlobalCache`.
 
-Shared data belongs in `GlobalCache`. Note that APCu is per-server: with more
-than one application server each keeps its own copy, and there is no way to
-invalidate them together. That is the point where a central cache (Redis)
-becomes necessary.
+**How `GlobalCache` stores things.** Two layers, cheapest first:
+
+| Layer | Store | Scope |
+|---|---|---|
+| L1 | APCu | this server, `redis.l1_ttl` seconds (default 5) |
+| L2 | Redis | every server, the TTL you passed |
+
+With neither installed the closure simply runs every time — correct, uncached.
+With only APCu it behaves as before. With Redis configured, `remove()` reaches
+every server through L2; other servers' L1 copies age out within `l1_ttl`, which
+is the window in which they may briefly disagree.
+
+---
+
+### 8.1. Redis
+
+Redis is what lets more than one application server share state. It is off by
+default — everything works without it, on one machine.
+
+```php
+// config/redis.php
+'enabled'  => true,
+'host'     => '127.0.0.1',
+'database' => ['cache' => 0, 'session' => 1, 'queue' => 2],
+```
+
+Requires the `redis` (phpredis) extension. Enabling it changes three things:
+
+| | Without Redis | With Redis |
+|---|---|---|
+| `GlobalCache` | APCu, per server | APCu (L1) + Redis (L2) |
+| Sessions | files on local disk | shared, via `config/session.php` |
+| `Auth` | id + password hash in the cookie | opaque token, revocable server-side |
+| `Queue::push()` | runs the job inline | queued for a worker |
+
+**Keep sessions and cache on separate instances.** A cache instance evicts keys
+when it fills; if sessions live there too, a full cache logs everyone out.
+
+```ini
+# session instance          # cache instance
+maxmemory-policy noeviction  maxmemory-policy allkeys-lru
+appendonly yes               appendonly no
+```
+
+Redis being unreachable does not take a request down: `GlobalCache` falls back to
+APCu, `Queue::push()` runs the job inline, `Auth` keeps using cookie mode. The
+exception is sessions — those are handled by PHP itself, and a Redis outage there
+is an outage.
+
+**What `Auth` does differently with Redis.** The cookie stops carrying the user's
+id and password hash and carries only a random token; the id and hash live in
+Redis, and the user row is cached for a minute:
+
+```
+cookie mode : one SELECT on users per request, session cannot be revoked
+token mode  : one SELECT per user per minute, logout kills the session server-side
+```
+
+Changing the password still ends other sessions — the hash is compared on every
+request, just server-side now. After updating the logged in user, call
+`Auth::forgetCache()` so the change is visible before the minute is up.
+
+---
+
+### 8.2. Queue
+
+For work that must not be lost and must not be waited for. Unlike
+[`Defer`](#71-defer) the web worker is freed and the job outlives the request.
+
+```php
+Queue::push([SendWelcomeMail::class, 'handle'], ['user_id' => $user['id']]);
+Queue::size();          // jobs waiting
+```
+
+```php
+class SendWelcomeMail
+{
+    public function handle(array $payload) { /* ... */ }
+}
+```
+
+```bash
+php terminal queue work            # process until stopped
+php terminal queue work emails     # a named queue
+php terminal queue work --once     # one job, then exit
+php terminal queue work --tries=5  # attempts before a job is dropped
+php terminal queue size
+```
+
+Run workers under `supervisor` (or systemd) so they come back after a crash or a
+deploy.
+
+Jobs are a class and a method, never a closure — closures cannot be serialised, so
+a queue that accepted them would only appear to work. The payload must survive
+`serialize()`.
+
+**Without Redis, `push()` runs the job immediately.** The same code works in
+development and on shared hosting; it simply does not get the benefit.
 
 ---
 
@@ -1486,6 +1650,20 @@ opcache is not optional: without it PHP recompiles every included file on every
 request. `validate_timestamps = 0` means PHP stops checking files for changes —
 reload PHP-FPM as part of your deploy, or code changes will not be picked up.
 
+### Compiled config
+
+```bash
+php terminal config cache    # merge every config file into one cached array
+php terminal config clear    # drop it - run after editing a config file
+```
+
+A request then includes one file instead of a dozen and skips the per-lookup
+`opcache_invalidate()`. Files containing closures (`app.php`'s `error.callback`)
+are left out of the compile and keep being read from disk. `Config::set()` drops
+the cache itself, so runtime config writes stay correct.
+
+Cache it on deploy, and remember to clear it when you edit a config file by hand.
+
 ### APCu (recommended)
 
 With the `apcu` extension installed, the table scheme is held in shared memory
@@ -1502,4 +1680,6 @@ still works — the disk path is simply used instead.
       reachable over HTTP — only `public_html/` should be served
 - [ ] no `sqlDebug(true)` left in the code (it writes to `/db-debug/` on every query)
 - [ ] `database/connections.php` credentials outside version control
+- [ ] `error.stream` set once there is more than one app server, so errors land
+      somewhere central instead of on each machine's disk
 - [ ] `php terminal db migrate` run before the new code goes live
