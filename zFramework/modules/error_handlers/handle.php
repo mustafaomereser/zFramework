@@ -1766,4 +1766,11 @@ function errorHandler($data)
     return $error_log;
 }
 
-set_exception_handler('errorHandler');
+set_exception_handler(function ($exception) {
+    # A response signal thrown outside Run::begin() - from a cron script, a
+    # terminal command, anything bootstrapping the framework on its own - still
+    # has to produce its response rather than an error page.
+    if ($exception instanceof \zFramework\Core\ResponseSignal) return $exception->send();
+
+    return errorHandler($exception);
+});

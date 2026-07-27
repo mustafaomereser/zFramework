@@ -76,13 +76,13 @@ function file_put_contents2($file_name, $content, $flags = 0)
 // Refresh page.
 function refresh()
 {
-    die(header("Refresh:0"));
+    throw new zFramework\Core\ResponseSignal(0, ['Refresh' => '0']);
 }
 
 // Redirect to url what are you want.
 function redirect($url = "/")
 {
-    die(header("Location: $url"));
+    throw new zFramework\Core\ResponseSignal(302, ['Location' => $url]);
 }
 
 // Back from current to previous page.

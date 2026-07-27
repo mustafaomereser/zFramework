@@ -45,15 +45,51 @@ class Cookie
     public static function set(string $key, string $value, ?int $expires = null): bool
     {
         if (is_array($value) || is_object($value)) $value = json_encode($value, JSON_UNESCAPED_UNICODE);
-        $_COOKIE[self::keyparse($key)] = Crypter::encode($value);
-        return setcookie(self::keyparse($key), Crypter::encode($value), [
+
+        $name    = self::keyparse($key);
+        $encoded = Crypter::encode($value);
+        $options = [
             'expires'  => $expires ? (time() + $expires) : self::$options['expires'],
             'path'     => self::$options['path'],
             'domain'   => self::$options['domain'],
             'secure'   => self::$options['security'],
             'httponly' => self::$options['http_only'],
             'samesite' => self::$options['samesite'],
-        ]);
+        ];
+
+        $_COOKIE[$name] = $encoded;
+
+        # setcookie() does nothing under the CLI SAPI, which is what a long-running
+        # worker runs as - the cookie would be set in $_COOKIE and never reach the
+        # browser. Build the header ourselves there and let the worker attach it.
+        if (PHP_SAPI === 'cli') {
+            Response::header('Set-Cookie', self::buildHeader($name, $encoded, $options), false);
+            return true;
+        }
+
+        return setcookie($name, $encoded, $options);
+    }
+
+    /**
+     * Render a Set-Cookie header value.
+     *
+     * @param string $name
+     * @param string $value
+     * @param array  $options
+     * @return string
+     */
+    private static function buildHeader(string $name, string $value, array $options): string
+    {
+        $header = urlencode($name) . '=' . urlencode($value);
+
+        if ($options['expires']) $header .= '; Expires=' . gmdate('D, d M Y H:i:s T', $options['expires']) . '; Max-Age=' . max(0, $options['expires'] - time());
+        if (strlen($options['path'] ?? ''))   $header .= '; Path=' . $options['path'];
+        if (strlen($options['domain'] ?? '')) $header .= '; Domain=' . $options['domain'];
+        if ($options['secure'])   $header .= '; Secure';
+        if ($options['httponly']) $header .= '; HttpOnly';
+        if (strlen($options['samesite'] ?? '')) $header .= '; SameSite=' . $options['samesite'];
+
+        return $header;
     }
 
     /**

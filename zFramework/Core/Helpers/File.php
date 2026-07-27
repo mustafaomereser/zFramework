@@ -145,14 +145,16 @@ class File
         $fullPath = public_dir($file);
         if (!file_exists($fullPath)) abort(404, 'File not exists.');
 
-        header($_SERVER["SERVER_PROTOCOL"] . " 200 OK");
-        header("Cache-Control: public");
-        header("Content-Type: application/octet-stream");
-        header("Content-Transfer-Encoding: Binary");
-        header("Content-Length: " . filesize($fullPath));
-        header("Content-Disposition: attachment; filename=\"" . basename($fullPath) . "\"");
-        readfile($fullPath);
-        exit;
+        # Read into the signal rather than streaming with readfile()+exit: the
+        # response has to be something Run::begin() can hand back, and under a
+        # long-running worker exit would take the worker down with it.
+        throw new \zFramework\Core\ResponseSignal(200, [
+            'Cache-Control'             => 'public',
+            'Content-Type'              => 'application/octet-stream',
+            'Content-Transfer-Encoding' => 'Binary',
+            'Content-Length'            => (string) filesize($fullPath),
+            'Content-Disposition'       => 'attachment; filename="' . basename($fullPath) . '"',
+        ], (string) file_get_contents($fullPath));
     }
 
     /**
