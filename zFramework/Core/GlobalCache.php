@@ -28,16 +28,48 @@ class GlobalCache
      */
     public static function cache(string $name, \Closure $callback, int|null $timeout = null)
     {
-        if (!function_exists('apcu_fetch')) return $callback();
+        $key = self::getName($name);
 
-        $data = apcu_fetch(self::getName($name), $success);
-        if (!$success) {
-            $data = $callback();
-            if (!is_null($timeout)) apcu_store(self::getName($name), $data, $timeout);
-            else apcu_store(self::getName($name), $data);
+        # L1: APCu. Server-local, so it cannot be invalidated from anywhere else -
+        # which is why it is only trusted for a few seconds when there is an L2.
+        $useL1 = function_exists('apcu_fetch');
+        if ($useL1) {
+            $data = apcu_fetch($key, $found);
+            if ($found) return $data;
         }
 
+        # L2: Redis. Shared by every server, so this is where the truth lives and
+        # where remove() actually reaches everyone.
+        $redis = \zFramework\Core\Facades\Redis::available('cache');
+        if ($redis) {
+            $data = \zFramework\Core\Facades\Redis::get($key, 'cache');
+            if ($data !== null) {
+                if ($useL1) apcu_store($key, $data, self::l1Ttl($timeout));
+                return $data;
+            }
+        }
+
+        $data = $callback();
+
+        if ($redis) \zFramework\Core\Facades\Redis::set($key, $data, $timeout, 'cache');
+        if ($useL1) apcu_store($key, $data, $redis ? self::l1Ttl($timeout) : ($timeout ?? 0));
+
         return $data;
+    }
+
+    /**
+     * How long L1 may hold a value while an L2 exists.
+     *
+     * Capped by config('redis.l1_ttl') - the window in which two servers can
+     * disagree after an invalidation. Never longer than the value's own TTL.
+     *
+     * @param int|null $timeout
+     * @return int
+     */
+    private static function l1Ttl(int|null $timeout): int
+    {
+        $l1 = (int) (\zFramework\Core\Facades\Config::get('redis.l1_ttl') ?: 5);
+        return $timeout ? min($l1, $timeout) : $l1;
     }
 
     /**
@@ -48,8 +80,14 @@ class GlobalCache
      */
     public static function remove(string $name): bool
     {
+        $key = self::getName($name);
+
+        # Redis first: that reaches every server. The local APCu copy goes too, but
+        # other servers keep theirs until l1_ttl expires - seconds, by design.
+        \zFramework\Core\Facades\Redis::delete($key, 'cache');
+
         if (!function_exists('apcu_delete')) return false;
-        apcu_delete(self::getName($name));
+        apcu_delete($key);
         return true;
     }
 
