@@ -78,9 +78,12 @@ class DB
     {
         if ($this->connection !== null) return $this->connection;
 
-        # Unknown connection name: bail out before handing a null key to PDO. The
-        # caller gets a named error from requireBuilder() at query time instead.
-        if (!isset($GLOBALS['databases']['connections'][$this->db])) return false;
+        # The `$this->table &&` guard is deliberate and must stay: an instance may
+        # be constructed before its connection exists - multi-tenant setups resolve
+        # the tenant and register its connection after the model is created. Such an
+        # instance has no table yet, and bailing out here would leave it permanently
+        # unusable even once the connection is registered.
+        if ($this->table && !isset($GLOBALS['databases']['connections'][$this->db])) return false;
         if (!isset($GLOBALS['databases']['connected'][$this->db])) {
             try {
                 $parameters = $GLOBALS['databases']['connections'][$this->db];

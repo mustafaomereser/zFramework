@@ -146,6 +146,11 @@ class Run
     private static array $bootRoutes = [];
 
     /**
+     * Whether handle() has already served a request in this process.
+     */
+    private static bool $handled = false;
+
+    /**
      * One request, start to finish: FPM's entry point.
      *
      * A long-running server calls boot() once and handle() per request instead -
@@ -188,6 +193,11 @@ class Run
                 'suffix'  => ''
             ] + Config::get('view'));
             #
+
+            # Before the route files, as it always was: a global middleware may set
+            # up state the route definitions depend on - resolving a tenant and
+            # registering its database connection, for one.
+            self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
 
             # Compiled route table (php terminal route cache): skips parsing and
             # executing every route file, which on a large project is the single
@@ -248,11 +258,13 @@ class Run
         ob_start();
 
         try {
-            # Global middlewares run here, not at boot: the file executes them
-            # rather than just declaring them, so booting once would have meant
-            # running them once - the language middleware would resolve the first
-            # visitor's locale and every later request would inherit it.
-            self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
+            # autoload.php executes the global middlewares rather than declaring
+            # them, so under a booted-once server they would run exactly once - the
+            # language middleware would resolve the first visitor's locale and every
+            # later request would inherit it. boot() already ran them for this
+            # request, so this only covers the ones after it.
+            if (self::$handled) self::includer(BASE_PATH . '/App/Middlewares/autoload.php');
+            self::$handled = true;
 
             # Same reasoning: module callbacks build menus and view data from the
             # current request.
