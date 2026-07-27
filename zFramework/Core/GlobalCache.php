@@ -8,6 +8,31 @@ class GlobalCache
     static $prefix = "";
 
     /**
+     * Whether APCu may be used. Resolved once from config/cache.php.
+     */
+    private static ?bool $apcu = null;
+
+    /**
+     * Is APCu available and enabled?
+     *
+     * Extension present is not enough: config cache.apcu turns it off without
+     * touching code, for when the working set no longer fits in apc.shm_size and
+     * constant eviction costs more than the cache saves - or simply to measure
+     * whether it is earning its keep.
+     *
+     * @return bool
+     */
+    public static function apcu(): bool
+    {
+        if (self::$apcu !== null) return self::$apcu;
+        if (!function_exists('apcu_fetch')) return self::$apcu = false;
+
+        $config = \zFramework\Core\Facades\Config::get('cache');
+
+        return self::$apcu = is_array($config) ? (bool) ($config['apcu'] ?? true) : true;
+    }
+
+    /**
      * Build cache name
      *
      * @param string   $name
@@ -38,7 +63,7 @@ class GlobalCache
 
         # L1: APCu. Server-local, so it cannot be invalidated from anywhere else -
         # which is why it is only trusted for a few seconds when there is an L2.
-        $useL1 = function_exists('apcu_fetch');
+        $useL1 = self::apcu();
         if ($useL1) {
             $data = apcu_fetch($key, $found);
             if ($found) return $data;
@@ -92,7 +117,7 @@ class GlobalCache
         # other servers keep theirs until l1_ttl expires - seconds, by design.
         \zFramework\Core\Facades\Redis::delete($key, 'cache');
 
-        if (!function_exists('apcu_delete')) return false;
+        if (!self::apcu()) return false;
         apcu_delete($key);
         return true;
     }
@@ -102,7 +127,7 @@ class GlobalCache
      */
     public static function clear(): bool
     {
-        if (!function_exists('apcu_clear_cache')) return false;
+        if (!self::apcu()) return false;
         apcu_clear_cache();
         return true;
     }
