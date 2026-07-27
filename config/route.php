@@ -12,4 +12,19 @@ return [
     #
     # Note that route/dynamic/ is never cached regardless of this setting.
     'caching' => true,
+
+    # Verify the cache against the route files it was built from, and ignore it
+    # when any of them changed. Files and their directories are both watched, so
+    # adding or deleting a route file is noticed too.
+    #
+    # This makes a stale cache harmless: edit a route, the change takes effect
+    # immediately, no `route clear` needed. The cache stays unused until
+    # `php terminal route cache` is run again - it is NOT rebuilt automatically,
+    # and that is deliberate: building it from a web request would freeze
+    # whatever was true for that one request (its user, its tenant) into a table
+    # served to everybody.
+    #
+    # Costs one stat() per route file per request. Leave it on in development.
+    # In production the deploy script rebuilds the cache, so it can be false.
+    'auto-check' => true,
 ];

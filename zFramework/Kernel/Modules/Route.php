@@ -24,12 +24,15 @@ class Route
 
         RouteFacade::$routes = [];
 
+        $before = Run::$included;
+
         Run::initProviders()::findModules(base_path('/modules'))::loadModules();
 
         # route/dynamic is excluded on purpose: it is where definitions that depend
         # on request state live, and a cache would freeze them at build time.
         Run::includer(BASE_PATH . '/route', true, false, '.php', BASE_PATH . '/route/dynamic');
 
+        $sources = self::sources(array_values(array_diff(Run::$included, $before)));
         $total   = count(RouteFacade::$routes);
         $blocked = [];
 
@@ -50,9 +53,9 @@ class Route
         }
 
         $path = "$storage_path/routes.cache.php";
-        file_put_contents2($path, "<?php \nreturn " . var_export(RouteFacade::$routes, true) . ";");
+        file_put_contents2($path, "<?php \nreturn " . var_export(['files' => $sources, 'routes' => RouteFacade::$routes], true) . ";");
 
-        Terminal::text("[color=green]Routes cached:[/color] $total route(s) -> $path");
+        Terminal::text("[color=green]Routes cached:[/color] $total route(s) from " . count($sources) . " source(s) -> $path");
         Terminal::text("[color=dark-gray]Run `php terminal route clear` after changing a route file.[/color]");
 
         Terminal::text("\n[color=yellow]A cached table is a snapshot of this moment.[/color]");
@@ -62,6 +65,35 @@ class Route
         Terminal::text("[color=dark-gray]or into route/dynamic/ which is never cached.[/color]");
 
         if (is_dir(BASE_PATH . '/route/dynamic')) Terminal::text("[color=green]route/dynamic/ found - those files stay dynamic.[/color]");
+    }
+
+    /**
+     * Files whose modification time decides whether the cache is still current.
+     *
+     * The directories are watched alongside the files: a directory's mtime
+     * changes when a route file is added or removed, which no per-file mtime
+     * would reveal.
+     *
+     * @param array $included Paths included while the routes were being collected.
+     * @return array path => mtime
+     */
+    private static function sources(array $included): array
+    {
+        $dynamic = str_replace('\\', '/', BASE_PATH . '/route/dynamic');
+        $sources = [];
+
+        foreach ($included as $file) {
+            $file = str_replace('\\', '/', $file);
+
+            # Only route definitions matter here. route/dynamic is never cached, so
+            # editing it cannot make the cache stale.
+            if (!strstr($file, '/route/') || strstr($file, $dynamic)) continue;
+
+            if (is_file($file)) $sources[$file] = filemtime($file);
+            if (is_dir($dir = dirname($file))) $sources[$dir] = filemtime($dir);
+        }
+
+        return $sources;
     }
 
     /**

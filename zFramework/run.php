@@ -95,10 +95,29 @@ class Run
             # most repeated piece of work in a request. Module callbacks still run -
             # only their route definitions come from the cache.
             $route_config = Config::get('route');
-            \zFramework\Core\Route::$caching = is_array($route_config) ? (bool) ($route_config['caching'] ?? true) : true;
+            $route_config = is_array($route_config) ? $route_config : [];
+            \zFramework\Core\Route::$caching = (bool) ($route_config['caching'] ?? true);
 
             $cached = \zFramework\Core\Route::$caching && is_file($route_cache = "$storage_path/routes.cache.php");
-            if ($cached) \zFramework\Core\Route::$routes = include($route_cache);
+
+            if ($cached) {
+                $compiled = include($route_cache);
+
+                # auto-check: a route file edited since the cache was built makes the
+                # cache stale, and the route files are loaded normally instead. Costs
+                # one stat() per source file; turn it off in production, where the
+                # deploy script rebuilds the cache anyway.
+                if ($route_config['auto-check'] ?? true) {
+                    foreach ($compiled['files'] ?? [] as $source => $mtime) {
+                        if (!file_exists($source) || filemtime($source) !== $mtime) {
+                            $cached = false;
+                            break;
+                        }
+                    }
+                }
+
+                if ($cached) \zFramework\Core\Route::$routes = $compiled['routes'] ?? $compiled;
+            }
 
             self::initProviders()::findModules(base_path('/modules'))::loadModules($cached);
             if (!$cached) self::includer(BASE_PATH . '/route');

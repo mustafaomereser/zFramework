@@ -1665,12 +1665,24 @@ the table replaces all of it with a single `include`.
 
 ```php
 // config/route.php
-'caching' => true,   // false: ignore the cache file even if one exists
+'caching'    => true,   // false: ignore the cache file even if one exists
+'auto-check' => true,   // ignore it when a route file changed
 ```
 
-Turn it off during development — otherwise an existing cache keeps being served
-after you edit a route file, until `route clear` is run. (If you also use
-`config cache`, clear that too after editing this file.)
+`auto-check` records the route files the cache was built from and compares their
+modification times on each request. Edit a route and the change takes effect
+immediately — no `route clear`, no stale table. Directories are watched too, so
+adding or deleting a route file is noticed. `route/dynamic/` is not watched,
+since it never enters the cache.
+
+The cache is **not** rebuilt automatically, and that is deliberate: building it
+from a web request would freeze whatever happened to be true for that one
+request — its user, its tenant, its permissions — into a table then served to
+everybody. Rebuilding stays an explicit `php terminal route cache`, run from the
+CLI where no such state exists.
+
+Cost is one `stat()` per route file per request. Leave it on in development; in
+production the deploy script rebuilds the cache, so it can be `false`.
 
 **A cached table is a snapshot.** Anything declared inside a condition that
 varies per request is frozen as it was when the cache was built — and no CLI
