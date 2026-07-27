@@ -1,4 +1,0 @@
-✅ DB analyzer use just in SELECT mode.
-✅ db migrator Primary key without auto increment and uuid
-✅ view::class incelenecek ve style içerisinde @page ve @media kullanımı olduğunda view direktifi sayılmayacak
-✅ debug false iken lak diye gelen mesajı dümdüz basıyor bu olmamalı productionda böyle bilgileri basmamalı düzenlenecek.
