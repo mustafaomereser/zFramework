@@ -344,6 +344,41 @@ $result = (new Post)
 // 'links'        → Closure — call $result['links']() to render pagination view
 ```
 
+**Real order** — once a list is sorted by the user, the per-page counter
+(`$result['start']++`) no longer tells you where a row actually sits.
+`withRealOrder()` adds the row's position in the table's default order as a
+column:
+
+```php
+$result = (new Post)
+    ->withRealOrder()                          // adds 'real_order'
+    ->orderBy(['title' => 'ASC'])
+    ->paginate(20);
+
+// in the view
+foreach ($result['items'] as $item) echo $item['real_order'];
+```
+
+```php
+$p->withRealOrder();                  // 'real_order', newest row = 1 (id DESC)
+$p->withRealOrder('rank');            // custom column name
+$p->withRealOrder('rank', 'ASC');     // oldest row = 1
+```
+
+It compiles to an index-only correlated count over the primary key, so only
+the index is read, never the table data:
+
+```sql
+(SELECT COUNT(*) FROM posts zf_ro WHERE zf_ro.id >= posts.id) AS real_order
+```
+
+Position in the chain does not matter, and it composes with `select()`.
+`paginate()` strips it before running its COUNT query.
+
+Note that the subquery repeats no `WHERE` clause on purpose: the number is the
+row's position in the whole table, not within the active filter. Ranking inside
+a filter would mean duplicating every condition into the subquery.
+
 ```php
 // In the view:
 echo $result['links']();                            // uses config('app.pagination.default-view')
