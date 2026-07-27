@@ -1744,6 +1744,18 @@ function errorHandler($data)
         Config::get('app.error.callback')($error_log_file_name, $error_log);
     }
 
+    # One-line summary to a stream a log collector can read. The HTML files above
+    # are unbeatable while debugging one machine and useless across several: with
+    # more than one app server, hunting an error means opening N local disks.
+    if ($stream = Config::get('app.error.stream')) {
+        $summary = sprintf('[zFramework] %s in %s:%s', $message, $data[3] ?? '?', $data[4] ?? '?');
+        match ($stream) {
+            'syslog' => syslog(LOG_ERR, $summary),
+            'stderr' => @file_put_contents('php://stderr', $summary . PHP_EOL),
+            default  => error_log($summary),
+        };
+    }
+
     # Production: never leak the raw exception message to the client.
     if (!Config::get('app.debug')) {
         if (Http::isAjax()) abort(500, 'Beklenmedik bir hata oluştu. Bu mesajı görüyorsanız yöneticiye otomatik olarak bilgilendirme yapılmıştır. Sorun uzun süre devam ederse lütfen yöneticiyle iletişime geçiniz.');

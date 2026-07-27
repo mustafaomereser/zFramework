@@ -10,6 +10,13 @@ return [
     'analyze'     => true,
     'error'       => [
         'logging'  => true,
+
+        # Also send a one-line summary to a stream a log collector can read.
+        # false | 'error_log' | 'stderr' | 'syslog'. Worth turning on as soon as
+        # there is more than one app server - the HTML files under error_logs/
+        # only help when you know which machine to look at.
+        'stream'   => false,
+
         'callback' => function ($log_path, $log) {
             if (PHP_SAPI === 'cli') die(zFramework\Kernel\Terminal::text("[color=red]-> unexcepted terminal error[/color][color=green] $log_path [/color]"));
         }
