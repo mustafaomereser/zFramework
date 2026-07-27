@@ -80,7 +80,9 @@ class Cookie
      */
     private static function buildHeader(string $name, string $value, array $options): string
     {
-        $header = urlencode($name) . '=' . urlencode($value);
+        # rawurlencode, matching how the worker decodes: urlencode would turn a
+        # space into "+", which is indistinguishable from a real "+" in base64.
+        $header = rawurlencode($name) . '=' . rawurlencode($value);
 
         if ($options['expires']) $header .= '; Expires=' . gmdate('D, d M Y H:i:s T', $options['expires']) . '; Max-Age=' . max(0, $options['expires'] - time());
         if (strlen($options['path'] ?? ''))   $header .= '; Path=' . $options['path'];

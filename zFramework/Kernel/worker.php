@@ -78,13 +78,18 @@ $populate = function (ServerRequestInterface $request): void {
     $_GET   = $request->getQueryParams();
     $_FILES = $request->getUploadedFiles();
 
-    # PHP url-decodes cookie names and values when it populates $_COOKIE itself;
-    # RoadRunner hands them over raw. Without this a cookie whose name contains an
-    # encoded character - which Crypter-derived names routinely do - is stored
-    # under "a%2Fb" while the framework looks up "a/b", so it is never found. Auth
-    # cookies vanish on the next request and the session appears not to stick.
+    # PHP url-decodes cookie names when it populates $_COOKIE itself; RoadRunner
+    # hands them over raw. Without this a name containing an encoded character -
+    # which Crypter-derived names routinely do - is stored as "a%2Fb" while the
+    # framework looks up "a/b", so auth cookies vanish on the next request.
+    #
+    # rawurldecode, not urldecode: the latter also turns "+" into a space. Values
+    # here are base64, where "+" is a real character, and RoadRunner has already
+    # decoded the value - so urldecode would corrupt every "+" in a password hash
+    # and the login would silently fail to stick. rawurldecode is correct whether
+    # the input arrives encoded or not.
     $_COOKIE = [];
-    foreach ($request->getCookieParams() as $name => $value) $_COOKIE[urldecode((string) $name)] = urldecode((string) $value);
+    foreach ($request->getCookieParams() as $name => $value) $_COOKIE[rawurldecode((string) $name)] = rawurldecode((string) $value);
 
     $parsed = $request->getParsedBody();
     $_POST  = is_array($parsed) ? $parsed : [];
