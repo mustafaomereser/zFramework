@@ -97,5 +97,10 @@ class Run
         } catch (\Exception $errorHandle) {
             errorHandler($errorHandle);
         }
+
+        # Release the response, then run whatever was handed to Defer::after().
+        # Outside the try/catch on purpose: deferred jobs handle their own errors,
+        # and an error page has already been rendered by this point anyway.
+        \zFramework\Core\Facades\Defer::flush();
     }
 }
