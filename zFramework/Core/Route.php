@@ -16,6 +16,11 @@ class Route
     static $caching     = true;
 
     /**
+     * Lookup index built from $routes, rebuilt when a route is registered.
+     */
+    private static ?array $index = null;
+
+    /**
      * Group parameters.
      */
     static $groups      = [];
@@ -79,6 +84,10 @@ class Route
         $old_key = @end(array_keys(self::$routes));
         self::$routes[$name] = array_pop(self::$routes);
         if (!is_null(self::$calledRoute) && @self::$calledRoute['name'] == $old_key) self::$calledRoute['name'] = $name;
+
+        # The route's array key just changed; the index points at the old one.
+        self::$index = null;
+
         return new self();
     }
 
@@ -178,74 +187,161 @@ class Route
     }
 
     /**
-     * Dispatch Route. 
-     * @param string|null $method
-     * @param array $args
+     * Split a url into comparable segments.
+     *
+     * Empty segments are dropped so "/panel//urunler/" and "/panel/urunler" are
+     * the same path - except for the root, which is a single empty segment.
+     *
+     * @param string $url
      * @return array
      */
-    private static function dispatch($method, array $args): array
+    private static function segments(string $url): array
     {
-        while (strstr($args[0], '//')) $args[0] = str_replace(['//'], ['/'], $args[0]);
+        while (strstr($url, '//')) $url = str_replace(['//'], ['/'], $url);
 
-        $method = strtoupper($method ?? '');
-        $URI    = explode('/', substr(strtok($_SERVER['REQUEST_URI'], '?'), 1));
-        $URL    = explode('/', substr($args[0], 1));
+        $parts = explode('/', (string) substr($url, 1));
+        if (count($parts) == 1) return $parts;
 
-        $match          = 0;
-        $parameters     = [];
-        $parameter_keys = [];
-        foreach ($URL as $key => $row) {
-            @$column = $URI[$key];
-
-            if (strstr($row, '{') && strstr($row, '}')) {
-                $parameter_keys[] = $row;
-
-                if (!strlen($column ?? '')) {
-                    if (strstr($row, '{?')) $match++;
-                    continue;
-                }
-
-                $URL[$key] = $column;
-                $match++;
-                $parameters[str_replace(['{?', '{', '}'], '', $row)] = $column;
-            } else {
-                if ($column == $row) $match++;
-            }
-
-            if (!strlen($URL[$key]) && count($URL) != 1) unset($URL[$key]);
-        }
-
-        $URI = array_values($URI);
-        $URL = array_values($URL);
-
-        self::$routes[] = [
-            'url'        => $args[0],
-            'method'     => $method,
-            'parameters' => $parameter_keys,
-            'groups'     => self::$groups
-        ];
-
-        $match = ((empty($method) || $method == method()) && $URI == $URL ? 1 : 0); #($match > 0 && (count($URL) - count($URI) == 0))) ? 1 : 0;
-        return compact('match', 'parameters', 'URI', 'URL');
+        return array_values(array_filter($parts, fn($segment) => strlen($segment)));
     }
 
     /**
-     * Call a route.
+     * Register a route. No matching happens here.
+     *
+     * Matching used to run inside this method, once per definition: a project
+     * with 1000 routes paid 1000 URI comparisons on every request, whichever
+     * route was actually being served. Definitions are now only collected, and
+     * match() resolves the request once, through an index.
+     *
      * @param string|null $method
      * @param array $args
      */
     public static function call($method, array $args): void
     {
-        $args[0] = @self::$groups['pre'] . $args[0];
+        $url = @self::$groups['pre'] . $args[0];
+        while (strstr($url, '//')) $url = str_replace(['//'], ['/'], $url);
 
-        $dispatch = self::dispatch($method, $args);
-        if (self::$calledRoute != null || !$dispatch['match']) return;
-        if (!Csrf::check(isset(self::$groups['no-csrf']))) abort(406, Lang::get('errors.csrf.no-verify'));
+        $segments   = self::segments($url);
+        $parameters = array_values(array_filter($segments, fn($segment) => strstr($segment, '{') && strstr($segment, '}')));
 
-        if (@self::$groups['middlewares']) {
-            $middleware = Middleware::middleware(self::$groups['middlewares'][0], function ($declines) {
+        self::$routes[] = [
+            'url'        => $url,
+            'method'     => strtoupper($method ?? ''),
+            'parameters' => $parameters,
+            'groups'     => self::$groups,
+            'callback'   => $args[1] ?? null,
+            'segments'   => $segments,
+            'dynamic'    => (bool) count($parameters),
+        ];
+
+        # A new definition invalidates the lookup index.
+        self::$index = null;
+    }
+
+    /**
+     * Lookup index over the registered routes, built once per request.
+     *
+     * Static routes go into a hash keyed by method and path, so resolving one is
+     * a single lookup instead of a scan. Routes carrying {parameters} cannot be
+     * hashed and stay in a list, in definition order.
+     *
+     * @return array
+     */
+    private static function index(): array
+    {
+        if (self::$index !== null) return self::$index;
+
+        $index    = ['static' => [], 'dynamic' => []];
+        $position = 0;
+
+        foreach (self::$routes as $key => $route) {
+            if ($route['dynamic'] ?? false) $index['dynamic'][$position] = $key;
+            else {
+                # First definition wins, matching the old "first match served" rule.
+                $path = implode('/', $route['segments'] ?? []);
+                $index['static'][$route['method']][$path] ??= ['position' => $position, 'key' => $key];
+            }
+            $position++;
+        }
+
+        return self::$index = $index;
+    }
+
+    /**
+     * Compare a route's segments against the request's.
+     *
+     * @param array $URL Route segments, may contain {id} / {?id}
+     * @param array $URI Request segments
+     * @return array|false Extracted parameters, or false when it does not match.
+     */
+    private static function matchSegments(array $URL, array $URI): array|false
+    {
+        $parameters = [];
+
+        foreach ($URL as $key => $row) {
+            if (!(strstr($row, '{') && strstr($row, '}'))) continue;
+
+            $column = $URI[$key] ?? null;
+
+            if (!strlen($column ?? '')) {
+                # Optional parameter with nothing to fill it: drop the segment.
+                if (strstr($row, '{?')) unset($URL[$key]);
+                continue;
+            }
+
+            $URL[$key] = $column;
+            $parameters[str_replace(['{?', '{', '}'], '', $row)] = $column;
+        }
+
+        return array_values($URL) == array_values($URI) ? $parameters : false;
+    }
+
+    /**
+     * Resolve the current request against the registered routes.
+     *
+     * Call once, after every route file has been loaded.
+     *
+     * @return void
+     */
+    public static function match(): void
+    {
+        if (self::$calledRoute !== null || !count(self::$routes)) return;
+
+        $method = strtoupper(method());
+        $URI    = self::segments(strtok($_SERVER['REQUEST_URI'] ?? '/', '?'));
+        $path   = implode('/', $URI);
+        $index  = self::index();
+
+        $static = $index['static'][$method][$path] ?? $index['static'][''][$path] ?? null;
+        $found  = null;
+
+        # A parameterised route defined before the static hit still wins, because
+        # the old behaviour served whichever route was declared first.
+        foreach ($index['dynamic'] as $position => $key) {
+            if ($static !== null && $position > $static['position']) break;
+
+            $route = self::$routes[$key];
+            if (!empty($route['method']) && $route['method'] != $method) continue;
+
+            $parameters = self::matchSegments($route['segments'], $URI);
+            if ($parameters === false) continue;
+
+            $found = ['key' => $key, 'parameters' => $parameters];
+            break;
+        }
+
+        if ($found === null && $static !== null) $found = ['key' => $static['key'], 'parameters' => []];
+        if ($found === null) return;
+
+        $route  = self::$routes[$found['key']];
+        $groups = $route['groups'] ?? [];
+
+        if (!Csrf::check(isset($groups['no-csrf']))) abort(406, Lang::get('errors.csrf.no-verify'));
+
+        if (@$groups['middlewares']) {
+            $middleware = Middleware::middleware($groups['middlewares'][0], function ($declines) use ($groups) {
                 if (!count($declines)) return true;
-                if (self::$groups['middlewares'][1]) self::$groups['middlewares'][1]($declines);
+                if ($groups['middlewares'][1]) $groups['middlewares'][1]($declines);
                 return false;
             });
 
@@ -253,9 +349,9 @@ class Route
         }
 
         self::$calledRoute = [
-            'name'       => @end(array_keys(self::$routes)),
-            'callback'   => $args[1],
-            'parameters' => $dispatch['parameters']
+            'name'       => $found['key'],
+            'callback'   => $route['callback'],
+            'parameters' => $found['parameters'],
         ];
     }
 
