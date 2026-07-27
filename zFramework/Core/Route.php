@@ -13,6 +13,11 @@ class Route
      */
     static $routes      = [];
     static $calledRoute = null;
+
+    /**
+     * Whether a compiled route table may be used. Set from config/route.php at
+     * boot; assign directly to override for the rest of the request.
+     */
     static $caching     = true;
 
     /**

@@ -94,6 +94,9 @@ class Run
             # executing every route file, which on a large project is the single
             # most repeated piece of work in a request. Module callbacks still run -
             # only their route definitions come from the cache.
+            $route_config = Config::get('route');
+            \zFramework\Core\Route::$caching = is_array($route_config) ? (bool) ($route_config['caching'] ?? true) : true;
+
             $cached = \zFramework\Core\Route::$caching && is_file($route_cache = "$storage_path/routes.cache.php");
             if ($cached) \zFramework\Core\Route::$routes = include($route_cache);
 

@@ -1663,6 +1663,15 @@ Route files are parsed **and executed** on every request: with 1000 routes that
 is 1000 `Route::get()` calls before the one being served is even found. Caching
 the table replaces all of it with a single `include`.
 
+```php
+// config/route.php
+'caching' => true,   // false: ignore the cache file even if one exists
+```
+
+Turn it off during development — otherwise an existing cache keeps being served
+after you edit a route file, until `route clear` is run. (If you also use
+`config cache`, clear that too after editing this file.)
+
 **A cached table is a snapshot.** Anything declared inside a condition that
 varies per request is frozen as it was when the cache was built — and no CLI
 process is logged in:
