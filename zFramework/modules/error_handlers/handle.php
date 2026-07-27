@@ -96,15 +96,11 @@ function getCodeSnippets($stackTrace)
                         $argStrings[] = $arg ? 'true' : 'false';
                     } elseif (is_null($arg)) {
                         $argStrings[] = 'null';
-                    } elseif (is_array($arg)) {
-                        // $argStrings[] = 'Array(' . count($arg) . ')';
-                        ob_start();
-                        dump($arg);
-                        $text = ob_get_clean();
-                        $argStrings[] = $text;
-                        $argStrings[] = $text;
-                    } elseif (is_object($arg)) {
-                        $argStrings[] = get_class($arg);
+                    } elseif (is_array($arg) || is_object($arg)) {
+                        # hl() renders arrays and objects the same way: a collapsible tree
+                        # with a depth limit, closures filtered out. dump() would also emit
+                        # its own <style> block (with global body rules) into this page.
+                        $argStrings[] = hl($arg);
                     } else {
                         $argStrings[] = gettype($arg);
                     }
@@ -942,6 +938,39 @@ function errorHandler($data)
                 color: var(--text-400);
                 word-break: break-all;
             }
+
+            /* Argument values rendered by hl() (see modules/Functions.php) */
+            .code-args-values .k { color: var(--blue-400); }
+            .code-args-values .s { color: var(--green-500); }
+            .code-args-values .n { color: var(--amber-500); }
+            .code-args-values .b { color: var(--red-400); }
+            .code-args-values .null { color: var(--text-500); font-style: italic; }
+            .code-args-values .arr-label { color: var(--purple-500); font-weight: 600; }
+
+            .code-args-values .row {
+                padding: 1px 0 1px 14px;
+                margin-left: 3px;
+                border-left: 1px solid var(--border);
+            }
+
+            .code-args-values .toggle { cursor: pointer; user-select: none; }
+            .code-args-values .toggle::before { content: "▾ "; color: var(--text-500); }
+            .code-args-values .toggle.closed::before { content: "▸ "; }
+            .code-args-values .collapsible.closed { display: none; }
+
+            .code-args-values .btn-xs {
+                background: var(--surface-4);
+                color: var(--text-300);
+                border: none;
+                padding: 0 6px;
+                margin-left: 4px;
+                border-radius: var(--radius-sm);
+                cursor: pointer;
+                font-size: 0.65rem;
+                font-family: inherit;
+            }
+
+            .code-args-values .btn-xs:hover { background: var(--surface-hover); }
 
             .ide-btn {
                 display: inline-flex;

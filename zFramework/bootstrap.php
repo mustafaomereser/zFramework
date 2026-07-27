@@ -7,9 +7,14 @@ if ($app_config['x-powered-by'] ?? true) header("X-Powered-By: zFramework v" . F
 // Initalize settings
 date_default_timezone_set('Europe/Istanbul');
 
-// zend ignore args disable and param max len increse
-ini_set('zend.exception_ignore_args', 0);
-ini_set('zend.exception_string_param_max_len', 100000);
+// Keep call arguments in stack traces so the error page can show them.
+// Debug only: with this on, every argument is retained on the exception and ends up
+// in the error logs too - a failed login would write the plain password next to the
+// trace, and 100 KB per string parameter is a lot of memory to hold on production.
+if ($app_config['debug'] ?? false) {
+    ini_set('zend.exception_ignore_args', 0);
+    ini_set('zend.exception_string_param_max_len', 100000);
+}
 
 // Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
