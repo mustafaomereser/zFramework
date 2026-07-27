@@ -70,6 +70,7 @@ Route::pre('/admin')->middleware([Auth::class])->group(function () {
 - [16. Helper Methods](#16-helper-methods)
 - [17. AutoSSL](#17-autossl)
 - [18. cPanel](#18-cpanel)
+- [19. Going to Production](#19-going-to-production)
 
 ---
 
@@ -992,7 +993,18 @@ GlobalCache::remove('site_stats');
 GlobalCache::clear();
 ```
 
-Requires the `apcu` PHP extension.
+Requires the `apcu` PHP extension. Without it `GlobalCache::cache()` simply runs
+the closure every time, so code stays correct but uncached.
+
+**Which one to use.** `Cache` stores the value in the current user's session, so
+it is for data that belongs to *that* user. Using it for something shared —
+"top 20 products", a site-wide counter — means the query runs once per visitor
+and a copy is kept in every session file.
+
+Shared data belongs in `GlobalCache`. Note that APCu is per-server: with more
+than one application server each keeps its own copy, and there is no way to
+invalidate them together. That is the point where a central cache (Redis)
+becomes necessary.
 
 ---
 
@@ -1422,3 +1434,72 @@ SSL::AutoSSLStatus();       // check if AutoSSL check is in progress
 SSL::StartAutoSSLCheck();   // trigger an immediate AutoSSL check
 SSL::install('example.com', $cert, $key, $caBundle);
 ```
+
+---
+
+## 19. Going to Production
+
+### config/app.php
+
+```php
+'debug'        => false,   // REQUIRED. Also gates the query analyzer and stack-trace args.
+'x-powered-by' => false,   // stop leaking the framework version
+'force-https'  => true,
+'error'        => ['logging' => true],
+```
+
+`debug => false` is the single most important switch. Besides hiding the error
+page, it turns off two things that are expensive or unsafe on production:
+
+- the **query analyzer**, which re-executes every analysed SELECT through
+  `EXPLAIN ANALYZE`,
+- **`zend.exception_ignore_args`**, which otherwise keeps every call argument
+  attached to exceptions — a failed login would write the plain password into
+  the error log next to the trace.
+
+### config/view.php
+
+```php
+'caching' => true,   // compile templates once
+'minify'  => true,
+```
+
+Compiled views live in `zFramework/storage/views`. The manifest tracks every
+file a template depends on — layouts and nested includes as well — so a changed
+partial invalidates the cache on its own. Clear it on deploy anyway:
+`View::clearCache()`.
+
+### PHP settings
+
+```ini
+opcache.enable = 1
+opcache.memory_consumption = 512
+opcache.max_accelerated_files = 50000
+opcache.validate_timestamps = 0   ; reload FPM on deploy for this to be safe
+
+realpath_cache_size = 4M
+expose_php = Off
+display_errors = Off
+```
+
+opcache is not optional: without it PHP recompiles every included file on every
+request. `validate_timestamps = 0` means PHP stops checking files for changes —
+reload PHP-FPM as part of your deploy, or code changes will not be picked up.
+
+### APCu (recommended)
+
+With the `apcu` extension installed, the table scheme is held in shared memory
+instead of being read and JSON-decoded from `storage/db/<db>/scheme.json` on
+every connection. It also backs [`GlobalCache`](#8-cache). Without it everything
+still works — the disk path is simply used instead.
+
+### Checklist
+
+- [ ] `debug => false`, `x-powered-by => false`
+- [ ] `view.caching => true`, view cache cleared on deploy
+- [ ] opcache on, FPM reloaded by the deploy script
+- [ ] `zFramework/storage/` and `error_logs/` writable by the web user, and not
+      reachable over HTTP — only `public_html/` should be served
+- [ ] no `sqlDebug(true)` left in the code (it writes to `/db-debug/` on every query)
+- [ ] `database/connections.php` credentials outside version control
+- [ ] `php terminal db migrate` run before the new code goes live
