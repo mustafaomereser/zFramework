@@ -29,6 +29,28 @@ class Redis
     private static ?array $config = null;
 
     /**
+     * Whether the phpredis extension is present. Resolved once.
+     */
+    private static ?bool $extension = null;
+
+    /**
+     * Is the extension loaded?
+     *
+     * extension_loaded(), not class_exists(): the class does not exist when the
+     * extension is missing, so class_exists() runs the autoloader every single
+     * time - a filesystem lookup per call. This is called from GlobalCache (so,
+     * from every table() call) and from Auth on every request, which made it one
+     * of the most expensive things the framework did. extension_loaded() is a
+     * lookup in an in-memory list, and the answer is cached here anyway.
+     *
+     * @return bool
+     */
+    private static function extension(): bool
+    {
+        return self::$extension ??= extension_loaded('redis');
+    }
+
+    /**
      * @return array
      */
     private static function config(): array
@@ -44,8 +66,11 @@ class Redis
      */
     public static function available(string $for = 'cache'): bool
     {
-        if (self::$failed || !class_exists('\Redis')) return false;
+        # Cheapest check first: config is memoised, so a disabled Redis costs an
+        # array lookup and nothing else. Everything below only runs when someone
+        # actually turned it on.
         if (!(self::config()['enabled'] ?? false)) return false;
+        if (self::$failed || !self::extension()) return false;
 
         return self::connection($for) !== null;
     }
@@ -58,10 +83,9 @@ class Redis
      */
     public static function connection(string $for = 'cache'): ?\Redis
     {
-        if (self::$failed || !class_exists('\Redis')) return null;
-
         $config = self::config();
         if (!($config['enabled'] ?? false)) return null;
+        if (self::$failed || !self::extension()) return null;
 
         $database = $config['database'][$for] ?? 0;
         if (isset(self::$connections[$database])) return self::$connections[$database];
@@ -221,5 +245,6 @@ class Redis
         self::$connections = [];
         self::$failed      = false;
         self::$config      = null;
+        self::$extension   = null;
     }
 }

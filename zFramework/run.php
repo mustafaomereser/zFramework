@@ -175,6 +175,7 @@ class Run
      *
      * @return void
      */
+
     public static function boot()
     {
         if (self::$booted) return;
@@ -207,7 +208,9 @@ class Run
             $route_config = is_array($route_config) ? $route_config : [];
             \zFramework\Core\Route::$caching = (bool) ($route_config['caching'] ?? true);
 
-            $cached = \zFramework\Core\Route::$caching && is_file($route_cache = "$storage_path/routes.cache.php");
+            $route_cache = "$storage_path/routes.cache.php";
+            $cache_vardi = is_file($route_cache);
+            $cached      = \zFramework\Core\Route::$caching && $cache_vardi;
 
             if ($cached) {
                 $compiled = include($route_cache);
@@ -236,7 +239,11 @@ class Run
                 # holds exactly what a CLI `route cache` would have produced.
                 self::includer(BASE_PATH . '/route', true, false, '.php', BASE_PATH . '/route/dynamic');
 
-                if (\zFramework\Core\Route::$caching && ($route_config['auto-check'] ?? true))
+                # Refresh only a cache that already existed and went stale. Creating
+                # one is `php terminal route cache` - otherwise an application with a
+                # closure route (which can never be cached) would rebuild the whole
+                # table, discover that, and throw it away on every single request.
+                if ($cache_vardi && \zFramework\Core\Route::$caching && ($route_config['auto-check'] ?? true))
                     \zFramework\Core\Route::writeCache($route_cache, \zFramework\Core\Route::sources(array_values(array_diff(self::$included, $before))));
             }
 
