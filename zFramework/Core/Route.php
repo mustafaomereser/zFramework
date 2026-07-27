@@ -85,8 +85,12 @@ class Route
      */
     public static function name(string $name)
     {
-        $name    = self::nameOrganize(@self::$groups['name'] . "/$name");
-        $old_key = @end(array_keys(self::$routes));
+        $name = self::nameOrganize(@self::$groups['name'] . "/$name");
+
+        # array_key_last(), not end(array_keys()): the latter copies every key in
+        # the table just to read the last one, on every name() call. With hundreds
+        # of named routes that is quadratic.
+        $old_key = array_key_last(self::$routes);
         self::$routes[$name] = array_pop(self::$routes);
         if (!is_null(self::$calledRoute) && @self::$calledRoute['name'] == $old_key) self::$calledRoute['name'] = $name;
 
