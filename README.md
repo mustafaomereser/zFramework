@@ -1,11 +1,11 @@
 <a href="https://buymeacoffee.com/mustafaomereser" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;" ></a>
 
-# zFramework v2.10.0
+# zFramework v3.0.0
 
 **Easiest, fastest PHP framework. (Simple)**
 
 ![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-blue)
-![Version](https://img.shields.io/badge/version-2.10.0-green)
+![Version](https://img.shields.io/badge/version-3.0.0-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
 ---
@@ -19,8 +19,9 @@
 | 📦 Module system | 📧 Mail — SMTP via PHPMailer |
 | 🌍 Multi-language | 🔄 AutoSSL — Let's Encrypt http-01 & dns-01 |
 | ✅ Validator | 🖥️ cPanel API — Domain, DNS, DB, Email, SSL |
-| 🗃️ Cache — Session-based & APCu (global) | 🔍 Query Analyzer — EXPLAIN + EXPLAIN ANALYZE |
+| 🗃️ Cache — session, APCu (L1) + Redis (L2) | 🔍 Query Analyzer — EXPLAIN + EXPLAIN ANALYZE |
 | 🎨 View / template engine (Blade-like directives) | 🔧 Terminal — Artisan-like CLI tool |
+| 📮 Queue — Redis-backed jobs + worker command | ⏭️ Defer — run work after the response is sent |
 
 ---
 
