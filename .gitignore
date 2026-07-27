@@ -12,3 +12,9 @@ config/crypt.php
 .DS_Store
 analysis
 CLAUDE.md
+
+# RoadRunner binary - fetched per machine with `./vendor/bin/rr get-binary`,
+# ~64MB and platform specific.
+rr
+rr.exe
+.rr.pid
