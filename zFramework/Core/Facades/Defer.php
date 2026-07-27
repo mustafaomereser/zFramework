@@ -64,6 +64,24 @@ class Defer
     }
 
     /**
+     * Reopen for the next request.
+     *
+     * flush() leaves $closed true so late registrations run inline rather than
+     * being queued for a flush that already happened. In a long-running worker
+     * that flag has to be cleared, or every later request would run its deferred
+     * work inline - defeating the point.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::flush();
+
+        self::$jobs   = [];
+        self::$closed = false;
+    }
+
+    /**
      * Are there jobs waiting?
      * @return bool
      */

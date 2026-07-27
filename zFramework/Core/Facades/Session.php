@@ -35,6 +35,23 @@ class Session
     }
 
     /**
+     * Drop the in-memory session so the next request loads its own.
+     *
+     * flush() is called first: a long-running worker has no script shutdown, so
+     * the shutdown function registered by load() would never fire and pending
+     * changes would be lost rather than written.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::flush();
+
+        self::$cache = null;
+        self::$dirty = false;
+    }
+
+    /**
      * Run a closure with direct $_SESSION access (for nested array manipulation).
      * Syncs cache ↔ $_SESSION around the callback.
      * @param \Closure $callback

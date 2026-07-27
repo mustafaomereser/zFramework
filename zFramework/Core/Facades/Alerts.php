@@ -7,6 +7,15 @@ class Alerts
     static $name = null;
 
     /**
+     * Drop the pending alert name.
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::$name = null;
+    }
+
+    /**
      * Get current Alerts list.
      * @return array
      */

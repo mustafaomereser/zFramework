@@ -38,6 +38,19 @@ class View
     }
 
     /**
+     * Drop everything left over from rendering.
+     *
+     * $binds, $directives and $config are registered at boot by providers and
+     * stay; only the state of the render that just happened goes.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::reset();
+    }
+
+    /**
      * Reset all variables.
      */
     private static function reset(): void

@@ -8,6 +8,19 @@ class Lang
     static $path = null;
 
     /**
+     * Drop the resolved locale.
+     *
+     * It comes from the visitor's cookie or browser, so keeping it would serve
+     * the next request in the previous visitor's language.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::$locale = null;
+    }
+
+    /**
      * is selectable?
      * @param string $lang
      * @return string

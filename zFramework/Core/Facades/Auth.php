@@ -28,6 +28,21 @@ class Auth
         return self::$api_mode ? Session::class : Cookie::class;
     }
 
+    /**
+     * Drop everything tied to the request being served.
+     *
+     * The single most dangerous leak in a long-running worker: $user surviving
+     * into the next request means one visitor is served as another.
+     *
+     * $model, $columns and $database_exists are boot state and stay.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::$user = null;
+    }
+
     public static function init()
     {
         self::$model = (new User);

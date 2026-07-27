@@ -18,6 +18,24 @@ class Mail
         'tls' => PHPMailer::ENCRYPTION_STARTTLS,
         'ssl' => PHPMailer::ENCRYPTION_SMTPS
     ];
+
+    /**
+     * Drop recipients and the PHPMailer instance.
+     *
+     * A recipient list surviving into the next request means one user's mail is
+     * addressed to another - the kind of leak nobody notices until it is in
+     * someone else's inbox.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::$mail    = null;
+        self::$toMail  = [];
+        self::$cc      = [];
+        self::$bcc     = [];
+        self::$sending = false;
+    }
     /**
      * Initalize settings.
      */

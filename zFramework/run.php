@@ -39,6 +39,49 @@ class Run
         }
     }
 
+    /**
+     * Classes holding state that belongs to one request.
+     *
+     * Each one clears its own - the class knows which of its statics are boot
+     * state and which are not, and a single list here is what keeps that
+     * knowledge from being scattered across the framework.
+     */
+    private const REQUEST_STATE = [
+        \zFramework\Core\Facades\Auth::class,
+        \zFramework\Core\Facades\Session::class,
+        \zFramework\Core\Facades\Defer::class,
+        \zFramework\Core\Facades\Lang::class,
+        \zFramework\Core\Facades\Alerts::class,
+        \zFramework\Core\Facades\Response::class,
+        \zFramework\Core\Facades\Mail::class,
+        \zFramework\Core\Facades\cURL::class,
+        \zFramework\Core\Route::class,
+        \zFramework\Core\View::class,
+    ];
+
+    /**
+     * Return the process to a state where it can serve an unrelated request.
+     *
+     * Under PHP-FPM this is free - the process dies and takes everything with it.
+     * Under a long-running server (RoadRunner, Swoole, a queue worker looping)
+     * nothing dies, so anything left in a static is handed to the next request:
+     * the previous visitor's identity, language, session or mail recipients.
+     *
+     * Boot state - the route table, view binds, config, database connections - is
+     * deliberately kept. That is the whole point of booting once.
+     *
+     * Safe to call under FPM as well; it simply has nothing to gain there.
+     *
+     * @return void
+     */
+    public static function resetState(): void
+    {
+        foreach (self::REQUEST_STATE as $class) if (method_exists($class, 'flushRequestState')) $class::flushRequestState();
+
+        # Only ever holds the request currently being analysed.
+        \zFramework\Core\Facades\Analyzer\Analyze::$process_id = null;
+    }
+
     public static function initProviders()
     {
         foreach (glob(BASE_PATH . "/App/Providers/*.php") as $provider) new ($provider = str_replace("/", "\\", str_replace([BASE_PATH . '/', '.php'], '', $provider)));
@@ -71,10 +114,47 @@ class Run
         return new self();
     }
 
+    /**
+     * Whether boot() has already run in this process.
+     */
+    private static bool $booted = false;
+
+    /**
+     * Route table as it stood after boot, before any route/dynamic definitions.
+     */
+    private static array $bootRoutes = [];
+
+    /**
+     * One request, start to finish: FPM's entry point.
+     *
+     * A long-running server calls boot() once and handle() per request instead -
+     * see worker.php. Keeping both paths going through the same two methods is
+     * what stops the two environments from drifting apart.
+     *
+     * @return void
+     */
     public static function begin()
     {
+        self::boot();
+        self::handle();
+    }
+
+    /**
+     * Everything that does not depend on the request: modules, providers, view
+     * settings, the route table.
+     *
+     * Under FPM this runs per request because the process is new every time.
+     * Under a long-running worker it runs once, which is where the speedup comes
+     * from - and why nothing request-specific may happen here.
+     *
+     * @return void
+     */
+    public static function boot()
+    {
+        if (self::$booted) return;
+        self::$booted = true;
+
         global $storage_path;
-        ob_start();
         try {
             # includes
             self::includer(FRAMEWORK_PATH . '/modules', false);
@@ -131,9 +211,28 @@ class Run
                     \zFramework\Core\Route::writeCache($route_cache, \zFramework\Core\Route::sources(array_values(array_diff(self::$included, $before))));
             }
 
-            # route/dynamic is never cached and always runs - loaded after the write
-            # above so it stays out of the table. Definitions that depend on request
-            # state belong here; a cached table would freeze them.
+            # The table as booted. handle() restores it before each request, so
+            # route/dynamic definitions do not pile up across requests.
+            self::$bootRoutes = \zFramework\Core\Route::$routes;
+        } catch (\Throwable $errorHandle) {
+            errorHandler($errorHandle);
+        }
+    }
+
+    /**
+     * Serve one request against the booted application.
+     *
+     * @return void
+     */
+    public static function handle()
+    {
+        ob_start();
+
+        try {
+            # Back to the booted table, then route/dynamic on top: those definitions
+            # depend on request state, so they are re-evaluated every time and never
+            # accumulate. A cached table could not hold them at all.
+            \zFramework\Core\Route::restoreTable(self::$bootRoutes);
             self::includer(BASE_PATH . '/route/dynamic');
 
             # Every route is registered by now: resolve the request once, then run it.
@@ -141,9 +240,15 @@ class Run
             \zFramework\Core\Route::run();
             \zFramework\Core\Facades\Alerts::unset(); # forgot alerts
             \zFramework\Core\Facades\JustOneTime::unset(); # forgot data
+        } catch (\zFramework\Core\ResponseSignal $signal) {
+            # abort(), redirect(), refresh(), a file download: the response is ready
+            # and nothing else should run. Under FPM this ends up identical to the
+            # die() these used to call; under a long-running worker the process
+            # survives to serve the next request.
+            $signal->send();
+            \zFramework\Core\Facades\Alerts::unset();
+            \zFramework\Core\Facades\JustOneTime::unset();
         } catch (\Throwable $errorHandle) {
-            errorHandler($errorHandle);
-        } catch (\Exception $errorHandle) {
             errorHandler($errorHandle);
         }
 

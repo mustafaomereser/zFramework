@@ -105,8 +105,7 @@ class Route
     public static function redirect(string $url, string $to)
     {
         self::any($url, function () use ($to) {
-            http_response_code(302);
-            die(header("Location: $to"));
+            throw new ResponseSignal(302, ['Location' => $to]);
         });
         return new self();
     }
@@ -189,6 +188,40 @@ class Route
         self::delete("$url/{id}", [$callback, 'delete'])->name("$url.delete");
 
         return new self();
+    }
+
+    /**
+     * Put the table back to a known state, discarding the lookup index with it.
+     *
+     * Used between requests in a long-running worker: the booted table is
+     * restored, then route/dynamic adds this request's conditional routes on top.
+     * Without the restore those definitions would accumulate request after
+     * request.
+     *
+     * @param array $routes
+     * @return void
+     */
+    public static function restoreTable(array $routes): void
+    {
+        self::$routes = $routes;
+        self::$index  = null;
+    }
+
+    /**
+     * Drop the match and the group stack, keep the table.
+     *
+     * $routes and $index are what a long-running worker registers once at boot and
+     * reuses - clearing them would mean re-reading every route file per request,
+     * which is the cost boot-once exists to avoid. Only the result of matching
+     * this request goes.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::$calledRoute = null;
+        self::$groups      = [];
+        self::$add_groups  = [];
     }
 
     /**

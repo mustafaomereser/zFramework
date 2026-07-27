@@ -11,6 +11,19 @@ class cURL
     static $post            = false;
 
     /**
+     * Drop the handle and whatever was being posted with it.
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        if (self::$cURL instanceof \CurlHandle) @curl_close(self::$cURL);
+
+        self::$cURL       = null;
+        self::$postFields = null;
+        self::$post       = false;
+    }
+
+    /**
      * set url and some options
      * @param string $url
      * @return self
