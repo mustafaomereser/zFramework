@@ -92,8 +92,7 @@ class Config
         if ($data === false) return $returnbool ? false : $config;
         $cache_name = str_replace('/', '.', $data['find']);
 
-        $cache = isset(self::$caches[$cache_name]);
-        if (!$cache && function_exists('opcache_invalidate')) opcache_invalidate($data['path'], true);
+        $cache  = isset(self::$caches[$cache_name]);
         $config = $cache ? self::$caches[$cache_name] : include($data['path']);
         if (!$cache) self::$caches[$cache_name] = $config;
 
@@ -152,8 +151,17 @@ class Config
 
         $written = file_put_contents2($path, "<?php \nreturn " . var_export($data, true) . ";");
 
-        # A compiled cache would keep serving what was just overwritten.
-        if ($written !== false) self::clearCache();
+        if ($written !== false) {
+            # A compiled cache would keep serving what was just overwritten.
+            self::clearCache();
+
+            # Invalidate here, where a config file actually changes - not in get(),
+            # which used to do it on every first read of every config file. That
+            # threw each one out of opcache per request and forced a recompile,
+            # which is precisely what opcache exists to avoid. Writing is rare;
+            # reading happens on every request.
+            if (function_exists('opcache_invalidate')) opcache_invalidate($path, true);
+        }
 
         return $written;
     }
