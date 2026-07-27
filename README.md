@@ -1,11 +1,11 @@
 <a href="https://buymeacoffee.com/mustafaomereser" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;" ></a>
 
-# zFramework v2.9.0
+# zFramework v2.10.0
 
 **Easiest, fastest PHP framework. (Simple)**
 
 ![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-blue)
-![Version](https://img.shields.io/badge/version-2.9.0-green)
+![Version](https://img.shields.io/badge/version-2.10.0-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
 ---
