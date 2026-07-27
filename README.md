@@ -75,6 +75,7 @@ Route::pre('/admin')->middleware([Auth::class])->group(function () {
 - [17. AutoSSL](#17-autossl)
 - [18. cPanel](#18-cpanel)
 - [19. Going to Production](#19-going-to-production)
+- [20. RoadRunner](#20-roadrunner)
 
 ---
 
@@ -1762,3 +1763,86 @@ still works — the disk path is simply used instead.
 - [ ] `php terminal route cache` and `config cache` run by the deploy script,
       after the new code is in place
 - [ ] `php terminal db migrate` run before the new code goes live
+
+---
+
+## 20. RoadRunner
+
+**Optional.** zFramework runs on PHP-FPM, shared hosting and the built-in dev
+server exactly as before — `public_html/index.php` is still the entry point and
+nothing on this page is required. RoadRunner is an alternative application
+server for when a single machine has to do more.
+
+### Why
+
+Under FPM every request rebuilds the application: include the framework, load
+the providers, register the routes, then answer. RoadRunner boots once and keeps
+the process alive, so a request only costs the request.
+
+```
+FPM          : boot + handle, per request
+RoadRunner   : boot once, then handle only
+```
+
+### Running it
+
+```bash
+composer require spiral/roadrunner-http spiral/roadrunner-worker nyholm/psr7
+./vendor/bin/rr get-binary          # or download a release manually
+
+php terminal run roadrunner         # serve
+php terminal run roadrunner reset   # reload workers - run this after a deploy
+php terminal run roadrunner workers # pid, memory, requests served
+php terminal run roadrunner stop
+```
+
+Configuration is `.rr.yaml`; the worker is `zFramework/Kernel/worker.php`. Keep
+RoadRunner behind nginx in production and let nginx handle TLS and static files —
+the same vhost as with FPM, `proxy_pass` instead of `fastcgi_pass`.
+
+`reset` is the one to remember: workers hold the old code in memory until they
+are told otherwise, so a deploy that skips it serves the previous version.
+
+### What changes for your code
+
+**State does not reset by itself.** Under FPM the process dies and takes
+everything with it; here it does not. `Run::resetState()` clears what belongs to
+a request — the logged in user, session, language, mail recipients, the matched
+route — after every one. Framework classes handle their own through
+`flushRequestState()`; **static properties in your own code are yours to clear.**
+
+A static that survives a request is not a slow leak, it is one visitor being
+served another's data.
+
+**`die()` and `exit` kill the worker, not the request.** The framework no longer
+uses them: `abort()`, `redirect()`, `refresh()` and file downloads throw a
+`ResponseSignal` that `Run::handle()` turns into the response. Behaviour under
+FPM is unchanged. Avoid `die()`/`exit` in application code for the same reason.
+
+**`header()` and `setcookie()` do nothing under CLI**, which is what a worker
+runs as. `Response::header()` and `Cookie::set()` collect them instead and the
+worker attaches them to the response. Calling PHP's `header()` directly works
+under FPM and silently disappears under RoadRunner.
+
+**Routes are registered at boot.** `route/dynamic/` is re-evaluated per request
+under FPM, but a worker executes it once at startup like everything else — so
+conditions that vary per request belong in middleware, not in a route file.
+
+**Database connections live for hours.** MySQL closes an idle one after
+`wait_timeout`; the first query afterwards fails with "server has gone away".
+The framework reconnects and retries that query once. A real SQL error is not
+retried.
+
+### Before switching
+
+- [ ] Own static properties audited, cleared where they hold request state
+- [ ] No `die()` / `exit` in application code
+- [ ] `header()` / `setcookie()` calls replaced with `Response::header()` / `Cookie::set()`
+- [ ] Conditional routes moved to middleware
+- [ ] `max_jobs` and `max_worker_memory` set in `.rr.yaml` — a worker recycled
+      periodically bounds any leak you missed
+- [ ] Deploy script runs `run roadrunner reset`
+- [ ] Watched in staging: a rising worker restart rate means a leak or a fatal loop
+
+A useful test: send two requests as different users through the same worker and
+assert the second response contains nothing of the first.

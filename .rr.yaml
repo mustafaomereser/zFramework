@@ -1,0 +1,47 @@
+version: "3"
+
+server:
+  command: "php zFramework/Kernel/worker.php"
+  relay: pipes
+
+http:
+  # Keep RoadRunner behind nginx in production and let nginx do TLS, static
+  # files and health checks - the same vhost as with FPM, with proxy_pass
+  # instead of fastcgi_pass. Bind to 0.0.0.0 only while developing.
+  address: 127.0.0.1:8080
+
+  # Served by RoadRunner directly, without waking a PHP worker.
+  static:
+    dir: "public_html"
+    forbid: [".php", ".htaccess", ".env"]
+
+  pool:
+    # Roughly cores x 2. Far fewer than FPM needs, because a worker is not
+    # blocked rebuilding the application on every request - which is also why
+    # the database sees a fraction of the connections.
+    num_workers: 8
+
+    # Recycle a worker after this many requests. Insurance against a slow leak:
+    # anything that grows per request gets thrown away regularly instead of
+    # accumulating for days.
+    max_jobs: 5000
+
+    # A request that hangs must not hold a worker forever.
+    allocate_timeout: 60s
+    destroy_timeout: 60s
+
+  supervisor:
+    # A worker above this is retired and replaced, gracefully.
+    max_worker_memory: 256
+
+    # Upper bound on a single request.
+    exec_ttl: 30s
+
+# Prometheus endpoint: worker count, memory, request timings. Watch the worker
+# restart rate - a climbing one means a leak or a fatal loop.
+metrics:
+  address: 127.0.0.1:2112
+
+logs:
+  mode: production
+  level: warn
