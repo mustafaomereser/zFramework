@@ -111,7 +111,11 @@ class Response
      */
     private static function do(string $type, array $data = [], ?string $flags = null)
     {
-        header("Content-Type: " . self::list[$type]);
+        # Through self::header(), not header(): under CLI the latter is dropped and
+        # a json response would arrive without its content type - jQuery then hands
+        # the caller a string, so `response.alerts` is undefined and the callback
+        # dies on it.
+        self::header('Content-Type', self::list[$type]);
 
         switch ($type) {
             case 'json':

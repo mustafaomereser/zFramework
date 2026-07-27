@@ -97,10 +97,8 @@ class DB
                 # request's. Answering 503 + Retry-After lets a load balancer's health
                 # check pull this node out and put it back once it recovers; the plain
                 # error page this used to emit carried a 200 and read as healthy.
-                if (!headers_sent()) {
-                    http_response_code(503);
-                    header('Retry-After: 5');
-                }
+                \zFramework\Core\Facades\Response::status(503);
+                \zFramework\Core\Facades\Response::header('Retry-After', '5');
                 die(errorHandler($err));
             }
 

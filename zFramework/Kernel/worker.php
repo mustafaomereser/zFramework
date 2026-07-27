@@ -75,9 +75,16 @@ $psr     = new PSR7Worker(Worker::create(), $factory, $factory, $factory);
 $populate = function (ServerRequestInterface $request): void {
     $uri = $request->getUri();
 
-    $_GET    = $request->getQueryParams();
-    $_COOKIE = $request->getCookieParams();
-    $_FILES  = $request->getUploadedFiles();
+    $_GET   = $request->getQueryParams();
+    $_FILES = $request->getUploadedFiles();
+
+    # PHP url-decodes cookie names and values when it populates $_COOKIE itself;
+    # RoadRunner hands them over raw. Without this a cookie whose name contains an
+    # encoded character - which Crypter-derived names routinely do - is stored
+    # under "a%2Fb" while the framework looks up "a/b", so it is never found. Auth
+    # cookies vanish on the next request and the session appears not to stick.
+    $_COOKIE = [];
+    foreach ($request->getCookieParams() as $name => $value) $_COOKIE[urldecode((string) $name)] = urldecode((string) $value);
 
     $parsed = $request->getParsedBody();
     $_POST  = is_array($parsed) ? $parsed : [];
@@ -133,6 +140,11 @@ while ($request = $psr->waitRequest()) {
         # start a brand new session. Adopt the id the client sent, and hand it back
         # on the response below.
         session_id(!empty($_COOKIE[session_name()]) ? $_COOKIE[session_name()] : '');
+
+        # public_html/index.php sends these on every response; the worker is the
+        # equivalent entry point, so it does too.
+        Response::header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        Response::header('Pragma', 'no-cache');
 
         ob_start();
         zFramework\Run::handle();
