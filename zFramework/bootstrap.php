@@ -19,10 +19,27 @@ if ($app_config['debug'] ?? false) {
 // Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
 if (!isset($cron_mode)) {
-    $sessions_path = "$storage_path/sessions";
-    @mkdir($sessions_path, 0777, true);
-    session_save_path($sessions_path);
-    ini_set('session.gc_probability', 1);
+    $session_config = @include(BASE_PATH . "/config/session.php") ?: [];
+    $redis_config   = @include(BASE_PATH . "/config/redis.php") ?: [];
+
+    if (($session_config['driver'] ?? 'file') === 'redis' && ($redis_config['enabled'] ?? false)) {
+        // Sessions in Redis: every app server reads the same store, so a user is
+        // recognised whichever one the load balancer picks. Session::load()'s
+        // early-unlock behaviour is unaffected - only the storage changes.
+        $auth = !empty($redis_config['password']) ? '?auth=' . urlencode($redis_config['password']) : '';
+        $db   = $redis_config['database']['session'] ?? 0;
+        $path = 'tcp://' . ($redis_config['host'] ?? '127.0.0.1') . ':' . ($redis_config['port'] ?? 6379) . $auth . ($auth ? '&' : '?') . 'database=' . $db;
+
+        ini_set('session.save_handler', 'redis');
+        ini_set('session.save_path', $path);
+        // Redis expires keys itself; PHP's collector has nothing to scan.
+        ini_set('session.gc_probability', 0);
+    } else {
+        $sessions_path = "$storage_path/sessions";
+        @mkdir($sessions_path, 0777, true);
+        session_save_path($sessions_path);
+        ini_set('session.gc_probability', $session_config['gc_probability'] ?? 1);
+    }
 }
 // Session settings: End
 
