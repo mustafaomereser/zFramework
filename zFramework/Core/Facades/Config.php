@@ -11,10 +11,14 @@ class Config
     static $caches = [];
 
     /**
-     * Compiled config for this request: array once loaded, false when there is no
-     * cache file, null before the first lookup.
+     * parseUrl() answers, keyed by the lookup that produced them.
+     *
+     * Resolving one costs a file_exists() per dotted segment, and get() is called
+     * from hot paths - DB::prepare() asks for app.debug on every single query, so
+     * a busy request used to make hundreds of stat calls to be told the same thing
+     * every time. $caches below only ever skipped the include(), never this.
      */
-    private static array|false|null $compiled = null;
+    private static array $paths = [];
 
     public static function init()
     {
@@ -27,6 +31,9 @@ class Config
      */
     private static function parseUrl(string $config): array|bool
     {
+        if (isset(self::$paths[$config])) return self::$paths[$config];
+        $lookup = $config;
+
         $config = explode(".", $config);
 
         $find = "";
@@ -48,7 +55,7 @@ class Config
         $output['args'] = implode('.', array_filter($config, fn($var) => strlen((string) $var)));
         if (isset($output['args']) && !$output['args']) unset($output['args']);
 
-        return $output;
+        return self::$paths[$lookup] = $output;
     }
 
     /**
@@ -70,24 +77,6 @@ class Config
      */
     public static function get(string $config, bool $returnbool = true)
     {
-        # Compiled cache (php terminal config cache): every config file merged into
-        # one array, so a request includes one file instead of a dozen and skips the
-        # per-lookup opcache_invalidate() below. Files with closures are left out of
-        # the compile and fall through to the normal path.
-        if (($compiled = self::compiled()) !== false) {
-            $parts = explode('.', $config);
-            $file  = array_shift($parts);
-
-            if (array_key_exists($file, $compiled)) {
-                $value = $compiled[$file];
-                # Same traversal as the uncached path below, including its quirk:
-                # a key that does not exist is skipped rather than failing, so the
-                # level above is what comes back. Callers depend on that.
-                foreach ($parts as $key) if (isset($value[$key])) $value = $value[$key];
-                return $value;
-            }
-        }
-
         $data = self::parseUrl($config);
         if ($data === false) return $returnbool ? false : $config;
         $cache_name = str_replace('/', '.', $data['find']);
@@ -101,36 +90,13 @@ class Config
     }
 
     /**
-     * Where the compiled config lives.
-     * @return string
-     */
-    public static function cachePath(): string
-    {
-        return FRAMEWORK_PATH . '/storage/config.cache.php';
-    }
-
-    /**
-     * Load the compiled config once per request. false when there is none.
-     * @return array|false
-     */
-    private static function compiled(): array|false
-    {
-        if (self::$compiled !== null) return self::$compiled;
-        if (!defined('FRAMEWORK_PATH') || !is_file($path = self::cachePath())) return self::$compiled = false;
-
-        $data = include $path;
-        return self::$compiled = is_array($data) ? $data : false;
-    }
-
-    /**
-     * Drop the compiled config, in memory and on disk.
+     * Forget what has been read and resolved so far.
      * @return void
      */
     public static function clearCache(): void
     {
-        self::$compiled = null;
-        self::$caches   = [];
-        if (defined('FRAMEWORK_PATH')) @unlink(self::cachePath());
+        self::$caches = [];
+        self::$paths  = [];
     }
 
     /**
@@ -152,7 +118,7 @@ class Config
         $written = file_put_contents2($path, "<?php \nreturn " . var_export($data, true) . ";");
 
         if ($written !== false) {
-            # A compiled cache would keep serving what was just overwritten.
+            # Otherwise the in-memory copy keeps serving what was just overwritten.
             self::clearCache();
 
             # Invalidate here, where a config file actually changes - not in get(),

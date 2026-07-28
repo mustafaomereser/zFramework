@@ -235,7 +235,7 @@ class Post extends Model
 ```php
 $p = new Post;
 
-$p->get();                              // all rows as array of ModelResult
+$p->get();                              // all rows, each one an array
 $p->first();                            // first row or empty array
 $p->firstOrFail();                      // first row or abort(404)
 $p->firstOrFail('Custom message');      // first row or abort(404) with message
@@ -244,7 +244,7 @@ $p->findOrFail(1);                      // find or abort(404)
 $p->count();                            // row count (int)
 $p->updateOrInsert(['title' => 'Hi']);  // update if row found, otherwise insert
 
-// insert() returns the full inserted row (ModelResult) or affected row count
+// insert() returns the full inserted row, or the affected row count
 $row = $p->insert(['title' => 'Hello', 'user_id' => 1]);
 $p->insert(['title' => 'Hello'], just_insert: true);   // skip re-fetch, returns int
 
@@ -340,7 +340,7 @@ $result = (new Post)
     );
 
 // $result keys:
-// 'items'        → array of ModelResult for the current page
+// 'items'        → the rows of the current page
 // 'item_count'   → total row count
 // 'shown'        → e.g. "21 / 40" (range shown on this page)
 // 'start'        → start index of current page
@@ -391,32 +391,38 @@ echo $result['links']();                            // uses config('app.paginati
 echo $result['links']('partials.my-pagination');    // custom view
 ```
 
-### ModelResult — Row Access
+### Row Access
 
-Every row returned by `get()`, `first()`, `find()`, and `insert()` is a `ModelResult` instance. It implements `ArrayAccess` and `JsonSerializable`.
+Every row returned by `get()`, `first()`, `find()`, and `insert()` is a plain PHP
+array (`PDO::FETCH_ASSOC`). Relation methods and the row-level `update`/`delete`
+are added to it as closures under their own keys.
 
 ```php
 $post = (new Post)->find(1);
 
-// Array access
+// Columns
 $post['title'];
 $post['user_id'];
 
-// Object property access
-$post->title;
-$post->user_id;
-
-// Call relation closures defined on the model
-$post->comments();       // invokes Post::comments(array $row)
-$post->author();         // invokes Post::author(array $row)
+// Relation closures defined on the model
+$post['comments']();     // invokes Post::comments(array $row)
+$post['author']();       // invokes Post::author(array $row)
 
 // Row-level update / delete (scoped to the primary key of this row)
-$post->update(['title' => 'Updated']);
-$post->delete();
+$post['update'](['title' => 'Updated']);
+$post['delete']();
+```
 
-// Serialization — closures are automatically excluded
-json_encode($post);
-$post->toArray();
+There is no object syntax: `$post->title` reads a property off an array and gives
+you `null` with a warning. Use `closureMode(false)` for a query whose rows you only
+want to read — it skips binding the closures entirely.
+
+Watch out when serialising. `json_encode()` does not fail on the closures, it
+encodes each one as `{}`, so an API response would carry `"update":{}` alongside
+the real columns. Drop them first:
+
+```php
+json_encode(array_filter($post, fn($v) => !$v instanceof Closure));
 ```
 
 ### Column Introspection
@@ -449,7 +455,7 @@ Auth::token_login('api_token_string');
 Auth::logout();
 
 Auth::check();   // bool — is a user currently authenticated?
-Auth::user();    // ModelResult of the authenticated user, or false
+Auth::user();    // the authenticated user's row, or false
 Auth::id();      // int|null — authenticated user's id
 
 // Hash a password using the configured method (bcrypt / md5 / crypter)
@@ -473,7 +479,7 @@ public $special_columns = [..., 'passwordencode' => 'crypter'];
 
 ### 2.2. Relations
 
-Relation methods are defined on the model and accept `array $row` (the current row). They are automatically bound as closures on each `ModelResult`, callable as `$row->posts()`.
+Relation methods are defined on the model and accept `array $row` (the current row). They are automatically bound as closures onto every row, callable as `$row['posts']()`.
 
 ```php
 class User extends Model
@@ -1754,20 +1760,6 @@ Routes handled by a closure cannot be cached — `var_export()` cannot write one
 `route cache` refuses the whole table and names them rather than caching half of
 it, since the missing half would 404. Use `[Controller::class, 'method']`.
 
-### Compiled config
-
-```bash
-php terminal config cache    # merge every config file into one cached array
-php terminal config clear    # drop it - run after editing a config file
-```
-
-A request then includes one file instead of a dozen and skips the per-lookup
-`opcache_invalidate()`. Files containing closures (`app.php`'s `error.callback`)
-are left out of the compile and keep being read from disk. `Config::set()` drops
-the cache itself, so runtime config writes stay correct.
-
-Cache it on deploy, and remember to clear it when you edit a config file by hand.
-
 ### APCu (recommended)
 
 With the `apcu` extension installed, the table scheme is held in shared memory
@@ -1786,8 +1778,8 @@ still works — the disk path is simply used instead.
 - [ ] `database/connections.php` credentials outside version control
 - [ ] `error.stream` set once there is more than one app server, so errors land
       somewhere central instead of on each machine's disk
-- [ ] `php terminal route cache` and `config cache` run by the deploy script,
-      after the new code is in place
+- [ ] `php terminal route cache` run by the deploy script, after the new code is
+      in place
 - [ ] `php terminal db migrate` run before the new code goes live
 
 ---

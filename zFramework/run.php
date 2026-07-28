@@ -57,6 +57,7 @@ class Run
         \zFramework\Core\Facades\cURL::class,
         \zFramework\Core\Route::class,
         \zFramework\Core\View::class,
+        \zFramework\Core\Facades\DB::class,
     ];
 
     /**

@@ -286,17 +286,6 @@ class Route
     }
 
     /**
-     * Marker written when the table cannot be cached at all.
-     *
-     * @param string $path Cache file path.
-     * @return string
-     */
-    public static function blockedMarker(string $path): string
-    {
-        return $path . '.blocked';
-    }
-
-    /**
      * Write the route table to a cache file, atomically.
      *
      * Written to a temporary file and renamed into place, so a request reading the
@@ -309,18 +298,9 @@ class Route
      */
     public static function writeCache(string $path, array $sources): bool
     {
-        $routes = self::compilable();
-
-        # A closure route makes the table uncacheable, and that does not change
-        # between requests. Leave a marker so the runtime stops rebuilding a table
-        # it will only throw away again - otherwise every request pays for the
-        # attempt, forever. `route cache` reports which routes and removes it.
-        if ($routes === false) {
-            @file_put_contents(self::blockedMarker($path), implode("\n", array_map(fn($reason, $name) => "$name ($reason)", self::cacheBlockers(), array_keys(self::cacheBlockers()))));
-            return false;
-        }
-
-        @unlink(self::blockedMarker($path));
+        # A closure route makes the whole table uncacheable. `route cache` reports
+        # which ones and why - cacheBlockers() names them.
+        if (($routes = self::compilable()) === false) return false;
 
         $temporary = $path . '.' . getmypid() . '.tmp';
         $content   = "<?php \nreturn " . var_export(['files' => $sources, 'routes' => $routes], true) . ";";

@@ -48,6 +48,40 @@ class DB
     public static array $schemeChecked = [];
 
     /**
+     * Clear what belongs to a single request.
+     *
+     * $schemeChecked is the "this connection's scheme has been validated" flag.
+     * Until DB was added to Run::REQUEST_STATE nothing cleared it, so a worker
+     * validated the scheme on its first request and never again - a migration
+     * could change the schema and that process would serve the old one until it
+     * was restarted. The comment on tables() has always claimed otherwise.
+     *
+     * The rollback is the other half. A connection outlives the request in a
+     * worker, so an open transaction does too: a request that ends between
+     * beginTransaction() and commit() - through ResponseSignal, or by dying -
+     * hands the next one a connection that is still inside it, and it would go on
+     * writing there without knowing. Under FPM this cannot happen; PDO rolls back
+     * as it destroys the handle, and here nothing is destroyed.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::$schemeChecked = [];
+
+        foreach ($GLOBALS['databases']['connections'] ?? [] as $connection) {
+            if (!($connection instanceof \PDO)) continue;
+
+            # A connection the server has already dropped throws here rather than
+            # answering, and that is not this request's problem to report.
+            try {
+                if ($connection->inTransaction()) $connection->rollBack();
+            } catch (\Throwable) {
+            }
+        }
+    }
+
+    /**
      * Options parameters
      */
     public $table;
@@ -99,8 +133,15 @@ class DB
                 # handle after the server drops one.
                 $GLOBALS['databases']['dsn'][$this->db] ??= $parameters;
 
-                $connection = new \PDO($parameters[0], $parameters[1], ($parameters[2] ?? null));
-                foreach ($parameters['options'] ?? [] as $option) $connection->setAttribute($option[0], $option[1]);
+                # PDO takes its options at construction, not after. ATTR_PERSISTENT is
+                # the one that matters here: whether a handle comes from the persistent
+                # pool is decided while it is being built, so setAttribute() has nothing
+                # to act on and quietly returns false. connections.php has been asking
+                # for persistent connections that were never actually persistent.
+                $options = [];
+                foreach ($parameters['options'] ?? [] as $option) $options[$option[0]] = $option[1];
+
+                $connection = new \PDO($parameters[0], $parameters[1], ($parameters[2] ?? null), $options);
             } catch (\Throwable $err) {
                 # The database is unreachable - that is the server's problem, not the
                 # request's. Answering 503 + Retry-After lets a load balancer's health
@@ -477,7 +518,9 @@ class DB
      */
     public function fetchType(null|string $type = null): self
     {
-        $this->buildQuery['fetchType'] = ['unique' => \PDO::FETCH_UNIQUE, 'lazy' => \PDO::FETCH_LAZY, 'keypair' => \PDO::FETCH_KEY_PAIR][$type] ?? \PDO::FETCH_ASSOC;
+        # 'lazy' is gone: get() is the only reader of this and fetchAll() rejects
+        # PDO::FETCH_LAZY outright, so asking for it could only ever have thrown.
+        $this->buildQuery['fetchType'] = ['unique' => \PDO::FETCH_UNIQUE, 'keypair' => \PDO::FETCH_KEY_PAIR][$type] ?? \PDO::FETCH_ASSOC;
         return $this;
     }
 
@@ -564,9 +607,9 @@ class DB
     }
 
     /**
-     * add a "AND NOT" where — negates the condition.
-     * whereNot('status', 'active')          → WHERE status != 'active'
-     * whereNot('name', 'LIKE', '%test%')    → WHERE name NOT LIKE '%test%'
+     * add a "AND NOT" where â€” negates the condition.
+     * whereNot('status', 'active')          â†’ WHERE status != 'active'
+     * whereNot('name', 'LIKE', '%test%')    â†’ WHERE name NOT LIKE '%test%'
      * @return self
      */
     public function whereNot(): self
@@ -576,7 +619,7 @@ class DB
     }
 
     /**
-     * add a "OR NOT" where — negates the condition with OR connector.
+     * add a "OR NOT" where â€” negates the condition with OR connector.
      * @return self
      */
     public function whereOrNot(): self
@@ -587,8 +630,8 @@ class DB
 
     /**
      * Negate where/having arguments.
-     * 2-arg: ['key', value]          → ['key', '!=', value]
-     * 3-arg: ['key', 'op', value]    → ['key', 'NOT op', value]
+     * 2-arg: ['key', value]          â†’ ['key', '!=', value]
+     * 3-arg: ['key', 'op', value]    â†’ ['key', 'NOT op', value]
      * @param array $args
      * @return array
      */
@@ -845,8 +888,8 @@ class DB
 
     /**
      * add a "AND NOT" having
-     * havingNot('count', 5)              → HAVING count != 5
-     * havingNot('name', 'LIKE', '%x%')   → HAVING name NOT LIKE '%x%'
+     * havingNot('count', 5)              â†’ HAVING count != 5
+     * havingNot('name', 'LIKE', '%x%')   â†’ HAVING name NOT LIKE '%x%'
      * @return self
      */
     public function havingNot(): self
@@ -943,13 +986,25 @@ class DB
      */
     public function get(): array
     {
-        $rows = $this->run()->fetchAll($this->buildQuery['fetchType']);
-        if ($this->setClosures) $rows = $this->setClosures($rows);
+        # Read before run(), not inside the call: run() ends in reset(), which puts
+        # fetchType back to FETCH_ASSOC, and PHP evaluates the object operand before
+        # the argument. Written inline, the argument was whatever reset() had just
+        # written a moment earlier - so fetchType() never did anything at all.
+        $fetchType = $this->buildQuery['fetchType'];
+        $rows      = $this->run()->fetchAll($fetchType);
+
+        # Both of these key things onto a row by column name, which only holds for
+        # FETCH_ASSOC. FETCH_KEY_PAIR hands back scalars - assigning a closure onto
+        # one is a fatal - and FETCH_UNIQUE moves the primary key out of the row and
+        # into the array key, leaving update()/delete() nothing to bind to.
+        $keyed = $fetchType === \PDO::FETCH_ASSOC;
+
+        if ($this->setClosures && $keyed) $rows = $this->setClosures($rows);
 
         # After setClosures, so an eager loaded relation replaces its closure with
         # the value itself - $item['posts'] instead of $item['posts']().
         if ($this->eagerLoad) {
-            $this->loadRelations($rows);
+            if ($keyed) $this->loadRelations($rows);
             $this->eagerLoad = [];
         }
 
@@ -967,7 +1022,7 @@ class DB
 
     /**
      * get one row in rows
-     * @return ModelResult|array
+     * @return array
      */
     public function first(): array
     {
@@ -977,7 +1032,7 @@ class DB
     /**
      * Find row by primary key
      * @param string $value
-     * @return ModelResult|array
+     * @return array
      */
     public function find(string $value): array
     {
@@ -1118,7 +1173,7 @@ class DB
     /**
      * Insert a row to database
      * @param array $sets
-     * @return ModelResult|array|int
+     * @return array|int
      */
     public function insert(array $sets = [], bool $just_insert = false): array|int
     {
