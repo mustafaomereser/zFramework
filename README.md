@@ -1864,6 +1864,21 @@ route — after every one. Framework classes handle their own through
 A static that survives a request is not a slow leak, it is one visitor being
 served another's data.
 
+```bash
+php terminal state check    # statics that would leak between requests
+```
+
+Every leak found in this framework so far was the same mistake: somebody added a
+static and nobody remembered to clear it. So it is checked rather than watched
+for. The command walks `zFramework/Core`, reads each `flushRequestState()` to see
+what it actually assigns, and reports anything that is neither cleared nor
+declared as deliberate boot state in `Kernel/Modules/State.php`.
+
+Nothing it reports is automatically a bug — the route table and database handles
+survive on purpose, and that is the whole point of booting once. What it gives
+you is the difference between a decision and an oversight. Worth running before a
+release, and after adding a static to a framework class.
+
 **`die()` and `exit` kill the worker, not the request.** The framework no longer
 uses them: `abort()`, `redirect()`, `refresh()` and file downloads throw a
 `ResponseSignal` that `Run::handle()` turns into the response. Behaviour under

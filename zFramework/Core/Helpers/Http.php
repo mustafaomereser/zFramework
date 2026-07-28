@@ -4,7 +4,27 @@ namespace zFramework\Core\Helpers;
 
 class Http
 {
-    static $error_view = 'errors.app';
+    /**
+     * Which set of error views abort() renders from.
+     *
+     * Application code picks this per request - the skeleton's ViewDirectives
+     * middleware points it at errors.admin for an authenticated admin. There is
+     * no else branch to such a decision, so in a worker the last request that
+     * changed it decided for everyone after it: a plain visitor's 404 came back
+     * as the admin error page. Reset below.
+     */
+    const DEFAULT_ERROR_VIEW = 'errors.app';
+
+    static $error_view = self::DEFAULT_ERROR_VIEW;
+
+    /**
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::$error_view = self::DEFAULT_ERROR_VIEW;
+    }
+
     /**
      * Check is XMLHttpRequest Or Normal Request
      */

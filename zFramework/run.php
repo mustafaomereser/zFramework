@@ -12,6 +12,11 @@ class Run
     static $modules  = [];
 
     /**
+     * Whether dump() has already emitted its stylesheet this request.
+     */
+    static bool $dumpStyled = false;
+
+    /**
      * @param string|null $except Absolute path to skip (file or directory).
      */
     public static function includer($_path, $include_in_folder = true, $reverse_include = false, $ext = '.php', ?string $except = null)
@@ -58,7 +63,22 @@ class Run
         \zFramework\Core\Route::class,
         \zFramework\Core\View::class,
         \zFramework\Core\Facades\DB::class,
+        \zFramework\Core\Facades\Redis::class,
+        \zFramework\Core\Helpers\Http::class,
+        \zFramework\Core\Facades\Analyzer\Analyze::class,
     ];
+
+    /**
+     * How many entries $included held once boot finished.
+     *
+     * handle() includes route/dynamic - and, from the second request on,
+     * App/Middlewares/autoload.php - through includer(), which appends to
+     * $included every time. Nothing trimmed it, so the array grew by a handful of
+     * entries per request for as long as the worker lived. Only what boot
+     * collected is of any use afterwards: Route::sources() reads it while the
+     * cache is being written, and that happens during boot.
+     */
+    private static ?int $bootIncluded = null;
 
     /**
      * Return the process to a state where it can serve an unrelated request.
@@ -84,8 +104,11 @@ class Run
 
         foreach (self::REQUEST_STATE as $class) if (method_exists($class, 'flushRequestState')) $class::flushRequestState();
 
-        # Only ever holds the request currently being analysed.
-        \zFramework\Core\Facades\Analyzer\Analyze::$process_id = null;
+        # Back to what boot collected; see $bootIncluded.
+        if (self::$bootIncluded !== null && count(self::$included) > self::$bootIncluded)
+            self::$included = array_slice(self::$included, 0, self::$bootIncluded);
+
+        self::$dumpStyled = false;
     }
 
     public static function initProviders()
@@ -255,7 +278,8 @@ class Run
 
             # The table as booted. handle() restores it before each request, so
             # route/dynamic definitions do not pile up across requests.
-            self::$bootRoutes = \zFramework\Core\Route::$routes;
+            self::$bootRoutes   = \zFramework\Core\Route::$routes;
+            self::$bootIncluded = count(self::$included);
         } catch (\Throwable $errorHandle) {
             errorHandler($errorHandle);
         }

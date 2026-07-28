@@ -314,7 +314,11 @@ function secondsToHours($seconds)
 // dump
 function dump(...$vars): void
 {
-    static $stylesPrinted = false;
+    # Not a `static` local: that lives as long as the process, so under a
+    # long-running worker the styles went out with the first request's dump and
+    # every later one came back unstyled. Run::resetState() clears this.
+    $stylesPrinted = \zFramework\Run::$dumpStyled;
+
     $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1)[0];
     $file  = ($trace['file'] ?? '?') . ':' . ($trace['line'] ?? '?');
 
@@ -352,7 +356,7 @@ function dump(...$vars): void
             <button class="btn" onclick="document.querySelectorAll('.collapsible').forEach(e=>e.classList.add('closed'));document.querySelectorAll('.toggle').forEach(e=>e.classList.add('closed'))">▸ Collapse All</button>
         </div>
         HTML;
-        $stylesPrinted = true;
+        \zFramework\Run::$dumpStyled = true;
     }
 
     foreach ($vars as $var) {

@@ -34,13 +34,20 @@ class Auth
      * The single most dangerous leak in a long-running worker: $user surviving
      * into the next request means one visitor is served as another.
      *
+     * $api_mode belongs to the request too, and was missed here at first. The API
+     * middleware sets it, getMode() reads it, and left standing it makes every
+     * later request on that worker authenticate through Session instead of
+     * Cookie - so one /api call was enough to stop "remember me" working for
+     * every web visitor the worker served afterwards.
+     *
      * $model, $columns and $database_exists are boot state and stay.
      *
      * @return void
      */
     public static function flushRequestState(): void
     {
-        self::$user = null;
+        self::$user     = null;
+        self::$api_mode = false;
     }
 
     public static function init()

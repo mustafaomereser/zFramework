@@ -236,7 +236,27 @@ class Redis
     }
 
     /**
-     * Drop cached config and connections. For tests and long-running workers.
+     * Let the next request try again after a failed connection.
+     *
+     * $failed exists so a down server is not retried on every call - but "every
+     * call" was meant to mean within one request, and nothing was clearing it.
+     * In a worker that turned a momentary outage into a permanent one: Redis
+     * came back and the process went on refusing to use it until it restarted.
+     *
+     * The connections themselves are deliberately kept. They are the reason to
+     * boot once, exactly like the database handles - $config and $extension are
+     * boot state as well.
+     *
+     * @return void
+     */
+    public static function flushRequestState(): void
+    {
+        self::$failed = false;
+    }
+
+    /**
+     * Drop cached config and connections. For tests, and for a worker that wants
+     * to start over rather than just clear the failure flag.
      *
      * @return void
      */
