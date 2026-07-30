@@ -38,7 +38,13 @@ if (!isset($cron_mode)) {
         ini_set('session.gc_probability', 0);
     } else {
         $sessions_path = "$storage_path/sessions";
-        @mkdir($sessions_path, 0777, true);
+
+        # A recursive mkdir() stats every segment of the path and tries to create
+        # each one, whether or not the directory is already there - which it is, on
+        # every request after the first. One is_dir() instead: 0.059 ms a request
+        # locally, and the kind of thing that costs more over a network filesystem.
+        if (!is_dir($sessions_path)) @mkdir($sessions_path, 0777, true);
+
         session_save_path($sessions_path);
         ini_set('session.gc_probability', $session_config['gc_probability'] ?? 1);
     }

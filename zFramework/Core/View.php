@@ -96,9 +96,7 @@ class View
 
         self::$view_name = $view_name;
 
-        $view_path = self::$config['dir'] . '/' . self::parseViewName($view_name);
-        if (!is_file($view_path)) $view_path = base_path('modules/' . self::parseViewName($view_name));
-        if (!is_file($view_path)) $view_path = base_path(self::parseViewName($view_name));
+        $view_path = self::resolveViewPath($view_name);
 
         self::$compiledFiles[] = $view_path;
         self::$view            = file_get_contents($view_path);
@@ -483,14 +481,41 @@ class View
      * text and - worse - its file never reached the manifest, so editing it
      * never invalidated the cache.
      */
+    /**
+     * Where a view name lives on disk.
+     *
+     * Three candidates, in order: the configured view directory, a module, then
+     * the project root - which is how module views (blog.views.client.pages.index)
+     * and absolute names resolve. The last candidate is returned even when it does
+     * not exist, so the caller reports the path it was actually looking for.
+     *
+     * @param string $view_name
+     * @return string
+     */
+    private static function resolveViewPath(string $view_name): string
+    {
+        $path = self::$config['dir'] . '/' . self::parseViewName($view_name);
+        if (!is_file($path)) $path = base_path('modules/' . self::parseViewName($view_name));
+        if (!is_file($path)) $path = base_path(self::parseViewName($view_name));
+
+        return $path;
+    }
+
     public static function parseIncludes(): void
     {
         for ($depth = 0; $depth < self::MAX_INCLUDE_DEPTH; $depth++) {
             $before = self::$view;
 
             self::$view = preg_replace_callback('/@include\(\'(.*?)\'\)/', function ($viewName) {
-                $path                  = self::$config['views'] . '/' . self::parseViewName($viewName[1]);
+                # Resolved the same way compile() resolves a view. This used to read
+                # self::$config['views'], a key nothing ever sets: the path came out
+                # as "/partials/header.php" and @include has been broken outright
+                # for as long as it has existed.
+                $path                  = self::resolveViewPath($viewName[1]);
                 self::$compiledFiles[] = $path;
+
+                if (!is_file($path)) throw new \RuntimeException('View: @include(\'' . $viewName[1] . '\') in `' . self::$view_name . '` - no such view (' . $path . ').');
+
                 return file_get_contents($path);
             }, self::$view);
 
