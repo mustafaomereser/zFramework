@@ -102,15 +102,23 @@ class Route
 
     /**
      * Quick redirect.
-     * @param $url
-     * @param $to
+     *
+     * The destination is stored as data, not as a closure. It used to be one, and
+     * since a single closure anywhere keeps the whole table out of the compiled
+     * cache, one Route::redirect() was enough to make an entire application parse
+     * its route files on every request. A redirect is also the one handler that
+     * never needs to run anything - it is a status and a header - so there was
+     * nothing to hold in a closure to begin with. run() turns this back into a
+     * response.
+     *
+     * @param string $url
+     * @param string $to
+     * @param int    $status 302 by default; 301 when the move is permanent.
      * @return self
      */
-    public static function redirect(string $url, string $to)
+    public static function redirect(string $url, string $to, int $status = 302)
     {
-        self::any($url, function () use ($to) {
-            throw new ResponseSignal(302, ['Location' => $to]);
-        });
+        self::any($url, ['redirect' => $to, 'status' => $status]);
         return new self();
     }
 
@@ -532,6 +540,13 @@ class Route
         if (self::$calledRoute === null) abort(404);
 
         $callback = self::$calledRoute['callback'];
+
+        # A redirect carries its destination rather than a handler - see redirect().
+        # Keyed by name, so it cannot be mistaken for a [Controller::class, 'method']
+        # pair, which is indexed.
+        if (is_array($callback) && isset($callback['redirect']))
+            throw new ResponseSignal((int) ($callback['status'] ?? 302), ['Location' => (string) $callback['redirect']]);
+
         if (!in_array(gettype($callback), ['object', 'array', 'string'])) throw new \Exception('This type not valid.');
 
         switch (gettype($callback)) {
