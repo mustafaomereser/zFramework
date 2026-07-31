@@ -138,19 +138,27 @@ class Bench
         # the first time. A served request finds them in opcache, so run them once
         # more and report that too - the difference between the two is what the
         # loading itself cost.
-        \zFramework\Core\Middleware::$timings = [];
-        try {
-            Run::includer($autoload);
-        } catch (\Throwable) {
-        }
+        $warm = PHP_FLOAT_MAX;
+        $worst = 0;
+        for ($i = 0; $i < 3; $i++) {
+            \zFramework\Core\Middleware::$timings = [];
+            try {
+                Run::includer($autoload);
+            } catch (\Throwable) {
+            }
 
-        $second = 0;
-        foreach (\zFramework\Core\Middleware::$timings ?: [] as [, $ns]) $second += $ns;
+            $run = 0;
+            foreach (\zFramework\Core\Middleware::$timings ?: [] as [, $ns]) $run += $ns;
+
+            if ($run <= 0) continue;
+            $warm  = min($warm, $run);
+            $worst = max($worst, $run);
+        }
         \zFramework\Core\Middleware::$timings = null;
 
-        if ($second > 0) {
-            self::line('second run', self::ms($second), 'classes already loaded - closer to a warm request');
-            self::$middlewareWarm = $second;
+        if ($worst > 0) {
+            self::line('warm runs, best of 3', self::ms($warm), self::spread($warm, $worst) ?: 'classes loaded - closest to a served request');
+            self::$middlewareWarm = $warm;
         }
     }
 
@@ -208,6 +216,44 @@ class Bench
     private static function ms(float $ns): string
     {
         return number_format($ns / 1e6, 3) . ' ms';
+    }
+
+    /**
+     * Run something a few times and keep the fastest.
+     *
+     * A shared machine does not give the same answer twice - the same command can
+     * report 40 ms once and 200 ms the next time, and neither is wrong. What is
+     * being asked here is what the work costs, not what the machine was doing at
+     * the time, and the floor is the closest thing to that. The spread is worth
+     * knowing too, so it comes back alongside.
+     *
+     * @return array{0:float,1:float} best, worst - in nanoseconds
+     */
+    private static function best(callable $work, int $times = 3): array
+    {
+        $best = PHP_FLOAT_MAX;
+        $worst = 0;
+
+        for ($i = 0; $i < $times; $i++) {
+            $t = hrtime(true);
+            $work();
+            $elapsed = hrtime(true) - $t;
+
+            $best  = min($best, $elapsed);
+            $worst = max($worst, $elapsed);
+        }
+
+        return [$best, $worst];
+    }
+
+    /**
+     * How far apart the fastest and slowest runs were, when it is worth saying.
+     */
+    private static function spread(float $best, float $worst): string
+    {
+        if ($best <= 0 || $worst / $best < 1.5) return '';
+
+        return 'varied up to ' . self::ms($worst) . ' - shared machine';
     }
 
     /**
@@ -435,13 +481,20 @@ class Bench
         $cache    = ($storage_path ?? FRAMEWORK_PATH . '/storage') . '/routes.cache.php';
         $blockers = RouteFacade::cacheBlockers();
 
-        $t = hrtime(true);
-        Run::includer(BASE_PATH . '/route', true, false, '.php', BASE_PATH . '/route/dynamic');
-        $defining = hrtime(true) - $t;
+        # The biggest line in the summary on most applications, so it is worth
+        # more than one sample. The table is reset between runs - includer() adds
+        # to it, and three passes would otherwise report a table three times the
+        # size of the real one.
+        $table = RouteFacade::$routes;
+        [$defining, $definingWorst] = self::best(function () use ($table) {
+            RouteFacade::$routes = $table;
+            Run::includer(BASE_PATH . '/route', true, false, '.php', BASE_PATH . '/route/dynamic');
+        });
+        RouteFacade::$routes = $table;
 
         if (count($blockers)) {
             self::line('route cache', 'BLOCKED', count($blockers) . ' route(s) use a closure - `route cache` names them');
-            self::line('cost of that', self::ms($defining), 're-running the route files, every request');
+            self::line('cost of that', self::ms($defining), self::spread($defining, $definingWorst) ?: 're-running the route files, every request');
             self::budget('route definitions', $defining, count($blockers) . ' closure route(s) block the cache');
         } elseif (is_file($cache)) {
             self::line('route cache', 'in use', number_format(filesize($cache) / 1024, 1) . ' KB');
