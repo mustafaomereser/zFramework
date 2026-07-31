@@ -1767,6 +1767,28 @@ instead of being read and JSON-decoded from `storage/db/<db>/scheme.json` on
 every connection. It also backs [`GlobalCache`](#8-cache). Without it everything
 still works — the disk path is simply used instead.
 
+### Measuring, on the machine that serves
+
+```bash
+php terminal bench run
+```
+
+Reports what a request actually pays for on *this* server: opening a database
+connection and reopening it from the pool, building the table scheme against
+reading it from cache, config lookups, the route table and what matching one
+costs. It only reads — no table is written and no cache is cleared — so it is
+meant to be run on the live machine.
+
+Run it there rather than locally, because the numbers do not travel. `host=localhost`
+is a unix socket on Linux and a TCP connection on Windows, and those differ by an
+order of magnitude; opcache changes what boot costs and nothing about what a
+connection costs. Optimising against local figures is how an afternoon goes into
+the wrong 0.2 ms.
+
+The connection lines are the ones to read first. If *reopen* is no faster than
+*first open*, connection pooling is not working and everything else is noise
+beside it.
+
 ### Checklist
 
 - [ ] `debug => false`, `x-powered-by => false`
