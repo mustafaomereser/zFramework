@@ -88,11 +88,22 @@ class Bench
     {
         self::baslik('Database connections');
 
-        $connections = $GLOBALS['databases']['connections'] ?? [];
-        if (!count($connections)) return;
+        # connections[] holds the live PDO once something has connected - and
+        # something has, because Auth::init() runs from the autoloader before any
+        # of this. The dsn and credentials are kept aside there for reconnect();
+        # they are what this needs too.
+        $connections = ($GLOBALS['databases']['dsn'] ?? []) + ($GLOBALS['databases']['connections'] ?? []);
+
+        if (!count($connections)) {
+            self::satir('connections', 'none defined', 'database/connections.php is empty?');
+            return;
+        }
 
         foreach ($connections as $name => $parameters) {
-            if (!is_array($parameters)) continue;
+            if (!is_array($parameters)) {
+                self::satir("[$name]", 'already open', 'no dsn kept - cannot reopen to measure');
+                continue;
+            }
 
             $options = [];
             foreach ($parameters['options'] ?? [] as $option) $options[$option[0]] = $option[1];
@@ -102,33 +113,55 @@ class Bench
             $transport = str_contains($dsn, 'unix_socket') ? 'unix socket'
                 : (preg_match('/host=([^;]+)/', $dsn, $m) ? ($m[1] === 'localhost' && PHP_OS_FAMILY !== 'Windows' ? 'unix socket (localhost)' : 'tcp ' . $m[1]) : '?');
 
+            $user = $parameters[1] ?? null;
+            $pass = $parameters[2] ?? null;
+
             try {
-                # First open: fills the persistent pool if there is one.
-                $t = hrtime(true);
-                $first = new \PDO($dsn, $parameters[1] ?? null, $parameters[2] ?? null, $options);
-                $ilk = hrtime(true) - $t;
+                # A genuinely new connection: the pool is bypassed, so this is what
+                # the handshake actually costs here. Measuring the persistent one
+                # "first" would not do - by the time anything runs, Auth::init() has
+                # already filled the pool and the answer would come back near zero.
+                $noPool = $options;
+                unset($noPool[\PDO::ATTR_PERSISTENT]);
 
-                $id1 = @$first->query('SELECT CONNECTION_ID()')->fetchColumn();
-                unset($first);
-
-                # Reopen, five times, and take the best - this is the per-request cost.
-                $tekrar = PHP_INT_MAX;
-                $id2 = null;
-                for ($i = 0; $i < 5; $i++) {
+                $taze = PHP_INT_MAX;
+                $tazeId = null;
+                for ($i = 0; $i < 3; $i++) {
                     $t = hrtime(true);
-                    $again = new \PDO($dsn, $parameters[1] ?? null, $parameters[2] ?? null, $options);
-                    $tekrar = min($tekrar, hrtime(true) - $t);
-                    $id2 ??= @$again->query('SELECT CONNECTION_ID()')->fetchColumn();
-                    unset($again);
+                    $fresh = new \PDO($dsn, $user, $pass, $noPool);
+                    $taze = min($taze, hrtime(true) - $t);
+                    $tazeId ??= @$fresh->query('SELECT CONNECTION_ID()')->fetchColumn();
+                    unset($fresh);
                 }
 
                 self::satir("[$name] transport", $transport);
                 self::satir("[$name] ATTR_PERSISTENT", $persistent ? 'requested' : 'off');
-                self::satir("[$name] first open", self::ms($ilk));
-                self::satir("[$name] reopen (per request)", self::ms($tekrar),
-                    $id1 !== null && $id1 === $id2 ? 'same server thread - pooling works' : 'new server thread each time');
-                self::satir("[$name] saved per request", self::ms(max($ilk - $tekrar, 0)),
-                    $persistent && $id1 === $id2 ? '' : 'nothing, without pooling');
+                self::satir("[$name] fresh connect", self::ms($taze), 'no pooling - the handshake itself');
+
+                if (!$persistent) {
+                    self::satir("[$name] per request", self::ms($taze), 'every request pays this');
+                    continue;
+                }
+
+                # Now the pooled one. Best of five, since the point is the floor.
+                $havuz = PHP_INT_MAX;
+                $havuzId = null;
+                $ilkId   = null;
+                for ($i = 0; $i < 5; $i++) {
+                    $t = hrtime(true);
+                    $pooled = new \PDO($dsn, $user, $pass, $options);
+                    $havuz = min($havuz, hrtime(true) - $t);
+                    $ilkId ??= @$pooled->query('SELECT CONNECTION_ID()')->fetchColumn();
+                    $havuzId = @$pooled->query('SELECT CONNECTION_ID()')->fetchColumn();
+                    unset($pooled);
+                }
+
+                $calisiyor = $ilkId !== null && $ilkId === $havuzId && $ilkId !== $tazeId;
+
+                self::satir("[$name] pooled reopen", self::ms($havuz),
+                    $calisiyor ? 'same server thread - pooling works' : 'NEW thread each time - pooling NOT working');
+                self::satir("[$name] saved per request", self::ms(max($taze - $havuz, 0)),
+                    $calisiyor ? 'what persistent is worth here' : 'nothing - see above');
             } catch (\Throwable $e) {
                 self::satir("[$name]", 'unreachable', substr($e->getMessage(), 0, 60));
             }
