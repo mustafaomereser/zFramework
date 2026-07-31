@@ -47,13 +47,13 @@ class Bench
         Terminal::text('[color=dark-gray]of them, and they are the part that differs most between machines.[/color]');
     }
 
-    private static function baslik(string $text): void
+    private static function title(string $text): void
     {
         Terminal::text('');
         Terminal::text("[color=green]== {$text}[/color]");
     }
 
-    private static function satir(string $label, string $value, string $note = ''): void
+    private static function line(string $label, string $value, string $note = ''): void
     {
         Terminal::text('  ' . str_pad($label, 34) . '[color=yellow]' . str_pad($value, 14, ' ', STR_PAD_LEFT) . '[/color]' . ($note ? '  [color=dark-gray]' . $note . '[/color]' : ''));
     }
@@ -68,13 +68,15 @@ class Bench
      */
     private static function environment(): void
     {
-        self::baslik('Environment');
-        self::satir('php', PHP_VERSION . ' / ' . PHP_SAPI);
-        self::satir('opcache', function_exists('opcache_get_status') && (@opcache_get_status()['opcache_enabled'] ?? false) ? 'on' : 'OFF',
+        self::title('Environment');
+        self::line('php', PHP_VERSION . ' / ' . PHP_SAPI);
+        self::line('opcache', function_exists('opcache_get_status') && (@\opcache_get_status()['opcache_enabled'] ?? false) ? 'on' : 'OFF',
             function_exists('opcache_get_status') ? '' : 'extension missing - boot below is compile-bound');
-        self::satir('apcu', function_exists('apcu_enabled') && @apcu_enabled() ? 'on' : 'OFF',
+        # GlobalCache's own answer rather than the extension's: it also honours
+        # cache.apcu, so this reports what the framework will actually do.
+        self::line('apcu', \zFramework\Core\GlobalCache::apcu() ? 'on' : 'OFF',
             'holds the table scheme when on');
-        self::satir('os', PHP_OS_FAMILY);
+        self::line('os', PHP_OS_FAMILY);
     }
 
     /**
@@ -86,7 +88,7 @@ class Bench
      */
     private static function connections(): void
     {
-        self::baslik('Database connections');
+        self::title('Database connections');
 
         # connections[] holds the live PDO once something has connected - and
         # something has, because Auth::init() runs from the autoloader before any
@@ -95,13 +97,13 @@ class Bench
         $connections = ($GLOBALS['databases']['dsn'] ?? []) + ($GLOBALS['databases']['connections'] ?? []);
 
         if (!count($connections)) {
-            self::satir('connections', 'none defined', 'database/connections.php is empty?');
+            self::line('connections', 'none defined', 'database/connections.php is empty?');
             return;
         }
 
         foreach ($connections as $name => $parameters) {
             if (!is_array($parameters)) {
-                self::satir("[$name]", 'already open', 'no dsn kept - cannot reopen to measure');
+                self::line("[$name]", 'already open', 'no dsn kept - cannot reopen to measure');
                 continue;
             }
 
@@ -124,46 +126,46 @@ class Bench
                 $noPool = $options;
                 unset($noPool[\PDO::ATTR_PERSISTENT]);
 
-                $taze = PHP_INT_MAX;
-                $tazeId = null;
+                $fresh   = PHP_INT_MAX;
+                $freshId = null;
                 for ($i = 0; $i < 3; $i++) {
-                    $t = hrtime(true);
-                    $fresh = new \PDO($dsn, $user, $pass, $noPool);
-                    $taze = min($taze, hrtime(true) - $t);
-                    $tazeId ??= @$fresh->query('SELECT CONNECTION_ID()')->fetchColumn();
-                    unset($fresh);
+                    $t      = hrtime(true);
+                    $handle = new \PDO($dsn, $user, $pass, $noPool);
+                    $fresh  = min($fresh, hrtime(true) - $t);
+                    $freshId ??= @$handle->query('SELECT CONNECTION_ID()')->fetchColumn();
+                    unset($handle);
                 }
 
-                self::satir("[$name] transport", $transport);
-                self::satir("[$name] ATTR_PERSISTENT", $persistent ? 'requested' : 'off');
-                self::satir("[$name] fresh connect", self::ms($taze), 'no pooling - the handshake itself');
+                self::line("[$name] transport", $transport);
+                self::line("[$name] ATTR_PERSISTENT", $persistent ? 'requested' : 'off');
+                self::line("[$name] fresh connect", self::ms($fresh), 'no pooling - the handshake itself');
 
                 if (!$persistent) {
-                    self::satir("[$name] per request", self::ms($taze), 'every request pays this');
+                    self::line("[$name] per request", self::ms($fresh), 'every request pays this');
                     continue;
                 }
 
                 # Now the pooled one. Best of five, since the point is the floor.
-                $havuz = PHP_INT_MAX;
-                $havuzId = null;
-                $ilkId   = null;
+                $pooled   = PHP_INT_MAX;
+                $pooledId = null;
+                $firstId  = null;
                 for ($i = 0; $i < 5; $i++) {
-                    $t = hrtime(true);
-                    $pooled = new \PDO($dsn, $user, $pass, $options);
-                    $havuz = min($havuz, hrtime(true) - $t);
-                    $ilkId ??= @$pooled->query('SELECT CONNECTION_ID()')->fetchColumn();
-                    $havuzId = @$pooled->query('SELECT CONNECTION_ID()')->fetchColumn();
-                    unset($pooled);
+                    $t      = hrtime(true);
+                    $handle = new \PDO($dsn, $user, $pass, $options);
+                    $pooled = min($pooled, hrtime(true) - $t);
+                    $firstId ??= @$handle->query('SELECT CONNECTION_ID()')->fetchColumn();
+                    $pooledId  = @$handle->query('SELECT CONNECTION_ID()')->fetchColumn();
+                    unset($handle);
                 }
 
-                $calisiyor = $ilkId !== null && $ilkId === $havuzId && $ilkId !== $tazeId;
+                $pooling = $firstId !== null && $firstId === $pooledId && $firstId !== $freshId;
 
-                self::satir("[$name] pooled reopen", self::ms($havuz),
-                    $calisiyor ? 'same server thread - pooling works' : 'NEW thread each time - pooling NOT working');
-                self::satir("[$name] saved per request", self::ms(max($taze - $havuz, 0)),
-                    $calisiyor ? 'what persistent is worth here' : 'nothing - see above');
+                self::line("[$name] pooled reopen", self::ms($pooled),
+                    $pooling ? 'same server thread - pooling works' : 'NEW thread each time - pooling NOT working');
+                self::line("[$name] saved per request", self::ms(max($fresh - $pooled, 0)),
+                    $pooling ? 'what persistent is worth here' : 'nothing - see above');
             } catch (\Throwable $e) {
-                self::satir("[$name]", 'unreachable', substr($e->getMessage(), 0, 60));
+                self::line("[$name]", 'unreachable', substr($e->getMessage(), 0, 60));
             }
         }
     }
@@ -174,7 +176,7 @@ class Bench
      */
     private static function scheme(): void
     {
-        self::baslik('Table scheme');
+        self::title('Table scheme');
 
         try {
             $db = new \zFramework\Core\Facades\DB();
@@ -182,27 +184,26 @@ class Bench
 
             $reflection = new \ReflectionClass($db);
             $builder    = $reflection->getProperty('builder');
-            $builder->setAccessible(true);
             $driver = $builder->getValue($db);
             if (!$driver) return;
 
             $t      = hrtime(true);
             $scheme = $driver->setParent($db)->tables();
-            $sure   = hrtime(true) - $t;
+            $elapsed   = hrtime(true) - $t;
 
-            $tablo  = count($scheme['TABLES'] ?? []);
-            $kolon  = array_sum(array_map(fn($x) => count($x['columns'] ?? []), $scheme['TABLE_COLUMNS'] ?? []));
+            $tables  = count($scheme['TABLES'] ?? []);
+            $columns  = array_sum(array_map(fn($x) => count($x['columns'] ?? []), $scheme['TABLE_COLUMNS'] ?? []));
             $json   = json_encode($scheme, JSON_UNESCAPED_UNICODE);
 
-            self::satir('tables / columns', $tablo . ' / ' . $kolon);
-            self::satir('build from server', self::ms($sure), 'paid when the cache is cold');
-            self::satir('cached size', number_format(strlen($json) / 1024, 1) . ' KB');
+            self::line('tables / columns', $tables . ' / ' . $columns);
+            self::line('build from server', self::ms($elapsed), 'paid when the cache is cold');
+            self::line('cached size', number_format(strlen($json) / 1024, 1) . ' KB');
 
             $t = hrtime(true);
             json_decode($json, true);
-            self::satir('json_decode', self::ms(hrtime(true) - $t), 'paid per request without apcu');
+            self::line('json_decode', self::ms(hrtime(true) - $t), 'paid per request without apcu');
         } catch (\Throwable $e) {
-            self::satir('scheme', 'failed', substr($e->getMessage(), 0, 60));
+            self::line('scheme', 'failed', substr($e->getMessage(), 0, 60));
         }
     }
 
@@ -212,7 +213,7 @@ class Bench
      */
     private static function boot(): void
     {
-        self::baslik('Boot (per request under FPM)');
+        self::title('Boot (per request under FPM)');
 
         # Cold: the include() itself, which opcache serves from memory in
         # production and recompiles here when it is off. Warm: what a second
@@ -221,25 +222,25 @@ class Bench
         Config::get('app');
         Config::get('view');
         Config::get('route');
-        self::satir('config files, first read (3)', self::ms(hrtime(true) - $t), 'include - opcache territory');
+        self::line('config files, first read (3)', self::ms(hrtime(true) - $t), 'include - opcache territory');
 
         $t = hrtime(true);
         Config::get('app');
         Config::get('view');
         Config::get('route');
-        self::satir('config files, second read (3)', self::ms(hrtime(true) - $t), 'memoised');
+        self::line('config files, second read (3)', self::ms(hrtime(true) - $t), 'memoised');
 
         $t = hrtime(true);
         for ($i = 0; $i < 1000; $i++) Config::get('app.debug');
-        self::satir('config lookup x1000', self::ms(hrtime(true) - $t), 'DB::prepare() does one per query');
+        self::line('config lookup x1000', self::ms(hrtime(true) - $t), 'DB::prepare() does one per query');
 
         $t = hrtime(true);
         glob(BASE_PATH . '/App/Providers/*.php');
         @scandir(BASE_PATH . '/modules');
-        self::satir('provider glob + module scan', self::ms(hrtime(true) - $t));
+        self::line('provider glob + module scan', self::ms(hrtime(true) - $t));
 
-        self::satir('files loaded so far', (string) count(get_included_files()));
-        self::satir('peak memory', number_format(memory_get_peak_usage() / 1048576, 1) . ' MB');
+        self::line('files loaded so far', (string) count(get_included_files()));
+        self::line('peak memory', number_format(memory_get_peak_usage() / 1048576, 1) . ' MB');
     }
 
     /**
@@ -247,7 +248,7 @@ class Bench
      */
     private static function routes(): void
     {
-        self::baslik('Routes');
+        self::title('Routes');
 
         # The terminal does not build the route table, so build it here - the same
         # way `route cache` does, and only if nothing has built it already.
@@ -256,7 +257,7 @@ class Bench
                 Run::initProviders()::findModules(base_path('/modules'))::loadModules();
                 Run::includer(BASE_PATH . '/route', true, false, '.php', BASE_PATH . '/route/dynamic');
             } catch (\Throwable $e) {
-                self::satir('route table', 'could not build', substr($e->getMessage(), 0, 60));
+                self::line('route table', 'could not build', substr($e->getMessage(), 0, 60));
                 return;
             }
         }
@@ -266,27 +267,47 @@ class Bench
         if (!$total) return;
 
         $dynamic = count(array_filter($routes, fn($r) => $r['dynamic'] ?? false));
-        self::satir('routes (static / dynamic)', ($total - $dynamic) . ' / ' . $dynamic);
+        self::line('routes (static / dynamic)', ($total - $dynamic) . ' / ' . $dynamic);
+
+        # Whether the table is actually being served from cache, which is a
+        # different question from whether caching is switched on. One closure
+        # anywhere keeps the whole table out, and then every request re-runs the
+        # route files - the cost of which is this line, not the matching below.
+        global $storage_path;
+        $cache    = ($storage_path ?? FRAMEWORK_PATH . '/storage') . '/routes.cache.php';
+        $blockers = RouteFacade::cacheBlockers();
+
+        $t = hrtime(true);
+        Run::includer(BASE_PATH . '/route', true, false, '.php', BASE_PATH . '/route/dynamic');
+        $defining = hrtime(true) - $t;
+
+        if (count($blockers)) {
+            self::line('route cache', 'BLOCKED', count($blockers) . ' route(s) use a closure - `route cache` names them');
+            self::line('cost of that', self::ms($defining), 're-running the route files, every request');
+        } elseif (is_file($cache)) {
+            self::line('route cache', 'in use', number_format(filesize($cache) / 1024, 1) . ' KB');
+            self::line('saved by it', self::ms($defining), 'what defining the routes would have cost');
+        } else {
+            self::line('route cache', 'not built', 'run `php terminal route cache`');
+            self::line('cost of that', self::ms($defining), 're-running the route files, every request');
+        }
 
         $reflection = new \ReflectionClass(RouteFacade::class);
         $index      = $reflection->getProperty('index');
-        $index->setAccessible(true);
         $build = $reflection->getMethod('index');
-        $build->setAccessible(true);
 
         $t = hrtime(true);
         for ($i = 0; $i < 20; $i++) { $index->setValue(null, null); $build->invoke(null); }
-        self::satir('index build', self::ms((hrtime(true) - $t) / 20), 'once per request');
+        self::line('index build', self::ms((hrtime(true) - $t) / 20), 'once per request');
 
         $called = $reflection->getProperty('calledRoute');
-        $called->setAccessible(true);
 
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
         foreach ([['first match', array_values($routes)[0]['url'] ?? '/'], ['no match (404)', '/' . bin2hex(random_bytes(6))]] as [$label, $path]) {
             $_SERVER['REQUEST_URI'] = $path;
             $t = hrtime(true);
             for ($i = 0; $i < 100; $i++) { $called->setValue(null, null); RouteFacade::match(); }
-            self::satir($label, self::ms((hrtime(true) - $t) / 100));
+            self::line($label, self::ms((hrtime(true) - $t) / 100));
         }
         $_SERVER['REQUEST_URI'] = $uri;
         $called->setValue(null, null);
