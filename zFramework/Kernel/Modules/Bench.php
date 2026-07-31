@@ -67,6 +67,86 @@ class Bench
     }
 
     /**
+     * Description: Measure the application's own global middlewares
+     * Usage: php terminal bench request
+     */
+    public static function request()
+    {
+        self::title('Global middlewares');
+
+        $autoload = BASE_PATH . '/App/Middlewares/autoload.php';
+        if (!is_file($autoload)) {
+            self::line('autoload.php', 'not found', $autoload);
+            return;
+        }
+
+        Terminal::text('  [color=dark-gray]These are run for real - whatever your middlewares do, they do now.[/color]');
+        Terminal::text('  [color=dark-gray]No session exists under the terminal, so anything behind Auth::check()[/color]');
+        Terminal::text('  [color=dark-gray]is not reached and not measured.[/color]');
+        Terminal::text('');
+
+        # Middlewares read the request, and under the terminal there is not one.
+        # Without these they warn about missing keys and take branches no visitor
+        # would take.
+        $_SERVER += [
+            'REQUEST_URI'     => '/',
+            'REQUEST_METHOD'  => 'GET',
+            'SCRIPT_NAME'     => '/index.php',
+            'PHP_SELF'        => '/index.php',
+            'HTTP_HOST'       => 'localhost',
+            'SERVER_NAME'     => 'localhost',
+            'SERVER_PROTOCOL' => 'HTTP/1.1',
+            'QUERY_STRING'    => '',
+            'HTTPS'           => 'off',
+        ];
+
+        \zFramework\Core\Middleware::$timings = [];
+
+        $files = count(get_included_files());
+        $t     = hrtime(true);
+        try {
+            Run::includer($autoload);
+        } catch (\Throwable $e) {
+            self::line('failed', get_class($e), substr($e->getMessage(), 0, 60));
+        }
+        $elapsed = hrtime(true) - $t;
+        $files   = count(get_included_files()) - $files;
+
+        $timings = \zFramework\Core\Middleware::$timings ?: [];
+        \zFramework\Core\Middleware::$timings = null;
+
+        $sum = 0;
+        foreach ($timings as [$class, $ns]) {
+            self::line(substr(strrchr($class, '\\') ?: $class, 1), self::ms($ns));
+            $sum += $ns;
+        }
+
+        Terminal::text('  ' . str_repeat('-', 48));
+        self::line('middlewares', self::ms($sum), count($timings) . ' of them');
+        self::line('including their files', self::ms($elapsed), $files . ' file(s) loaded');
+
+        # Everything above was measured while the classes were being loaded for
+        # the first time. A served request finds them in opcache, so run them once
+        # more and report that too - the difference between the two is what the
+        # loading itself cost.
+        \zFramework\Core\Middleware::$timings = [];
+        try {
+            Run::includer($autoload);
+        } catch (\Throwable) {
+        }
+
+        $second = 0;
+        foreach (\zFramework\Core\Middleware::$timings ?: [] as [, $ns]) $second += $ns;
+        \zFramework\Core\Middleware::$timings = null;
+
+        if ($second > 0) self::line('second run', self::ms($second), 'classes already loaded - closer to a warm request');
+
+        Terminal::text('');
+        Terminal::text('[color=dark-gray]This is your code, not the framework. If the total here dwarfs what[/color]');
+        Terminal::text('[color=dark-gray]`bench run` reports, that is where the request is actually going.[/color]');
+    }
+
+    /**
      * What one request pays the framework, before any application code runs.
      *
      * Added up from the lines above rather than measured in one go, because the
