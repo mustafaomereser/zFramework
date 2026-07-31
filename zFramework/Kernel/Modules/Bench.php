@@ -40,6 +40,11 @@ class Bench
      */
     private static float $middlewareWarm = 0;
 
+    /**
+     * When measuring started, so the cost of measuring can be reported too.
+     */
+    private static float $began = 0;
+
     public static function begin($methods)
     {
         if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
@@ -56,8 +61,9 @@ class Bench
         # able to run a command at all. Under the terminal that is bootstrap plus
         # the module includes - not a request, but the same code path an FPM
         # process walks before it can serve one.
-        $started = (float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
-        self::$startup = (microtime(true) - $started) * 1e9;   # seconds -> ns, as ms() expects
+        $started       = (float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
+        self::$began   = microtime(true);
+        self::$startup = (self::$began - $started) * 1e9;   # seconds -> ns, as ms() expects
 
         self::environment();
         self::connections();
@@ -223,6 +229,22 @@ class Bench
         $served = PHP_SAPI !== 'cli';
         self::line($served ? 'this request, start to here' : 'this process, startup to here', self::ms(self::$startup),
             $served ? 'the real boot: everything above, paid once, for real' : 'CLI - a served request does not pay this');
+
+        # And what measuring cost, which is not small: the scheme is rebuilt from
+        # information_schema, the route files are included three more times,
+        # matching runs two hundred times, the middlewares four more. None of that
+        # is work a request does - it is the price of asking. Without this line the
+        # page takes far longer than anything on it accounts for, and the gap looks
+        # like a mystery rather than the bill for the measurement.
+        $spent = (microtime(true) - self::$began) * 1e9;
+        self::line('measuring cost', self::ms($spent), 'the benchmarks themselves - not a request cost');
+
+        if (!$served) return;
+
+        Terminal::text('  ' . str_repeat('-', 48));
+        self::line('server time so far', self::ms(self::$startup + $spent), 'compare with TTFB in devtools');
+        Terminal::text('  [color=dark-gray]Anything devtools shows beyond this is network: dns, tls, latency,[/color]');
+        Terminal::text('  [color=dark-gray]and sending the response back.[/color]');
     }
 
     /**
