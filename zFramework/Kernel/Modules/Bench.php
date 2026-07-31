@@ -90,8 +90,21 @@ class Bench
         }
 
         Terminal::text('  [color=dark-gray]These are run for real - whatever your middlewares do, they do now.[/color]');
-        Terminal::text('  [color=dark-gray]No session exists under the terminal, so anything behind Auth::check()[/color]');
-        Terminal::text('  [color=dark-gray]is not reached and not measured.[/color]');
+
+        # Which branch is being measured, asked rather than assumed. Over HTTP
+        # with a logged-in visitor these run their full path; from the CLI there
+        # is no session and everything behind Auth::check() is skipped, which is
+        # usually where the expensive half lives. Reporting the wrong one makes
+        # the number mean something it does not.
+        $authenticated = false;
+        try {
+            $authenticated = \zFramework\Core\Facades\Auth::check();
+        } catch (\Throwable) {
+        }
+
+        Terminal::text('  [color=dark-gray]measured as: ' . ($authenticated
+            ? 'a logged-in visitor - the full path'
+            : 'a guest - anything behind Auth::check() is not reached') . '[/color]');
         Terminal::text('');
 
         # Middlewares read the request, and under the terminal there is not one.
@@ -132,7 +145,8 @@ class Bench
 
         Terminal::text('  ' . str_repeat('-', 48));
         self::line('middlewares', self::ms($sum), count($timings) . ' of them');
-        self::line('including their files', self::ms($elapsed), $files . ' file(s) loaded');
+        self::line('including their files', self::ms($elapsed),
+            $files ? $files . ' file(s) loaded' : 'no files - they were loaded during boot, above');
 
         # Everything above was measured while the classes were being loaded for
         # the first time. A served request finds them in opcache, so run them once
@@ -157,7 +171,7 @@ class Bench
         \zFramework\Core\Middleware::$timings = null;
 
         if ($worst > 0) {
-            self::line('warm runs, best of 3', self::ms($warm), self::spread($warm, $worst) ?: 'classes loaded - closest to a served request');
+            self::line('warm runs, best of 3', self::ms($warm), self::spread($warm, $worst) ?: 'a repeat run - the first one is inside the boot figure');
             self::$middlewareWarm = $warm;
         }
     }
@@ -186,7 +200,14 @@ class Bench
         self::line('framework overhead', self::ms($sum), 'before a single line of your code');
 
         if (self::$middlewareWarm > 0) {
-            self::line('your global middlewares', self::ms(self::$middlewareWarm), 'warm, and without a session');
+            $authenticated = false;
+            try {
+                $authenticated = \zFramework\Core\Facades\Auth::check();
+            } catch (\Throwable) {
+            }
+
+            self::line('your global middlewares', self::ms(self::$middlewareWarm),
+                $authenticated ? 'warm, full path' : 'warm, guest path only');
             Terminal::text('  ' . str_repeat('-', 48));
             self::line('together', self::ms($sum + self::$middlewareWarm));
         }
