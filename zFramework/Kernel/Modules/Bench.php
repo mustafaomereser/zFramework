@@ -191,12 +191,17 @@ class Bench
             self::line('together', self::ms($sum + self::$middlewareWarm));
         }
 
-        # Reported for scale, not as a figure to act on. This is a CLI process:
-        # new every time, opcache cold, and carrying the terminal's own module
-        # discovery. A served request under FPM pays none of that, and readings
-        # here have been seen to swing between 9 ms and 121 ms on the same box
-        # within a minute. Profile a real request if this number matters.
-        if (self::$startup > 0) self::line('this process, startup to here', self::ms(self::$startup), 'CLI - a served request does not pay this');
+        # Measured from REQUEST_TIME_FLOAT, so under a web SAPI this is the real
+        # thing: bootstrap, boot() with its modules, providers and route table,
+        # handle() with the global middlewares, and matching the route that got
+        # here. Everything itemised above is a second, warm run of work this
+        # figure already paid for once - which is why it is larger, and why it is
+        # the number that matters.
+        if (self::$startup <= 0) return;
+
+        $served = PHP_SAPI !== 'cli';
+        self::line($served ? 'this request, start to here' : 'this process, startup to here', self::ms(self::$startup),
+            $served ? 'the real boot: everything above, paid once, for real' : 'CLI - a served request does not pay this');
     }
 
     /**
@@ -270,6 +275,33 @@ class Bench
         self::line('php', PHP_VERSION . ' / ' . PHP_SAPI);
         self::line('opcache', function_exists('opcache_get_status') && (@\opcache_get_status()['opcache_enabled'] ?? false) ? 'on' : 'OFF',
             function_exists('opcache_get_status') ? '' : 'extension missing - boot below is compile-bound');
+
+        # Where a swinging boot time usually hides. validate_timestamps makes
+        # every request stat every cached file; a low hit rate or a restart count
+        # that climbs means scripts are being recompiled rather than reused.
+        if (function_exists('opcache_get_status')) {
+            $status = @\opcache_get_status(false) ?: [];
+            $stats  = $status['opcache_statistics'] ?? [];
+            $memory = $status['memory_usage'] ?? [];
+
+            $hits   = (int) ($stats['hits'] ?? 0);
+            $misses = (int) ($stats['misses'] ?? 0);
+            if ($hits + $misses > 0) self::line('opcache hit rate', number_format($hits / ($hits + $misses) * 100, 1) . '%',
+                ($stats['num_cached_scripts'] ?? '?') . ' scripts cached');
+
+            $restarts = (int) ($stats['oom_restarts'] ?? 0) + (int) ($stats['hash_restarts'] ?? 0) + (int) ($stats['manual_restarts'] ?? 0);
+            if ($restarts > 0) self::line('opcache restarts', (string) $restarts, 'cache has been thrown away this many times');
+
+            if (isset($memory['free_memory'], $memory['used_memory'])) {
+                $free = $memory['free_memory'] / 1048576;
+                self::line('opcache free memory', number_format($free, 1) . ' MB', $free < 8 ? 'low - a full cache evicts and recompiles' : '');
+            }
+
+            $directives = @\opcache_get_configuration()['directives'] ?? [];
+            if (array_key_exists('opcache.validate_timestamps', $directives))
+                self::line('validate_timestamps', $directives['opcache.validate_timestamps'] ? 'on' : 'off',
+                    $directives['opcache.validate_timestamps'] ? 'stats every included file, every request' : 'deploy must reload php');
+        }
         # GlobalCache's own answer rather than the extension's: it also honours
         # cache.apcu, so this reports what the framework will actually do.
         self::line('apcu', \zFramework\Core\GlobalCache::apcu() ? 'on' : 'OFF',
