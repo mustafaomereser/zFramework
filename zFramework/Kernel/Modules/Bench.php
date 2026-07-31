@@ -24,6 +24,17 @@ use zFramework\Core\Facades\Config;
  */
 class Bench
 {
+    /**
+     * Costs a request actually pays, collected as they are measured.
+     * @var array<array{0:string,1:float,2:string}>
+     */
+    private static array $budget = [];
+
+    /**
+     * How long this process took to reach the command, in nanoseconds.
+     */
+    private static float $startup = 0;
+
     public static function begin($methods)
     {
         if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
@@ -36,15 +47,57 @@ class Bench
      */
     public static function run()
     {
+        # Before anything else is measured: how long this process took to become
+        # able to run a command at all. Under the terminal that is bootstrap plus
+        # the module includes - not a request, but the same code path an FPM
+        # process walks before it can serve one.
+        $started = (float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
+        self::$startup = (microtime(true) - $started) * 1e9;   # seconds -> ns, as ms() expects
+
         self::environment();
         self::connections();
         self::scheme();
         self::boot();
         self::routes();
+        self::total();
 
         Terminal::text('');
         Terminal::text('[color=dark-gray]Read the connection figures first. Everything else is arithmetic on top[/color]');
         Terminal::text('[color=dark-gray]of them, and they are the part that differs most between machines.[/color]');
+    }
+
+    /**
+     * What one request pays the framework, before any application code runs.
+     *
+     * Added up from the lines above rather than measured in one go, because the
+     * pieces are what can be acted on: a single number tells you whether to care,
+     * these tell you where to look. Anything a request does not actually pay -
+     * building the scheme from the server, opening a connection the pool already
+     * has - is left out, and the ones that are only paid under some condition say
+     * so.
+     */
+    private static function total(): void
+    {
+        self::title('Per request, on this machine');
+
+        $sum = 0;
+        foreach (self::$budget as [$label, $ns, $note]) {
+            self::line($label, self::ms($ns), $note);
+            $sum += $ns;
+        }
+
+        Terminal::text('  ' . str_repeat('-', 48));
+        self::line('framework overhead', self::ms($sum), 'before a single line of your code');
+
+        if (self::$startup > 0) self::line('this process, startup to here', self::ms(self::$startup), 'bootstrap + module includes');
+    }
+
+    /**
+     * Record a cost a request actually pays, for the summary above.
+     */
+    private static function budget(string $label, float $ns, string $note = ''): void
+    {
+        self::$budget[] = [$label, $ns, $note];
     }
 
     private static function title(string $text): void
@@ -142,6 +195,7 @@ class Bench
 
                 if (!$persistent) {
                     self::line("[$name] per request", self::ms($fresh), 'every request pays this');
+                    self::budget("connect [$name]", $fresh, 'no pooling - full handshake');
                     continue;
                 }
 
@@ -164,6 +218,8 @@ class Bench
                     $pooling ? 'same server thread - pooling works' : 'NEW thread each time - pooling NOT working');
                 self::line("[$name] saved per request", self::ms(max($fresh - $pooled, 0)),
                     $pooling ? 'what persistent is worth here' : 'nothing - see above');
+
+                self::budget("connect [$name]", $pooling ? $pooled : $fresh, $pooling ? 'from the pool' : 'pooling not working');
             } catch (\Throwable $e) {
                 self::line("[$name]", 'unreachable', substr($e->getMessage(), 0, 60));
             }
@@ -201,7 +257,11 @@ class Bench
 
             $t = hrtime(true);
             json_decode($json, true);
-            self::line('json_decode', self::ms(hrtime(true) - $t), 'paid per request without apcu');
+            $decode = hrtime(true) - $t;
+
+            $apcu = \zFramework\Core\GlobalCache::apcu();
+            self::line('json_decode', self::ms($decode), $apcu ? 'not paid - apcu holds it' : 'paid per request - apcu is off');
+            if (!$apcu) self::budget('scheme decode', $decode, 'turn apcu on and this goes');
         } catch (\Throwable $e) {
             self::line('scheme', 'failed', substr($e->getMessage(), 0, 60));
         }
@@ -222,7 +282,9 @@ class Bench
         Config::get('app');
         Config::get('view');
         Config::get('route');
-        self::line('config files, first read (3)', self::ms(hrtime(true) - $t), 'include - opcache territory');
+        $configRead = hrtime(true) - $t;
+        self::line('config files, first read (3)', self::ms($configRead), 'include - opcache territory');
+        self::budget('config includes', $configRead);
 
         $t = hrtime(true);
         Config::get('app');
@@ -237,7 +299,9 @@ class Bench
         $t = hrtime(true);
         glob(BASE_PATH . '/App/Providers/*.php');
         @scandir(BASE_PATH . '/modules');
-        self::line('provider glob + module scan', self::ms(hrtime(true) - $t));
+        $discover = hrtime(true) - $t;
+        self::line('provider glob + module scan', self::ms($discover));
+        self::budget('provider + module discovery', $discover);
 
         self::line('files loaded so far', (string) count(get_included_files()));
         self::line('peak memory', number_format(memory_get_peak_usage() / 1048576, 1) . ' MB');
@@ -284,12 +348,20 @@ class Bench
         if (count($blockers)) {
             self::line('route cache', 'BLOCKED', count($blockers) . ' route(s) use a closure - `route cache` names them');
             self::line('cost of that', self::ms($defining), 're-running the route files, every request');
+            self::budget('route definitions', $defining, count($blockers) . ' closure route(s) block the cache');
         } elseif (is_file($cache)) {
             self::line('route cache', 'in use', number_format(filesize($cache) / 1024, 1) . ' KB');
             self::line('saved by it', self::ms($defining), 'what defining the routes would have cost');
+
+            # What the cached table costs instead: one include, which opcache
+            # serves from memory.
+            $t = hrtime(true);
+            include $cache;
+            self::budget('route cache include', hrtime(true) - $t);
         } else {
             self::line('route cache', 'not built', 'run `php terminal route cache`');
             self::line('cost of that', self::ms($defining), 're-running the route files, every request');
+            self::budget('route definitions', $defining, 'no cache built yet');
         }
 
         $reflection = new \ReflectionClass(RouteFacade::class);
@@ -298,7 +370,9 @@ class Bench
 
         $t = hrtime(true);
         for ($i = 0; $i < 20; $i++) { $index->setValue(null, null); $build->invoke(null); }
-        self::line('index build', self::ms((hrtime(true) - $t) / 20), 'once per request');
+        $indexBuild = (hrtime(true) - $t) / 20;
+        self::line('index build', self::ms($indexBuild), 'once per request');
+        self::budget('route index build', $indexBuild, 'not cached - rebuilt every request');
 
         $called = $reflection->getProperty('calledRoute');
 
