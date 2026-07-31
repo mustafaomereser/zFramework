@@ -191,7 +191,12 @@ class Bench
             self::line('together', self::ms($sum + self::$middlewareWarm));
         }
 
-        if (self::$startup > 0) self::line('this process, startup to here', self::ms(self::$startup), 'bootstrap + module includes');
+        # Reported for scale, not as a figure to act on. This is a CLI process:
+        # new every time, opcache cold, and carrying the terminal's own module
+        # discovery. A served request under FPM pays none of that, and readings
+        # here have been seen to swing between 9 ms and 121 ms on the same box
+        # within a minute. Profile a real request if this number matters.
+        if (self::$startup > 0) self::line('this process, startup to here', self::ms(self::$startup), 'CLI - a served request does not pay this');
     }
 
     /**
