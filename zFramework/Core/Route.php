@@ -195,20 +195,49 @@ class Route
     }
 
     /**
-     * Put the table back to a known state, discarding the lookup index with it.
+     * Put the table back to a known state, with the index that belongs to it.
      *
      * Used between requests in a long-running worker: the booted table is
      * restored, then route/dynamic adds this request's conditional routes on top.
      * Without the restore those definitions would accumulate request after
      * request.
      *
-     * @param array $routes
+     * The index is handed back rather than discarded when the caller has one for
+     * this exact table - the compiled cache carries it. If route/dynamic then
+     * defines anything, call() clears the index itself and the next lookup
+     * rebuilds it, so a stale index cannot survive a route being added.
+     *
+     * @param array      $routes
+     * @param array|null $index The index built for $routes, when one is known.
      * @return void
      */
-    public static function restoreTable(array $routes): void
+    public static function restoreTable(array $routes, ?array $index = null): void
     {
         self::$routes = $routes;
-        self::$index  = null;
+        self::$index  = $index;
+    }
+
+    /**
+     * Adopt a table and index that were built elsewhere - the compiled cache.
+     *
+     * @param array      $routes
+     * @param array|null $index
+     * @return void
+     */
+    public static function useCompiled(array $routes, ?array $index = null): void
+    {
+        self::$routes = $routes;
+        self::$index  = is_array($index) ? $index : null;
+    }
+
+    /**
+     * The lookup index for the current table, if one has been built.
+     *
+     * @return array|null
+     */
+    public static function currentIndex(): ?array
+    {
+        return self::$index;
     }
 
     /**
@@ -302,8 +331,13 @@ class Route
         # which ones and why - cacheBlockers() names them.
         if (($routes = self::compilable()) === false) return false;
 
+        # The lookup index goes in with the table. It is derived from $routes and
+        # nothing else, and it is entirely scalar, so var_export() handles it.
+        # Building it walks every route - which a cached table was still paying for
+        # on every request, having skipped the parsing precisely to avoid that kind
+        # of work.
         $temporary = $path . '.' . getmypid() . '.tmp';
-        $content   = "<?php \nreturn " . var_export(['files' => $sources, 'routes' => $routes], true) . ";";
+        $content   = "<?php \nreturn " . var_export(['files' => $sources, 'routes' => $routes, 'index' => self::index()], true) . ";";
 
         if (!is_dir($directory = dirname($path))) @mkdir($directory, 0755, true);
         if (@file_put_contents($temporary, $content) === false) return false;

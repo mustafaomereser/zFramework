@@ -176,6 +176,13 @@ class Run
     private static array $bootRoutes = [];
 
     /**
+     * The lookup index for $bootRoutes, when one is already known - the compiled
+     * cache ships with it. Restored alongside the table so a request that adds no
+     * dynamic routes never rebuilds it. Null means the first lookup builds one.
+     */
+    private static ?array $bootIndex = null;
+
+    /**
      * Whether handle() has already served a request in this process.
      */
     private static bool $handled = false;
@@ -258,7 +265,10 @@ class Run
                     }
                 }
 
-                if ($cached) \zFramework\Core\Route::$routes = $compiled['routes'] ?? $compiled;
+                # The cache carries the lookup index alongside the table, so a
+                # cached boot skips building it too. Older cache files predate it
+                # and simply have none; the first lookup builds one as before.
+                if ($cached) \zFramework\Core\Route::useCompiled($compiled['routes'] ?? $compiled, $compiled['index'] ?? null);
             }
 
             $before = self::$included;
@@ -280,6 +290,7 @@ class Run
             # The table as booted. handle() restores it before each request, so
             # route/dynamic definitions do not pile up across requests.
             self::$bootRoutes   = \zFramework\Core\Route::$routes;
+            self::$bootIndex    = \zFramework\Core\Route::currentIndex();
             self::$bootIncluded = count(self::$included);
         } catch (\Throwable $errorHandle) {
             errorHandler($errorHandle);
@@ -311,7 +322,7 @@ class Run
             # Back to the booted table, then route/dynamic on top: those definitions
             # depend on request state, so they are re-evaluated every time and never
             # accumulate. A cached table could not hold them at all.
-            \zFramework\Core\Route::restoreTable(self::$bootRoutes);
+            \zFramework\Core\Route::restoreTable(self::$bootRoutes, self::$bootIndex);
             self::includer(BASE_PATH . '/route/dynamic');
 
             # Every route is registered by now: resolve the request once, then run it.
