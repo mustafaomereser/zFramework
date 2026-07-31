@@ -1776,8 +1776,15 @@ php terminal bench run
 Reports what a request actually pays for on *this* server: opening a database
 connection and reopening it from the pool, building the table scheme against
 reading it from cache, config lookups, the route table and what matching one
-costs. It only reads — no table is written and no cache is cleared — so it is
-meant to be run on the live machine.
+costs — then your own global middlewares, which is usually where the rest of the
+time is. It ends with the two totals side by side.
+
+Everything the framework does is measured without being changed: nothing is
+written and no cache is cleared. The middlewares are the exception, because a
+middleware cannot be timed without being run — so whatever yours do, they do. It
+warns before it starts. Under the terminal there is no session, so anything
+behind `Auth::check()` is neither reached nor measured, and the figure comes back
+as a floor rather than the whole cost.
 
 Run it there rather than locally, because the numbers do not travel. `host=localhost`
 is a unix socket on Linux and a TCP connection on Windows, and those differ by an
@@ -1787,7 +1794,8 @@ the wrong 0.2 ms.
 
 The connection lines are the ones to read first. If *reopen* is no faster than
 *first open*, connection pooling is not working and everything else is noise
-beside it.
+beside it. And if *your global middlewares* dwarfs *framework overhead*, the
+framework is not what the request is waiting for.
 
 ### Checklist
 

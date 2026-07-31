@@ -35,6 +35,11 @@ class Bench
      */
     private static float $startup = 0;
 
+    /**
+     * The middlewares' second run - classes loaded, closest to a warm request.
+     */
+    private static float $middlewareWarm = 0;
+
     public static function begin($methods)
     {
         if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
@@ -42,7 +47,7 @@ class Bench
     }
 
     /**
-     * Description: Measure connection, scheme, boot and route costs on this machine
+     * Description: Measure what a request costs on this machine, framework and application
      * Usage: php terminal bench run
      */
     public static function run()
@@ -59,6 +64,7 @@ class Bench
         self::scheme();
         self::boot();
         self::routes();
+        self::middlewares();
         self::total();
 
         Terminal::text('');
@@ -67,12 +73,15 @@ class Bench
     }
 
     /**
-     * Description: Measure the application's own global middlewares
-     * Usage: php terminal bench request
+     * The application's own global middlewares - usually where its time goes.
+     *
+     * Unlike everything above, this runs code rather than timing something the
+     * framework was going to do anyway. There is no way to measure a middleware
+     * without executing it, so it says as much before it starts.
      */
-    public static function request()
+    private static function middlewares(): void
     {
-        self::title('Global middlewares');
+        self::title('Global middlewares (your code)');
 
         $autoload = BASE_PATH . '/App/Middlewares/autoload.php';
         if (!is_file($autoload)) {
@@ -139,11 +148,10 @@ class Bench
         foreach (\zFramework\Core\Middleware::$timings ?: [] as [, $ns]) $second += $ns;
         \zFramework\Core\Middleware::$timings = null;
 
-        if ($second > 0) self::line('second run', self::ms($second), 'classes already loaded - closer to a warm request');
-
-        Terminal::text('');
-        Terminal::text('[color=dark-gray]This is your code, not the framework. If the total here dwarfs what[/color]');
-        Terminal::text('[color=dark-gray]`bench run` reports, that is where the request is actually going.[/color]');
+        if ($second > 0) {
+            self::line('second run', self::ms($second), 'classes already loaded - closer to a warm request');
+            self::$middlewareWarm = $second;
+        }
     }
 
     /**
@@ -168,6 +176,12 @@ class Bench
 
         Terminal::text('  ' . str_repeat('-', 48));
         self::line('framework overhead', self::ms($sum), 'before a single line of your code');
+
+        if (self::$middlewareWarm > 0) {
+            self::line('your global middlewares', self::ms(self::$middlewareWarm), 'warm, and without a session');
+            Terminal::text('  ' . str_repeat('-', 48));
+            self::line('together', self::ms($sum + self::$middlewareWarm));
+        }
 
         if (self::$startup > 0) self::line('this process, startup to here', self::ms(self::$startup), 'bootstrap + module includes');
     }
