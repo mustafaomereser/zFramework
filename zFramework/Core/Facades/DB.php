@@ -1304,9 +1304,16 @@ class DB
      */
     public function debugSQL(string $sql, array $data = []): string
     {
+        # The loop reads $data, not buildQuery directly. It used to do the latter
+        # while the line above carefully worked out which of the two to use, so
+        # passing bindings in did nothing and the placeholders came back
+        # unreplaced - which is a syntax error for anything that then tries to
+        # EXPLAIN the result.
         $data      = count($data) ? $data : $this->buildQuery['data'] ?? [];
         $debug_sql = $sql;
-        foreach ($this->buildQuery['data'] ?? [] as $key => $value) $debug_sql = str_replace(":$key", !$value ? 'null' : $this->connection()->quote($value), $debug_sql);
+
+        foreach ($data as $key => $value) $debug_sql = str_replace(":$key", !$value ? 'null' : $this->connection()->quote($value), $debug_sql);
+
         return $debug_sql;
     }
 

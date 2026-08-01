@@ -111,5 +111,19 @@ return [
          * so it costs roughly twice what it measures.
          */
         'queryAnalyze' => false,
+
+        /**
+         * Where those findings go: 'file' | 'table'.
+         *
+         * file writes analysis/queries/{analyze-id}.jsonl, one line per query.
+         * Nothing else has to exist for it to work and it can be read with a
+         * text editor, which is why it is the default.
+         *
+         * table writes rows into system_db_collector through App\Models -
+         * queryable, joinable, and what this did before there was a choice. It
+         * needs the table (`php terminal db migrate`), and it means every
+         * measured request also writes to the database it is measuring.
+         */
+        'queryStore' => 'file',
     ],
 ];

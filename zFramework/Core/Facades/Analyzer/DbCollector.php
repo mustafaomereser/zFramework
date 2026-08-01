@@ -2,7 +2,6 @@
 
 namespace zFramework\Core\Facades\Analyzer;
 
-use App\Models\SystemDbCollector;
 use zFramework\Core\Facades\DB;
 
 class DbCollector
@@ -48,11 +47,21 @@ class DbCollector
                 self::walkExplain($root, $analysis);
             }
 
+            # Running the query to see what it really did, which the two servers
+            # spell differently - and until this told them apart, the MySQL
+            # spelling threw a syntax error on MariaDB that the catch below
+            # swallowed, so the analyser quietly recorded nothing at all there.
+            #
+            #   MySQL 8.0.18+  EXPLAIN ANALYZE FORMAT=JSON -> query_plan
+            #   MariaDB 10.1+  ANALYZE FORMAT=JSON         -> query_block
             if (self::isSelect($executed)) {
-                $row = $pdo->query("EXPLAIN ANALYZE FORMAT=JSON $executed")->fetch(\PDO::FETCH_ASSOC);
+                $mariadb   = stripos((string) $pdo->getAttribute(\PDO::ATTR_SERVER_VERSION), 'mariadb') !== false;
+                $statement = ($mariadb ? 'ANALYZE' : 'EXPLAIN ANALYZE') . " FORMAT=JSON $executed";
+
+                $row = $pdo->query($statement)->fetch(\PDO::FETCH_ASSOC);
                 if ($row) {
                     $plan = json_decode(current($row), true);
-                    $root = $plan['query_plan'] ?? $plan;
+                    $root = $plan['query_plan'] ?? $plan['query_block'] ?? $plan;
                     self::walkAnalyze($root, $analysis);
                 }
             }
@@ -95,9 +104,45 @@ class DbCollector
                 }
             }
 
-            (new SystemDbCollector)->insert($analysis, true);
+            self::record($analysis);
         } catch (\Throwable) {
         }
+    }
+
+    /**
+     * Store one query's analysis, wherever framework.profiling.queryStore says.
+     *
+     * Two ways of keeping the same thing, and which suits depends on what you
+     * mean to do with it. A table is queryable and joinable; a file needs nothing
+     * to exist first, can be read in an editor, and does not write to the
+     * database it is measuring.
+     *
+     * @param array $analysis
+     * @return void
+     */
+    private static function record(array $analysis): void
+    {
+        if (\zFramework\Core\Facades\Config::framework('profiling.queryStore') === 'table') {
+            (new \App\Models\SystemDbCollector)->insert($analysis, true);
+            return;
+        }
+
+        # One file per request, named after the analyze id, one JSON object per
+        # line. Appended as each query finishes rather than collected and written
+        # at the end, so a request that dies halfway still leaves behind the
+        # queries that ran before it did - usually the interesting part.
+        $directory = base_path('/analysis/queries');
+        $file      = $directory . '/' . (Analyze::$process_id ?: 'unknown') . '.jsonl';
+
+        if (!is_dir($directory)) @mkdir($directory, 0755, true);
+
+        # Same ceiling as the request records. Checked only when starting a new
+        # file, so a request already being written keeps its remaining queries
+        # rather than ending up half recorded.
+        $keep = (int) (\zFramework\Core\Facades\Config::framework('profiling.keep') ?? 200);
+        if ($keep > 0 && !is_file($file) && count(glob("$directory/*.jsonl") ?: []) >= $keep) return;
+
+        @file_put_contents($file, json_encode($analysis, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
     }
 
     private static function walkExplain(array $node, array &$a): void
@@ -119,8 +164,16 @@ class DbCollector
         if ($table) {
             if (!empty($node['covering'])) $a['warnings'][$table][] = 'COVERING_INDEX';
             if (!empty($node['estimated_total_cost'])) $a['estimated_total_cost'][$table] = $node['estimated_total_cost'];
+
+            # MySQL reports what one execution did; MariaDB reports the average
+            # per loop alongside the loop count, so a table scanned once inside a
+            # join of ten rows reads as a tenth of its real work until they are
+            # multiplied back together.
             if (isset($node['actual_rows'])) $a['metrics'][$table]['actual_rows'] = $node['actual_rows'];
+            elseif (isset($node['r_rows'])) $a['metrics'][$table]['actual_rows'] = (int) round((float) $node['r_rows'] * (float) ($node['r_loops'] ?? 1));
+
             if (isset($node['actual_last_row_ms'])) $a['metrics'][$table]['actual_time_ms'] = $node['actual_last_row_ms'];
+            elseif (isset($node['r_total_time_ms'])) $a['metrics'][$table]['actual_time_ms'] = $node['r_total_time_ms'];
         }
         foreach ($node as $child) if (is_array($child)) self::walkAnalyze($child, $a);
     }
