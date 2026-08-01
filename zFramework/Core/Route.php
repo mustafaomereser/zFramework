@@ -194,7 +194,7 @@ class Route
         self::get("$url/{id}", [$callback, 'show'])->name("$url.show");
         self::get("$url/{id}/edit", [$callback, 'edit'])->name("$url.edit");
         self::patch("$url/{id}", [$callback, 'update'])->name("$url.update");
-        self::put("$url/{id}", [$callback, 'update'])->name("$url.update");
+        self::put("$url/{id}", [$callback, 'update']);
         self::delete("$url/{id}", [$callback, 'delete'])->name("$url.delete");
 
         return new self();
