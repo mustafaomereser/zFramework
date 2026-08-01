@@ -5,19 +5,19 @@ namespace Modules\Profiling;
 use zFramework\Core\Facades\Config;
 
 /**
- * Records what a request cost, one file per request, for comparing later.
+ * Records what each request cost - one JSON file per request under
+ * analysis/profiling/ - so runs can be compared over time.
  *
- * The point is not a single number - `bench run` already answers that, and
- * answers it better because it can run things repeatedly. The point is a hundred
- * of them: what a page costs on a Tuesday afternoon against what it cost before
- * a deploy, and whether the difference is the framework, the queries, or a
- * machine that happened to be busy.
+ * Where `bench run` measures one moment on demand, this collects many samples of
+ * real traffic: what a page costs on an ordinary afternoon, and whether a deploy
+ * changed it.
  *
- * Nothing here reaches into the framework. It takes the two moments it can see
- * from a module - boot finishing, and the process shutting down - and reads what
- * PHP already knows about the rest. Instrumenting controllers and views would
- * mean putting measurement code in Route::run() and View::make(), where it would
- * sit being read by everyone and used by almost nobody.
+ * Timing comes from two points a module can see: this class is started from the
+ * module callback, once boot and the global middlewares are done, and finishes
+ * at shutdown. That gives boot and handle. Splitting handle further into
+ * controller and view would need timing code inside the framework itself.
+ *
+ * Switched on in config/framework.php under profiling.
  */
 class Recorder
 {
@@ -95,9 +95,9 @@ class Recorder
         $directory = self::directory();
         if (!is_dir($directory)) @mkdir($directory, 0755, true);
 
-        # Keeping old records is the whole point, so nothing is rotated away.
-        # Once there are enough to compare, stop writing rather than start
-        # deleting - a full directory is a signal, a silently emptied one is not.
+        # Stop writing rather than delete: old records are what a comparison is
+        # made against. Clear them from /profiling when they no longer describe
+        # the code that is running.
         $keep = (int) (Config::framework('profiling.keep') ?? 200);
         if ($keep > 0 && count(glob("$directory/*.json") ?: []) >= $keep) return;
 
@@ -117,7 +117,8 @@ class Recorder
             'memory_mb' => round(memory_get_peak_usage() / 1048576, 2),
             'files'     => count(get_included_files()),
 
-            # What the answer means depends on these, so they travel with it.
+            # Recorded alongside, since the same code costs very different things
+            # depending on them.
             'opcache'   => function_exists('opcache_get_status') && (@\opcache_get_status(false)['opcache_enabled'] ?? false),
             'apcu'      => \zFramework\Core\GlobalCache::apcu(),
         ];
@@ -150,10 +151,9 @@ class Recorder
     /**
      * Records grouped by url, with the numbers that survive a noisy machine.
      *
-     * The median rather than the mean: one request that waited on a busy disk
-     * drags an average somewhere no request actually went. The fastest run is
-     * closer to what the work costs, and the gap between it and the slowest is
-     * how much the machine is interfering.
+     * Median rather than mean, since one request that waited on a busy disk
+     * drags an average somewhere no request actually went. best is closest to
+     * what the work costs; the distance to worst is the machine interfering.
      *
      * @return array
      */
