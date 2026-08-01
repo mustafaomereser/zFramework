@@ -194,6 +194,10 @@ class Route
         self::get("$url/{id}", [$callback, 'show'])->name("$url.show");
         self::get("$url/{id}/edit", [$callback, 'edit'])->name("$url.edit");
         self::patch("$url/{id}", [$callback, 'update'])->name("$url.update");
+
+        # PUT answers the same handler but stays unnamed on purpose. A route's
+        # name is its key in the table, so naming both would leave only the one
+        # declared second.
         self::put("$url/{id}", [$callback, 'update']);
         self::delete("$url/{id}", [$callback, 'delete'])->name("$url.delete");
 
