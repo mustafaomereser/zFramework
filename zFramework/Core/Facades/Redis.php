@@ -253,18 +253,4 @@ class Redis
     {
         self::$failed = false;
     }
-
-    /**
-     * Drop cached config and connections. For tests, and for a worker that wants
-     * to start over rather than just clear the failure flag.
-     *
-     * @return void
-     */
-    public static function reset(): void
-    {
-        self::$connections = [];
-        self::$failed      = false;
-        self::$config      = null;
-        self::$extension   = null;
-    }
 }
