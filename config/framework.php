@@ -139,7 +139,7 @@ return [
      *                     first, and note it writes to the database it measures.
      */
     'profiling' => [
-        'enabled'      => true,
+        'enabled'      => false,
         'rate'         => 1,
         'keep'         => 200,
         'queryAnalyze' => false,
