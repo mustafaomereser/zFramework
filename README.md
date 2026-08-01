@@ -1319,11 +1319,12 @@ return [
 
 ```php
 return [
-    'view'    => ['caching' => true, 'minify' => true],
-    'route'   => ['caching' => true, 'auto-check' => false],
-    'session' => ['driver' => 'file', 'gc_probability' => 1],
-    'cache'   => ['apcu' => true],
-    'redis'   => ['enabled' => false, 'host' => '127.0.0.1', /* ... */],
+    'view'     => ['caching' => true, 'minify' => true],
+    'route'    => ['caching' => true, 'auto-check' => false],
+    'session'  => ['driver' => 'file', 'gc_probability' => 1],
+    'response' => ['ajax' => ['include-alerts' => true]],
+    'cache'    => ['apcu' => true],
+    'redis'    => ['enabled' => false, 'host' => '127.0.0.1', /* ... */],
 
     'profiling' => [
         'enabled'      => false,   // write a record per request to analysis/profiling/
@@ -1334,10 +1335,11 @@ return [
 ];
 ```
 
-These were once five files — `view.php`, `route.php`, `session.php`, `cache.php`,
-`redis.php` — plus `analyze` in `app.php`. They are read together and changed
-together, so they live together. The old files are still read for anything
-`framework.php` does not carry, so an application can move across when it suits.
+These were once six files — `view.php`, `route.php`, `session.php`,
+`response.php`, `cache.php`, `redis.php` — plus `analyze` in `app.php`. They are
+read together and changed together, so they live together. The old files are
+still read for anything `framework.php` does not carry, so an application can
+move across when it suits.
 
 **database/connections.php**
 

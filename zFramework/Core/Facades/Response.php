@@ -119,7 +119,10 @@ class Response
 
         switch ($type) {
             case 'json':
-                if (config('response.ajax.include-alerts')) $data['alerts'] = Alerts::get();
+                # Defaults to on, which is what config/response.php shipped with -
+                # an installation carrying neither file should behave as it always
+                # did rather than quietly stop sending alerts.
+                if (Config::framework('response.ajax.include-alerts') ?? true) $data['alerts'] = Alerts::get();
                 $data = json_encode($data + self::$addinationals, JSON_UNESCAPED_UNICODE | $flags);
                 self::$addinationals = [];
                 break;

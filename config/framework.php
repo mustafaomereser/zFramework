@@ -3,9 +3,10 @@
 /**
  * How the framework itself behaves.
  *
- * These used to be five separate files - view.php, route.php, session.php,
- * cache.php, redis.php - and they are read together, changed together and
- * reasoned about together. One file so the whole picture is on one screen.
+ * These used to be six separate files - view.php, route.php, session.php,
+ * response.php, cache.php, redis.php - plus `analyze` in app.php. They are read
+ * together, changed together and reasoned about together, so one file, with the
+ * whole picture on one screen.
  *
  * The old files still work: anything missing here falls back to them, so an
  * application can move across when it suits. Delete them once you have.
@@ -38,6 +39,18 @@ return [
     'session' => [
         'driver'         => 'file',
         'gc_probability' => 1,
+    ],
+
+    /**
+     * include-alerts puts the pending alerts into every JSON response, so an ajax
+     * caller can show them without asking for them separately. Turn it off if
+     * your front end reads alerts its own way, or if you would rather the shape
+     * of a JSON response was only ever what the controller returned.
+     */
+    'response' => [
+        'ajax' => [
+            'include-alerts' => true,
+        ],
     ],
 
     /**
@@ -76,7 +89,7 @@ return [
      * and compares runs - disable the module and nothing is recorded at all.
      */
     'profiling' => [
-        'enabled' => false,
+        'enabled' => true,
 
         # Record only this fraction of requests. 1 is all of them, 0.05 is one in
         # twenty - enough to see a pattern on a busy site without filling a disk.
