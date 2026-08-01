@@ -4,7 +4,7 @@ namespace zFramework\Core\Facades;
 
 use ReflectionClass;
 use zFramework\Core\GlobalCache;
-use zFramework\Core\Facades\Analyzer\DbCollector;
+use zFramework\Core\Facades\DB\Analyzer\DbCollector;
 use zFramework\Core\Helpers\Date;
 use zFramework\Core\Traits\DB\OrMethods;
 use zFramework\Core\Traits\DB\RelationShips;

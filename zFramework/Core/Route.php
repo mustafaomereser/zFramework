@@ -569,7 +569,14 @@ class Route
             self::$calledRoute['parameters'][$name] = new $dependence;
         }
 
+        # Timed only while something is profiling; otherwise this is one
+        # comparison. Covers the controller and anything it renders, so the view
+        # stage reported separately is a part of this, not extra to it.
+        $started = \zFramework\Core\Profiler::active() ? hrtime(true) : 0;
+
         echo call_user_func_array($callback, self::$calledRoute['parameters']);
+
+        if ($started) \zFramework\Core\Profiler::mark('controller', hrtime(true) - $started);
     }
 
     #region Groups

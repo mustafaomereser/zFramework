@@ -149,6 +149,8 @@
                 <th>url</th>
                 <th class="n">boot</th>
                 <th class="n">handle</th>
+                <th class="n">controller</th>
+                <th class="n">view</th>
                 <th class="n">total</th>
                 <th class="n">status</th>
                 <th>env</th>
@@ -159,6 +161,8 @@
                     <td class="url"><?= $row['url'] ?></td>
                     <td class="n dim"><?= $row['boot_ms'] ?></td>
                     <td class="n dim"><?= $row['handle_ms'] ?></td>
+                    <td class="n dim"><?= $row['controller_ms'] ?? '-' ?></td>
+                    <td class="n dim"><?= $row['view_ms'] ?? '-' ?></td>
                     <td class="n"><b><?= $row['total_ms'] ?></b></td>
                     <td class="n <?= ($row['status'] ?? 200) >= 400 ? 'slow' : 'dim' ?>"><?= $row['status'] ?? '-' ?></td>
                     <td class="dim">
@@ -171,10 +175,12 @@
 
         <div class="sub">
             <b>boot</b> is the framework getting ready — bootstrap, route table, providers,
-            modules, global middlewares. <b>handle</b> is matching the route, the controller
-            and rendering. Controllers and views are not split apart: doing that would mean
-            measurement code living inside Route::run() and View::make(), read by everyone
-            and used by almost nobody.
+            modules, global middlewares. <b>handle</b> is everything after: matching the
+            route, the controller, rendering, sending the response.
+            <b>controller</b> and <b>view</b> come from inside handle, and view is
+            <i>part of</i> controller rather than additional to it — a controller that
+            returns a view spends most of its time there. handle minus controller is the
+            framework's own share: matching, and the response.
         </div>
 
     <?php endif; ?>

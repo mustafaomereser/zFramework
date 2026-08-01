@@ -4,6 +4,12 @@ namespace zFramework\Core;
 
 class View
 {
+    /**
+     * How deep the current render is. Only used to tell the outermost view from
+     * the ones it renders inside itself.
+     */
+    private static int $depth = 0;
+
     static $binds             = [];
     static $config            = [];
     static $view;
@@ -48,6 +54,10 @@ class View
     public static function flushRequestState(): void
     {
         self::reset();
+
+        # Balanced by view() itself; zeroed here in case a render was abandoned
+        # mid-way and left the count standing.
+        self::$depth = 0;
     }
 
     /**
@@ -218,6 +228,27 @@ class View
      */
     public static function view(string $view_name, array $data = [])
     {
+        # Views nest - a layout renders a page, pagination renders its own view -
+        # so only the outermost call is timed. Timing each would report the same
+        # milliseconds several times over.
+        $timing = \zFramework\Core\Profiler::active() && self::$depth === 0 ? hrtime(true) : 0;
+        self::$depth++;
+
+        try {
+            return self::render($view_name, $data, $timing);
+        } finally {
+            self::$depth--;
+        }
+    }
+
+    /**
+     * @param string $view_name
+     * @param array  $data
+     * @param float  $timing hrtime() when the outermost render started, or 0.
+     * @return string
+     */
+    private static function render(string $view_name, array $data, float $timing = 0)
+    {
         $caching = (self::$config['caching'] ?? false) && !empty(self::$config['caches']);
         $cache   = null;
         $result  = null;
@@ -252,6 +283,8 @@ class View
         }
 
         self::reset();
+
+        if ($timing) \zFramework\Core\Profiler::mark('view', hrtime(true) - $timing);
 
         return $output;
     }

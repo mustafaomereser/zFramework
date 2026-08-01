@@ -7,7 +7,7 @@ include 'index.php';
 $bootTime = (hrtime(true) - $start) / 1e6;
 $bootMem  = (memory_get_usage() - $memStart) / 1024;
 
-file_put_contents2(base_path('/analysis/profiling/' . zFramework\Core\Facades\Analyzer\Analyze::$process_id . '.json'), json_encode([
+file_put_contents2(base_path('/analysis/profiling/' . zFramework\Core\Facades\DB\Analyzer\Analyze::$process_id . '.json'), json_encode([
     'boot_time_ms'        => round($bootTime, 2),
     'boot_memory_kb'      => round($bootMem),
     'peak_memory_kb'      => round(memory_get_peak_usage() / 1024),

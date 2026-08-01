@@ -65,7 +65,8 @@ class Run
         \zFramework\Core\Facades\DB::class,
         \zFramework\Core\Facades\Redis::class,
         \zFramework\Core\Helpers\Http::class,
-        \zFramework\Core\Facades\Analyzer\Analyze::class,
+        \zFramework\Core\Facades\DB\Analyzer\Analyze::class,
+        \zFramework\Core\Profiler::class,
     ];
 
     /**

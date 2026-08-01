@@ -33,6 +33,13 @@ class Recorder
     private static ?bool $recording = null;
 
     /**
+     * Stage durations reported by the framework, in nanoseconds. A stage may be
+     * reported more than once - several controllers cannot happen, but a view
+     * rendered after a redirect can - so they accumulate.
+     */
+    private static array $stages = [];
+
+    /**
      * Start recording, if this request is one of the sampled ones.
      *
      * Called from the module's callback, which Run::handle() reaches after the
@@ -45,6 +52,13 @@ class Recorder
         if (!self::sampling()) return;
 
         self::$booted = microtime(true);
+
+        # From here the framework reports each stage it finishes. Without this
+        # call it reports nothing and the timing code in it costs a comparison.
+        \zFramework\Core\Profiler::listen(function (string $stage, float $ns) {
+            self::$stages[$stage] = (self::$stages[$stage] ?? 0) + $ns;
+        });
+
         register_shutdown_function([self::class, 'write']);
     }
 
@@ -107,12 +121,18 @@ class Recorder
             'method'  => $_SERVER['REQUEST_METHOD'] ?? 'GET',
             'status'  => http_response_code() ?: 200,
 
-            # boot: everything before the route was matched - bootstrap, the route
-            # table, providers, modules, the global middlewares.
-            # handle: matching, the controller, and rendering.
+            # boot   everything before the route was matched: bootstrap, the route
+            #        table, providers, modules, the global middlewares.
+            # handle matching, the controller, rendering, and the response.
             'boot_ms'   => round((self::$booted - $started) * 1000, 3),
             'handle_ms' => round(($ended - self::$booted) * 1000, 3),
             'total_ms'  => round(($ended - $started) * 1000, 3),
+
+            # Inside handle, reported by the framework. view is part of
+            # controller, not additional to it - a controller returning a view
+            # spends most of its time there.
+            'controller_ms' => round((self::$stages['controller'] ?? 0) / 1e6, 3),
+            'view_ms'       => round((self::$stages['view'] ?? 0) / 1e6, 3),
 
             'memory_mb' => round(memory_get_peak_usage() / 1048576, 2),
             'files'     => count(get_included_files()),

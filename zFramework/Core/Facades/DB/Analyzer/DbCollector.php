@@ -1,6 +1,6 @@
 <?php
 
-namespace zFramework\Core\Facades\Analyzer;
+namespace zFramework\Core\Facades\DB\Analyzer;
 
 use zFramework\Core\Facades\DB;
 
