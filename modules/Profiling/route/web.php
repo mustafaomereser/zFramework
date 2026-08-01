@@ -9,6 +9,6 @@ use zFramework\Core\Route;
  * application that.
  */
 Route::pre('/profiling')->group(function () {
-    Route::get('/', [ReportController::class, 'index'])->name('profiling.index');
-    Route::get('/clear', [ReportController::class, 'clear'])->name('profiling.clear');
+    Route::get('/', [ReportController::class, 'index'])->name('index');
+    Route::get('/clear', [ReportController::class, 'clear'])->name('clear');
 });

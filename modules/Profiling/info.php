@@ -13,7 +13,7 @@ return [
     'created_at'        => '2026-08-01 00:00:00',
     'framework_version' => '3.0.0',
     'module_version'    => '0.1.0',
-    'sort'              => 99,
+    'sort'              => 1,
 
     /**
      * Run::handle() reaches this after the global middlewares and before the
@@ -26,5 +26,10 @@ return [
      */
     'callback' => function () {
         Recorder::begin();
+        $GLOBALS['menu']['profiling'] = [
+            'icon'  => 'fad fa-flask',
+            'title' => 'Profiler',
+            'route' => route('profiling.index')
+        ];
     },
 ];

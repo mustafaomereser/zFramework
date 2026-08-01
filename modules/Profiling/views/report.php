@@ -1,18 +1,92 @@
 <style>
-    .zp { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; background: #0f0f14; color: #cdd6f4; padding: 24px; margin: 0; min-height: 100vh; font-size: 13px; line-height: 1.6 }
-    .zp h1 { font-size: 15px; margin: 0 0 4px; color: #89b4fa; font-weight: 600 }
-    .zp .sub { color: #6c7086; margin-bottom: 20px; font-size: 12px }
-    .zp table { border-collapse: collapse; width: 100%; margin-bottom: 28px }
-    .zp th { text-align: left; color: #6c7086; font-weight: 500; border-bottom: 1px solid #313244; padding: 6px 12px 6px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .5px }
-    .zp td { padding: 5px 12px 5px 0; border-bottom: 1px solid #1e1e2e }
-    .zp td.n { text-align: right; font-variant-numeric: tabular-nums }
-    .zp .url { color: #a6e3a1 }
-    .zp .slow { color: #f38ba8 }
-    .zp .ok { color: #a6e3a1 }
-    .zp .dim { color: #6c7086 }
-    .zp .off { background: #45213a; border-left: 3px solid #f38ba8; padding: 10px 14px; margin-bottom: 20px; border-radius: 3px }
-    .zp a { color: #89b4fa }
-    .zp .bar { display: inline-block; height: 8px; background: #45475a; border-radius: 2px; vertical-align: middle; margin-left: 8px }
+    .zp {
+        font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+        background: #0f0f14;
+        color: #cdd6f4;
+        padding: 24px;
+        margin: 0;
+        min-height: 100vh;
+        font-size: 13px;
+        line-height: 1.6
+    }
+
+    .zp h1 {
+        font-size: 15px;
+        margin: 0 0 4px;
+        color: #89b4fa;
+        font-weight: 600
+    }
+
+    .zp .sub {
+        color: #6c7086;
+        margin-bottom: 20px;
+        font-size: 12px
+    }
+
+    .zp table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-bottom: 28px
+    }
+
+    .zp th {
+        text-align: left;
+        color: #6c7086;
+        font-weight: 500;
+        border-bottom: 1px solid #313244;
+        padding: 6px 12px 6px 0;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .5px
+    }
+
+    .zp td {
+        padding: 5px 12px 5px 0;
+        border-bottom: 1px solid #1e1e2e
+    }
+
+    .zp td.n {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: #fff
+    }
+
+    .zp .url {
+        color: #a6e3a1
+    }
+
+    .zp .slow {
+        color: #f38ba8
+    }
+
+    .zp .ok {
+        color: #a6e3a1
+    }
+
+    .zp .dim {
+        color: #6c7086
+    }
+
+    .zp .off {
+        background: #45213a;
+        border-left: 3px solid #f38ba8;
+        padding: 10px 14px;
+        margin-bottom: 20px;
+        border-radius: 3px
+    }
+
+    .zp a {
+        color: #89b4fa
+    }
+
+    .zp .bar {
+        display: inline-block;
+        height: 8px;
+        background: #45475a;
+        border-radius: 2px;
+        vertical-align: middle;
+        margin-left: 8px
+    }
 </style>
 
 <div class="zp">
@@ -36,9 +110,15 @@
 
         <table>
             <tr>
-                <th>url</th><th class="n">runs</th><th class="n">best</th>
-                <th class="n">median</th><th class="n">worst</th><th class="n">boot avg</th>
-                <th class="n">memory</th><th class="n">files</th><th></th>
+                <th>url</th>
+                <th class="n">runs</th>
+                <th class="n">best</th>
+                <th class="n">median</th>
+                <th class="n">worst</th>
+                <th class="n">boot avg</th>
+                <th class="n">memory</th>
+                <th class="n">files</th>
+                <th></th>
             </tr>
             <?php $slowest = max(array_column($summary, 'median_ms')); ?>
             <?php foreach ($summary as $row) : ?>
@@ -64,7 +144,15 @@
         </div>
 
         <table>
-            <tr><th>when</th><th>url</th><th class="n">boot</th><th class="n">handle</th><th class="n">total</th><th class="n">status</th><th>env</th></tr>
+            <tr>
+                <th>when</th>
+                <th>url</th>
+                <th class="n">boot</th>
+                <th class="n">handle</th>
+                <th class="n">total</th>
+                <th class="n">status</th>
+                <th>env</th>
+            </tr>
             <?php foreach ($recent as $row) : ?>
                 <tr>
                     <td class="dim"><?= $row['at'] ?></td>

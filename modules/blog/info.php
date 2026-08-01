@@ -11,7 +11,7 @@ return [
     'created_at'        => '2024-03-05 14:20:15',
     'framework_version' => '2.6.0',
     'module_version'    => '0.0.0',
-    'sort'              => 1,
+    'sort'              => 2,
     'callback'          => function () {
         $GLOBALS['menu']['blog'] = [
             'icon'  => 'fad fa-newspaper',
