@@ -128,8 +128,11 @@ class Bench
             'HTTPS'           => 'off',
         ];
 
-        \zFramework\Core\Middleware::$timings = [];
-
+        # The whole stack, not one line per middleware. Timing them individually
+        # would mean a hook inside Middleware::middleware() - measurement code
+        # living in the framework, read by everyone, useful to almost nobody. The
+        # total is what the summary needs; which middleware owns it is a question
+        # for a profiler, not for this.
         $files = count(get_included_files());
         $t     = hrtime(true);
         try {
@@ -137,49 +140,23 @@ class Bench
         } catch (\Throwable $e) {
             self::line('failed', get_class($e), substr($e->getMessage(), 0, 60));
         }
-        $elapsed = hrtime(true) - $t;
-        $files   = count(get_included_files()) - $files;
+        $first = hrtime(true) - $t;
+        $files = count(get_included_files()) - $files;
 
-        $timings = \zFramework\Core\Middleware::$timings ?: [];
-        \zFramework\Core\Middleware::$timings = null;
+        self::line('first run', self::ms($first),
+            $files ? $files . ' file(s) loaded with it' : 'no files - loaded during boot, above');
 
-        $sum = 0;
-        foreach ($timings as [$class, $ns]) {
-            self::line(substr(strrchr($class, '\\') ?: $class, 1), self::ms($ns));
-            $sum += $ns;
-        }
-
-        Terminal::text('  ' . str_repeat('-', 48));
-        self::line('middlewares', self::ms($sum), count($timings) . ' of them');
-        self::line('including their files', self::ms($elapsed),
-            $files ? $files . ' file(s) loaded' : 'no files - they were loaded during boot, above');
-
-        # Everything above was measured while the classes were being loaded for
-        # the first time. A served request finds them in opcache, so run them once
-        # more and report that too - the difference between the two is what the
-        # loading itself cost.
-        $warm = PHP_FLOAT_MAX;
-        $worst = 0;
-        for ($i = 0; $i < 3; $i++) {
-            \zFramework\Core\Middleware::$timings = [];
+        # That first pass may have been loading classes. A served request finds
+        # them in opcache, so run it again - the gap is the loading.
+        [$warm, $worst] = self::best(function () use ($autoload) {
             try {
                 Run::includer($autoload);
             } catch (\Throwable) {
             }
+        });
 
-            $run = 0;
-            foreach (\zFramework\Core\Middleware::$timings ?: [] as [, $ns]) $run += $ns;
-
-            if ($run <= 0) continue;
-            $warm  = min($warm, $run);
-            $worst = max($worst, $run);
-        }
-        \zFramework\Core\Middleware::$timings = null;
-
-        if ($worst > 0) {
-            self::line('warm runs, best of 3', self::ms($warm), self::spread($warm, $worst) ?: 'a repeat run - the first one is inside the boot figure');
-            self::$middlewareWarm = $warm;
-        }
+        self::line('warm runs, best of 3', self::ms($warm), self::spread($warm, $worst) ?: 'a repeat - the first one is inside the boot figure');
+        self::$middlewareWarm = $warm;
     }
 
     /**
