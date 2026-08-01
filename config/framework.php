@@ -1,20 +1,20 @@
 <?php
 
 /**
- * How the framework itself behaves.
+ * Framework behaviour: caching, sessions, redis, profiling.
  *
- * These used to be six separate files - view.php, route.php, session.php,
- * response.php, cache.php, redis.php - plus `analyze` in app.php. They are read
- * together, changed together and reasoned about together, so one file, with the
- * whole picture on one screen.
- *
- * The old files still work: anything missing here falls back to them, so an
- * application can move across when it suits. Delete them once you have.
+ * Application settings live in app.php. This file is about how the framework
+ * itself works, not about what your application is.
  */
 return [
 
     /**
-     * Compiled views. Caching off means every request parses the template.
+     * Views.
+     *
+     * caching  Compile templates once and reuse them. Turn off while writing
+     *          templates so edits show up without clearing anything; on in
+     *          production. Clear with `php terminal view clear`.
+     * minify   Strip whitespace from the compiled output.
      */
     'view' => [
         'caching' => true,
@@ -22,10 +22,17 @@ return [
     ],
 
     /**
-     * The compiled route table (`php terminal route cache`).
+     * Routes.
      *
-     * auto-check costs a stat per route file per request to notice an edit.
-     * Leave it off in production, where the deploy rebuilds the cache anyway.
+     * caching     Serve the route table from the compiled cache built by
+     *             `php terminal route cache`, instead of running every route
+     *             file on every request.
+     * auto-check  Notice an edited route file and fall back to the source. Costs
+     *             one stat per route file per request, so leave it off in
+     *             production where the deploy rebuilds the cache.
+     *
+     * A route defined with a closure cannot be cached, and one of them keeps the
+     * whole table out. `route cache` names them.
      */
     'route' => [
         'caching'    => true,
@@ -33,8 +40,13 @@ return [
     ],
 
     /**
-     * driver: file | redis. Redis needs 'redis.enabled' below and is what lets
-     * more than one machine recognise the same visitor.
+     * Sessions.
+     *
+     * driver          file | redis. Use redis when more than one machine serves
+     *                 the site, so a visitor is recognised whichever one answers.
+     *                 Needs redis.enabled below.
+     * gc_probability  Chance of PHP sweeping expired session files, per request.
+     *                 Ignored by the redis driver, which expires its own keys.
      */
     'session' => [
         'driver'         => 'file',
@@ -42,10 +54,13 @@ return [
     ],
 
     /**
-     * include-alerts puts the pending alerts into every JSON response, so an ajax
-     * caller can show them without asking for them separately. Turn it off if
-     * your front end reads alerts its own way, or if you would rather the shape
-     * of a JSON response was only ever what the controller returned.
+     * Responses.
+     *
+     * ajax.include-alerts  Attach pending alerts to every JSON response, so the
+     *                      caller can display them without a second request.
+     *                      Turn off if your front end fetches alerts itself, or
+     *                      if JSON responses should contain only what the
+     *                      controller returned.
      */
     'response' => [
         'ajax' => [
@@ -54,24 +69,38 @@ return [
     ],
 
     /**
-     * APCu holds the table scheme in shared memory instead of reading and
-     * decoding scheme.json per connection. Turn it off to measure whether it is
-     * earning its keep, or when the working set no longer fits in apc.shm_size.
+     * Local cache.
+     *
+     * apcu  Keep the table scheme in shared memory instead of reading and
+     *       decoding storage/db/<db>/scheme.json on every connection. Needs
+     *       ext-apcu; without it everything still works from disk.
+     *
+     *       Turn off if the working set outgrows apc.shm_size - constant
+     *       eviction costs more than the cache saves.
      */
     'cache' => [
         'apcu' => true,
     ],
 
     /**
-     * Shared cache, sessions and queue across servers. Nothing here is touched
-     * while 'enabled' is false.
+     * Redis: shared cache, sessions and queue across servers.
+     *
+     * Nothing here is read while enabled is false.
+     *
+     * database  Which redis database each store uses. Separate numbers keep a
+     *           cache flush from taking sessions with it.
+     * prefix    Prepended to every key, so several applications can share one
+     *           redis instance.
+     * l1_ttl    Seconds a cached value may be served from this process's own
+     *           memory before redis is asked again. Higher is faster and means
+     *           two servers can briefly disagree.
      */
     'redis' => [
         'enabled'  => false,
         'host'     => '127.0.0.1',
         'port'     => 6379,
         'password' => null,
-        'timeout'  => 1.5,   # connect timeout in seconds
+        'timeout'  => 1.5,   # connect timeout, seconds
         'database' => [
             'cache'   => 0,
             'session' => 1,
@@ -82,48 +111,38 @@ return [
     ],
 
     /**
-     * Measuring the application: whole requests, and the queries inside them.
+     * Profiling: what requests cost, and what the queries inside them do.
      *
-     * All of it off by default and meant to stay that way in production. The
-     * Profiling module under modules/ reads what lands in analysis/profiling/
-     * and compares runs - disable the module and nothing is recorded at all.
+     * Off by default. Records go to analysis/profiling/ and the Profiling module
+     * under modules/ reads them back at /profiling, grouped by url. Disabling
+     * that module stops recording whatever this says.
+     *
+     * enabled       Record requests.
+     * rate          Fraction of requests to record. 1 is every one; 0.05 is one
+     *               in twenty, enough to see a pattern without filling a disk.
+     * keep          Stop recording once this many records exist. Old records are
+     *               what you compare against, so nothing is deleted to make room.
+     *               Clear them at /profiling after a deploy.
+     *
+     * queryAnalyze  Run EXPLAIN on each SELECT and collect what it says: tables
+     *               scanned, indexes used, missing-index suggestions. true is
+     *               every query, false is off, or a fraction to sample.
+     *
+     *               Needs app.debug, so production is unaffected either way. An
+     *               analysed query is executed a second time to measure it, so
+     *               it costs about twice what it reports.
+     *
+     * queryStore    file  analysis/queries/<id>.jsonl, one line per query.
+     *                     Needs nothing to exist and opens in any editor.
+     *               table rows in system_db_collector, so findings can be
+     *                     queried and joined. Run `php terminal db migrate`
+     *                     first, and note it writes to the database it measures.
      */
     'profiling' => [
-        'enabled' => true,
-
-        # Record only this fraction of requests. 1 is all of them, 0.05 is one in
-        # twenty - enough to see a pattern on a busy site without filling a disk.
-        'rate'    => 1,
-
-        # Stop writing once this many files are in the directory. Old runs are
-        # what make a comparison possible, so they are kept rather than rotated.
-        'keep'    => 200,
-
-        /**
-         * Query analyzer: EXPLAIN on every SELECT, collected per request.
-         *
-         * Only ever runs while app.debug is true, so production is safe even if
-         * this is left on. true analyses every SELECT, false is off, and a
-         * fraction samples - 0.01 is one query in a hundred, which is what keeps
-         * a busy staging box usable.
-         *
-         * Bear in mind an analysed query is re-executed through EXPLAIN ANALYZE,
-         * so it costs roughly twice what it measures.
-         */
+        'enabled'      => true,
+        'rate'         => 1,
+        'keep'         => 200,
         'queryAnalyze' => false,
-
-        /**
-         * Where those findings go: 'file' | 'table'.
-         *
-         * file writes analysis/queries/{analyze-id}.jsonl, one line per query.
-         * Nothing else has to exist for it to work and it can be read with a
-         * text editor, which is why it is the default.
-         *
-         * table writes rows into system_db_collector through App\Models -
-         * queryable, joinable, and what this did before there was a choice. It
-         * needs the table (`php terminal db migrate`), and it means every
-         * measured request also writes to the database it is measuring.
-         */
-        'queryStore' => 'file',
+        'queryStore'   => 'file',
     ],
 ];

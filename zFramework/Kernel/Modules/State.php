@@ -6,27 +6,24 @@ use zFramework\Kernel\Terminal;
 use zFramework\Run;
 
 /**
- * Finds static properties that would survive from one request into the next
- * under a long-running worker.
+ * `php terminal state check` - finds static properties that would leak from one
+ * request into the next under a long-running worker.
  *
- * Under PHP-FPM none of this matters - the process dies after every request and
- * takes its statics with it. Under RoadRunner nothing dies, so a static that
- * belongs to one request is handed to the next one: the previous visitor's
- * identity, their language, the error views an admin page selected.
+ * Only matters for RoadRunner and similar: under PHP-FPM the process dies after
+ * each request and takes its statics with it. Where it does matter, a static
+ * left holding request data hands it to the next visitor - their identity,
+ * language, or the error views an admin page selected.
  *
- * Every leak found so far was the same mistake - somebody added a static and
- * nobody remembered to clear it. That is not a thing to be careful about, it is
- * a thing to check, so this checks it.
+ * Run it after adding a static to a framework class, and before a release.
  */
 class State
 {
     /**
-     * Statics that are deliberately kept between requests, and why.
+     * Statics deliberately kept between requests, and why.
      *
-     * This is the whole point of booting once: the route table, the view binds,
-     * database handles. A static listed here is a decision; a static in neither
-     * this list nor a flushRequestState() is an oversight, and that is precisely
-     * the distinction the report below draws.
+     * Keeping the route table, view binds and database handles is the point of
+     * booting once. Add a static here when it should survive; otherwise clear it
+     * in the class's flushRequestState(). Anything in neither is reported.
      */
     private const BOOT_STATE = [
         'zFramework\Run::$loadtime'                    => 'set once at boot',
@@ -61,13 +58,10 @@ class State
         'zFramework\Core\Validator::$ruleMap'          => 'a lookup table',
         'zFramework\Core\Facades\JustOneTime::$session_name' => 'a fixed session key',
 
-        # These four are credentials, and the only entries here that are a
-        # judgement rather than a fact. The class documents itself as configured
-        # once at boot, which is boot state and safe. Set them per request instead
-        # - resolving a tenant's own cPanel account, say - and a worker will carry
-        # one tenant's API token into the next tenant's request. Clear them
-        # yourself at the end of such a request; the framework cannot tell the two
-        # usages apart, so it does not guess.
+        # Credentials, and safe only while set once at boot as the class
+        # documents. If you set them per request - a tenant's own cPanel account,
+        # say - clear them yourself at the end of it, or a worker will carry one
+        # tenant's token into the next tenant's request.
         'zFramework\Core\Helpers\cPanel\API::$domain'    => 'configured at boot - see the note above if you set it per request',
         'zFramework\Core\Helpers\cPanel\API::$username'  => 'configured at boot - see the note above if you set it per request',
         'zFramework\Core\Helpers\cPanel\API::$apiToken'  => 'configured at boot - see the note above if you set it per request',

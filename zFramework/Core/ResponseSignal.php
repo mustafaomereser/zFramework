@@ -5,15 +5,12 @@ namespace zFramework\Core;
 /**
  * "The response is ready, stop here."
  *
- * abort(), redirect(), refresh() and file downloads used to call die(). That
- * works on PHP-FPM and shared hosting, where the process ends with the request
- * anyway - but under a long-running server (RoadRunner and friends) die() kills
- * the worker, not the request.
+ * Thrown by abort(), redirect(), refresh() and file downloads. It unwinds to
+ * Run::begin(), which sends the response and carries on.
  *
- * Throwing instead unwinds to Run::begin(), which sends the response and carries
- * on. Behaviour under FPM is unchanged: the script still stops right there and
- * prints exactly what die() would have printed. Nothing extra is required to run
- * on shared hosting - there is only one code path.
+ * Where die() would end the process - fine under PHP-FPM, fatal to a
+ * long-running worker - this ends only the request, and behaves identically
+ * either way. One code path for both.
  *
  * Extends Error rather than Exception on purpose: application code doing
  * `try { ... } catch (\Exception $e)` around a controller would otherwise

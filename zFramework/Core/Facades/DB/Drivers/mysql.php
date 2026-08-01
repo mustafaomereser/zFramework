@@ -38,16 +38,11 @@ class mysql
         $engines = [];
         $tables  = $this->parent->prepare("SELECT TABLE_NAME, ENGINE FROM information_schema.tables WHERE table_schema = :table_scheme", ['table_scheme' => $this->parent->dbname])->fetchAll(\PDO::FETCH_ASSOC);
 
-        # Every column of every table in one round-trip. This used to ask for one
-        # table at a time: on an 87-table schema that was 88 queries and 394 ms
-        # against a local server, and information_schema.columns is slow enough that
-        # the count is what hurts, not the size of the answer. The whole thing is
-        # paid whenever the scheme cache is cold - after a deploy, after a migration
-        # drops scheme.json, when a new tenant connects - and paid again by every
-        # request that arrives while the first one is still building it.
-        #
-        # ORDINAL_POSITION is what the per-table query returned columns in anyway;
-        # naming it keeps the cached scheme byte-identical to what it was before.
+        # Every column of every table in one round-trip rather than a query per
+        # table. information_schema is slow enough that the number of queries is
+        # what costs, not the size of the answer - and this is paid in full
+        # whenever the scheme cache is cold: after a deploy, after a migration
+        # drops scheme.json, or when a new tenant connects.
         $rows = $this->parent->prepare("SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH, COLUMN_TYPE, COLUMN_KEY FROM information_schema.columns WHERE table_schema = :table_scheme ORDER BY TABLE_NAME, ORDINAL_POSITION", ['table_scheme' => $this->parent->dbname])->fetchAll(\PDO::FETCH_ASSOC);
 
         $grouped = [];
@@ -57,8 +52,7 @@ class mysql
             $grouped[$table][] = $row;
         }
 
-        # A schema with no tables used to leave $data undefined and warn on the two
-        # assignments below.
+        # Initialised, so a schema with no tables still returns the same shape.
         $data = ["TABLE_COLUMNS" => []];
 
         foreach ($tables as $key => $table) {

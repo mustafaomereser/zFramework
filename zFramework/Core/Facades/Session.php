@@ -101,13 +101,12 @@ class Session
     {
         self::load();
 
-        # Deleting a key that was never there changes nothing, so it must not mark
-        # the session dirty: run.php clears the alerts and the one-time data at the
-        # end of every request, and with an unconditional $dirty that alone made a
-        # request which never touched the session open it, write it and hand back a
-        # cookie. Measured at 0.32 ms a request on a local disk, more on the network
-        # filesystems shared hosting runs on - and it took the session lock, which
-        # serialises a visitor's concurrent requests for as long as it is held.
+        # Deleting a key that is not there changes nothing, so the session is not
+        # marked dirty and no write happens at shutdown. Worth the check: the
+        # framework clears alerts and one-time data after every request, and
+        # without it a request that never used the session would still write one
+        # - taking the session lock, which serialises that visitor's other
+        # requests while it is held.
         if (!array_key_exists($key, self::$cache)) return new self();
 
         unset(self::$cache[$key]);

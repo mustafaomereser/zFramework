@@ -48,9 +48,7 @@ class DbCollector
             }
 
             # Running the query to see what it really did, which the two servers
-            # spell differently - and until this told them apart, the MySQL
-            # spelling threw a syntax error on MariaDB that the catch below
-            # swallowed, so the analyser quietly recorded nothing at all there.
+            # spell differently, in the statement and in what comes back:
             #
             #   MySQL 8.0.18+  EXPLAIN ANALYZE FORMAT=JSON -> query_plan
             #   MariaDB 10.1+  ANALYZE FORMAT=JSON         -> query_block
@@ -165,10 +163,8 @@ class DbCollector
             if (!empty($node['covering'])) $a['warnings'][$table][] = 'COVERING_INDEX';
             if (!empty($node['estimated_total_cost'])) $a['estimated_total_cost'][$table] = $node['estimated_total_cost'];
 
-            # MySQL reports what one execution did; MariaDB reports the average
-            # per loop alongside the loop count, so a table scanned once inside a
-            # join of ten rows reads as a tenth of its real work until they are
-            # multiplied back together.
+            # MySQL reports the total; MariaDB reports rows per loop beside the
+            # loop count, so the two are multiplied to mean the same thing.
             if (isset($node['actual_rows'])) $a['metrics'][$table]['actual_rows'] = $node['actual_rows'];
             elseif (isset($node['r_rows'])) $a['metrics'][$table]['actual_rows'] = (int) round((float) $node['r_rows'] * (float) ($node['r_loops'] ?? 1));
 

@@ -8,19 +8,20 @@ use zFramework\Core\Route as RouteFacade;
 use zFramework\Core\Facades\Config;
 
 /**
- * Measures where a request's time actually goes, on the machine that serves it.
+ * `php terminal bench run` - where a request's time goes on this machine.
  *
- * Written because a round of optimisation was done against local numbers and
- * the difference did not show up in production - and the reason is the sort of
- * thing no amount of reading finds. Connecting to MySQL over TCP on one platform
- * and over a unix socket on another differ by an order of magnitude; opcache
- * changes what boot costs but nothing about what a connection costs. Guessing
- * which of those applies to a given server is how a day gets spent on the wrong
- * 0.2 ms.
+ * Reports connection setup, table scheme, config, the route table and the
+ * application's global middlewares, then totals what a request pays before its
+ * own code runs.
  *
- * Everything here only reads. No table is written, no cache is cleared, no
- * request is served - it is safe to run on a live machine, which is the only
- * place the answer is worth anything.
+ * Run it on the server you care about. The numbers do not travel: host=localhost
+ * is a unix socket on Linux and a TCP connection on Windows, an order of
+ * magnitude apart, and opcache changes what boot costs while changing nothing
+ * about what a connection costs.
+ *
+ * Everything is measured without being changed - nothing written, no cache
+ * cleared - except the middlewares, which cannot be timed without being run.
+ * That section says so before it starts.
  */
 class Bench
 {
@@ -57,10 +58,9 @@ class Bench
      */
     public static function run()
     {
-        # Before anything else is measured: how long this process took to become
-        # able to run a command at all. Under the terminal that is bootstrap plus
-        # the module includes - not a request, but the same code path an FPM
-        # process walks before it can serve one.
+        # Taken first: how long this process took to reach the command. Over HTTP
+        # that is the request's real boot; on the CLI it is bootstrap and the
+        # module includes.
         $started       = (float) ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
         self::$began   = microtime(true);
         self::$startup = (self::$began - $started) * 1e9;   # seconds -> ns, as ms() expects
@@ -162,12 +162,10 @@ class Bench
     /**
      * What one request pays the framework, before any application code runs.
      *
-     * Added up from the lines above rather than measured in one go, because the
-     * pieces are what can be acted on: a single number tells you whether to care,
-     * these tell you where to look. Anything a request does not actually pay -
-     * building the scheme from the server, opening a connection the pool already
-     * has - is left out, and the ones that are only paid under some condition say
-     * so.
+     * Summed from the lines above, so the breakdown shows where to look rather
+     * than only whether to care. Work a request does not actually do - building
+     * the scheme from the server, opening a connection the pool already holds -
+     * is left out, and lines that are only paid under some condition say which.
      */
     private static function total(): void
     {
@@ -207,12 +205,10 @@ class Bench
         self::line($served ? 'this request, start to here' : 'this process, startup to here', self::ms(self::$startup),
             $served ? 'the real boot: everything above, paid once, for real' : 'CLI - a served request does not pay this');
 
-        # And what measuring cost, which is not small: the scheme is rebuilt from
-        # information_schema, the route files are included three more times,
-        # matching runs two hundred times, the middlewares four more. None of that
-        # is work a request does - it is the price of asking. Without this line the
-        # page takes far longer than anything on it accounts for, and the gap looks
-        # like a mystery rather than the bill for the measurement.
+        # What measuring itself cost, which is not small - the scheme is rebuilt,
+        # the route files included three more times, matching run two hundred
+        # times. A request pays none of it, but this page does, and without the
+        # line the difference looks unexplained.
         $spent = (microtime(true) - self::$began) * 1e9;
         self::line('measuring cost', self::ms($spent), 'the benchmarks themselves - not a request cost');
 
@@ -251,11 +247,9 @@ class Bench
     /**
      * Run something a few times and keep the fastest.
      *
-     * A shared machine does not give the same answer twice - the same command can
-     * report 40 ms once and 200 ms the next time, and neither is wrong. What is
-     * being asked here is what the work costs, not what the machine was doing at
-     * the time, and the floor is the closest thing to that. The spread is worth
-     * knowing too, so it comes back alongside.
+     * A shared machine does not answer the same way twice. The floor is the
+     * closest thing to what the work itself costs; the spread comes back beside
+     * it so the caller can say how much the machine was interfering.
      *
      * @return array{0:float,1:float} best, worst - in nanoseconds
      */
@@ -340,10 +334,9 @@ class Bench
     {
         self::title('Database connections');
 
-        # connections[] holds the live PDO once something has connected - and
-        # something has, because Auth::init() runs from the autoloader before any
-        # of this. The dsn and credentials are kept aside there for reconnect();
-        # they are what this needs too.
+        # connections[] holds live PDO objects once anything has connected, which
+        # Auth::init() does from the autoloader. The dsn kept aside for
+        # reconnect() is what can still be opened again here.
         $connections = ($GLOBALS['databases']['dsn'] ?? []) + ($GLOBALS['databases']['connections'] ?? []);
 
         if (!count($connections)) {
@@ -369,10 +362,9 @@ class Bench
             $pass = $parameters[2] ?? null;
 
             try {
-                # A genuinely new connection: the pool is bypassed, so this is what
-                # the handshake actually costs here. Measuring the persistent one
-                # "first" would not do - by the time anything runs, Auth::init() has
-                # already filled the pool and the answer would come back near zero.
+                # Pool bypassed, so this is the handshake itself. Timing the
+                # persistent one instead would measure an already-filled pool and
+                # report near zero.
                 $noPool = $options;
                 unset($noPool[\PDO::ATTR_PERSISTENT]);
 
@@ -538,10 +530,9 @@ class Bench
         $cache    = ($storage_path ?? FRAMEWORK_PATH . '/storage') . '/routes.cache.php';
         $blockers = RouteFacade::cacheBlockers();
 
-        # The biggest line in the summary on most applications, so it is worth
-        # more than one sample. The table is reset between runs - includer() adds
-        # to it, and three passes would otherwise report a table three times the
-        # size of the real one.
+        # Usually the largest line in the summary, so more than one sample. The
+        # table is restored between runs: includer() appends, and three passes
+        # would otherwise measure a table three times its real size.
         $table = RouteFacade::$routes;
         [$defining, $definingWorst] = self::best(function () use ($table) {
             RouteFacade::$routes = $table;

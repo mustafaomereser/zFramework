@@ -101,15 +101,13 @@ class Route
     }
 
     /**
-     * Quick redirect.
+     * Redirect one url to another.
      *
-     * The destination is stored as data, not as a closure. It used to be one, and
-     * since a single closure anywhere keeps the whole table out of the compiled
-     * cache, one Route::redirect() was enough to make an entire application parse
-     * its route files on every request. A redirect is also the one handler that
-     * never needs to run anything - it is a status and a header - so there was
-     * nothing to hold in a closure to begin with. run() turns this back into a
-     * response.
+     *   Route::redirect('/old-page', '/new-page');
+     *   Route::redirect('/moved', 'https://example.com', 301);
+     *
+     * The destination is stored as data rather than a closure, so routes using
+     * this can still be compiled into the route cache.
      *
      * @param string $url
      * @param string $to
@@ -383,12 +381,9 @@ class Route
     }
 
     /**
-     * Register a route. No matching happens here.
-     *
-     * Matching used to run inside this method, once per definition: a project
-     * with 1000 routes paid 1000 URI comparisons on every request, whichever
-     * route was actually being served. Definitions are now only collected, and
-     * match() resolves the request once, through an index.
+     * Register a route. Definitions are only collected here - match() resolves
+     * the request once afterwards, through an index, rather than comparing the
+     * url against every route as it is defined.
      *
      * @param string|null $method
      * @param array $args

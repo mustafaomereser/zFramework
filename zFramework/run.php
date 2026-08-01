@@ -71,12 +71,10 @@ class Run
     /**
      * How many entries $included held once boot finished.
      *
-     * handle() includes route/dynamic - and, from the second request on,
-     * App/Middlewares/autoload.php - through includer(), which appends to
-     * $included every time. Nothing trimmed it, so the array grew by a handful of
-     * entries per request for as long as the worker lived. Only what boot
-     * collected is of any use afterwards: Route::sources() reads it while the
-     * cache is being written, and that happens during boot.
+     * handle() keeps appending to $included as it includes route/dynamic and the
+     * middleware autoloader, so resetState() trims back to this mark - otherwise
+     * the array grows for as long as a worker lives. Only what boot collected is
+     * read afterwards, by Route::sources() when writing the cache.
      */
     private static ?int $bootIncluded = null;
 
@@ -330,10 +328,9 @@ class Run
             \zFramework\Core\Facades\Alerts::unset(); # forgot alerts
             \zFramework\Core\Facades\JustOneTime::unset(); # forgot data
         } catch (\zFramework\Core\ResponseSignal $signal) {
-            # abort(), redirect(), refresh(), a file download: the response is ready
-            # and nothing else should run. Under FPM this ends up identical to the
-            # die() these used to call; under a long-running worker the process
-            # survives to serve the next request.
+            # abort(), redirect(), refresh(), a file download: the response is
+            # ready and nothing else should run. Unlike die(), this leaves a
+            # long-running worker alive to serve the next request.
             $signal->send();
             \zFramework\Core\Facades\Alerts::unset();
             \zFramework\Core\Facades\JustOneTime::unset();

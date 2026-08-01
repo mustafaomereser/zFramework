@@ -507,10 +507,8 @@ class View
             $before = self::$view;
 
             self::$view = preg_replace_callback('/@include\(\'(.*?)\'\)/', function ($viewName) {
-                # Resolved the same way compile() resolves a view. This used to read
-                # self::$config['views'], a key nothing ever sets: the path came out
-                # as "/partials/header.php" and @include has been broken outright
-                # for as long as it has existed.
+                # Same resolution as any other view, so @include('partials.header')
+                # finds the file wherever view('partials.header') would.
                 $path                  = self::resolveViewPath($viewName[1]);
                 self::$compiledFiles[] = $path;
 

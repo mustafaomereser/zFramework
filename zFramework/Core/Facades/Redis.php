@@ -238,14 +238,10 @@ class Redis
     /**
      * Let the next request try again after a failed connection.
      *
-     * $failed exists so a down server is not retried on every call - but "every
-     * call" was meant to mean within one request, and nothing was clearing it.
-     * In a worker that turned a momentary outage into a permanent one: Redis
-     * came back and the process went on refusing to use it until it restarted.
-     *
-     * The connections themselves are deliberately kept. They are the reason to
-     * boot once, exactly like the database handles - $config and $extension are
-     * boot state as well.
+     * $failed stops a down server being retried on every call within a request;
+     * clearing it here keeps a brief outage from becoming permanent for the life
+     * of a worker. Connections, config and the extension check are kept - they
+     * are why the process boots once.
      *
      * @return void
      */

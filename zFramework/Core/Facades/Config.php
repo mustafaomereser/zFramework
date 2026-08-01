@@ -11,12 +11,11 @@ class Config
     static $caches = [];
 
     /**
-     * parseUrl() answers, keyed by the lookup that produced them.
+     * Resolved lookups, keyed by the dotted string that produced them.
      *
-     * Resolving one costs a file_exists() per dotted segment, and get() is called
-     * from hot paths - DB::prepare() asks for app.debug on every single query, so
-     * a busy request used to make hundreds of stat calls to be told the same thing
-     * every time. $caches below only ever skipped the include(), never this.
+     * Working out which file a lookup belongs to costs a file_exists() per
+     * segment, and the answer cannot change within a request. $caches below
+     * holds file contents; this holds where they were found.
      */
     private static array $paths = [];
 
@@ -90,17 +89,19 @@ class Config
     }
 
     /**
-     * A framework setting, from config/framework.php.
+     * Read a framework setting from config/framework.php.
      *
-     * Falls back to the old per-subject file when framework.php has no answer:
-     * config('framework.view.caching'), then config('view.caching'). An
-     * application that has not moved its settings across keeps working, and one
-     * that has can delete the old files.
+     *   Config::framework('view.caching')
+     *   Config::framework('redis.database.session')
      *
-     * The fallback is a plain get(), so a key missing from both behaves exactly
-     * as it always did.
+     * Returns null when the setting is not configured anywhere, so callers can
+     * supply their own default with ??.
      *
-     * @param string $key Dotted path below the subject - 'view.caching'.
+     * For backwards compatibility, a subject framework.php does not define falls
+     * back to its own file - 'view.caching' to config/view.php - which is how an
+     * application upgrades without moving its settings first.
+     *
+     * @param string $key Dotted path, starting with the subject.
      * @return mixed
      */
     public static function framework(string $key): mixed
@@ -111,14 +112,13 @@ class Config
         $parts   = explode('.', $key);
         $subject = $parts[0];
 
-        # framework.php says nothing about this subject, so the old file is still
-        # the source of truth for it - if there is one. exists() rather than a
-        # bare get(), which would try to include config/profiling/enabled.php and
-        # warn about a file nobody ever meant to write.
+        # Subject not in framework.php: use its own file if there is one. exists()
+        # rather than get(), which would try to include config/<subject>/<key>.php
+        # and warn about a path nobody meant to write.
         if (!array_key_exists($subject, $framework)) return self::exists($subject) ? self::get($key) : null;
 
-        # It does, so this file answers for the whole branch. A key missing below
-        # it is missing, not a reason to go looking on disk.
+        # Subject is here, so this file answers for all of it. A key missing below
+        # it is simply missing.
         $value = $framework;
         foreach ($parts as $part) {
             if (!is_array($value) || !array_key_exists($part, $value)) return null;
@@ -160,11 +160,8 @@ class Config
             # Otherwise the in-memory copy keeps serving what was just overwritten.
             self::clearCache();
 
-            # Invalidate here, where a config file actually changes - not in get(),
-            # which used to do it on every first read of every config file. That
-            # threw each one out of opcache per request and forced a recompile,
-            # which is precisely what opcache exists to avoid. Writing is rare;
-            # reading happens on every request.
+            # opcache is holding the previous version of this file. Dropping it
+            # here, on the rare write, rather than on every read.
             if (function_exists('opcache_invalidate')) opcache_invalidate($path, true);
         }
 

@@ -48,20 +48,15 @@ class DB
     public static array $schemeChecked = [];
 
     /**
-     * Clear what belongs to a single request.
+     * Clear what belongs to a single request. Called between requests by a
+     * long-running worker; under FPM the process ends instead.
      *
-     * $schemeChecked is the "this connection's scheme has been validated" flag.
-     * Until DB was added to Run::REQUEST_STATE nothing cleared it, so a worker
-     * validated the scheme on its first request and never again - a migration
-     * could change the schema and that process would serve the old one until it
-     * was restarted. The comment on tables() has always claimed otherwise.
+     * Clearing $schemeChecked makes the next request re-validate the table
+     * scheme, so a migration is noticed by a worker that is already running.
      *
-     * The rollback is the other half. A connection outlives the request in a
-     * worker, so an open transaction does too: a request that ends between
-     * beginTransaction() and commit() - through ResponseSignal, or by dying -
-     * hands the next one a connection that is still inside it, and it would go on
-     * writing there without knowing. Under FPM this cannot happen; PDO rolls back
-     * as it destroys the handle, and here nothing is destroyed.
+     * The rollback covers a request that ended between beginTransaction() and
+     * commit(). Connections outlive the request in a worker, so the transaction
+     * would too, and the next request would carry on writing inside it.
      *
      * @return void
      */
@@ -133,20 +128,17 @@ class DB
                 # handle after the server drops one.
                 $GLOBALS['databases']['dsn'][$this->db] ??= $parameters;
 
-                # PDO takes its options at construction, not after. ATTR_PERSISTENT is
-                # the one that matters here: whether a handle comes from the persistent
-                # pool is decided while it is being built, so setAttribute() has nothing
-                # to act on and quietly returns false. connections.php has been asking
-                # for persistent connections that were never actually persistent.
+                # Options go to the constructor, not setAttribute(). ATTR_PERSISTENT
+                # is decided while the handle is built and setAttribute() returns
+                # false for it without saying so.
                 $options = [];
                 foreach ($parameters['options'] ?? [] as $option) $options[$option[0]] = $option[1];
 
                 $connection = new \PDO($parameters[0], $parameters[1], ($parameters[2] ?? null), $options);
             } catch (\Throwable $err) {
-                # The database is unreachable - that is the server's problem, not the
-                # request's. Answering 503 + Retry-After lets a load balancer's health
-                # check pull this node out and put it back once it recovers; the plain
-                # error page this used to emit carried a 200 and read as healthy.
+                # 503 + Retry-After rather than an error page, so a load balancer's
+                # health check pulls this node out and puts it back once the
+                # database answers again.
                 \zFramework\Core\Facades\Response::status(503);
                 \zFramework\Core\Facades\Response::header('Retry-After', '5');
                 die(errorHandler($err));
@@ -159,10 +151,10 @@ class DB
 
         $this->driver = $GLOBALS['databases']['connected'][$this->db]['driver'];
 
-        # One builder per connection instead of one per DB instance. The builder is
-        # stateless apart from its owner, and every `new Model` used to construct its
-        # own - each of which asked the server for the database name again.
-        # setParent() re-points the shared instance right before it is used.
+        # One builder per connection, shared by every model using it. The builder
+        # holds no state but its owner, and setParent() re-points it just before
+        # use - constructing one per model would ask the server for the database
+        # name each time.
         $this->builder = $GLOBALS['databases']['builders'][$this->db] ??= (new ("\zFramework\Core\Facades\DB\Drivers\\$this->driver")($this));
         $this->dbname  = $GLOBALS['databases']['connected'][$this->db]['name'];
 
@@ -198,19 +190,16 @@ class DB
         }
 
         $queryTime = microtime(true) - $queryTime;
-        # Analyzer runs on SELECT only (EXPLAIN on a write costs a round-trip and
-        # suggests nothing) and never without debug: EXPLAIN ANALYZE re-executes the
-        # query, so leaving this on in production doubles the cost of every SELECT.
-        # `framework.profiling.queryAnalyze` may also be a rate - 0.01 analyses 1%
-        # of queries. It used to be app.analyze and is still read from there when
-        # framework.php does not carry it.
+        # SELECT only - EXPLAIN on a write costs a round-trip and suggests
+        # nothing - and never without app.debug, since analysing a query means
+        # running it twice. framework.profiling.queryAnalyze is true, false, or a
+        # sampling rate.
         if (!$this->ignoreAnalyze && config('app.debug') && DbCollector::isSelect($sql)) {
             $configured = Config::framework('profiling.queryAnalyze');
 
-            # Not in framework.php, so look where it used to live. Config::get()
-            # answers a missing key with the level above it - the whole of app.php
-            # here - and casting that to float would read as 1, turning the
-            # analyzer on for an application that never asked for it.
+            # Older applications keep this in app.php. Config::get() answers a
+            # missing key with the level above it, so guard against the whole
+            # app.php array arriving here and casting to 1.
             if ($configured === null) {
                 $legacy     = config('app.analyze');
                 $configured = is_scalar($legacy) ? $legacy : false;
@@ -291,8 +280,8 @@ class DB
     /**
      * Make sure a builder exists, or say why it does not.
      *
-     * connection() returns false for a connection name that is not in
-     * database/connections.php, which used to leave $builder null and surface
+     * connection() returns false for a name that is not in
+     * database/connections.php. Without this the missing builder would surface
      * three frames later as "Call to a member function build() on null".
      *
      * @return void
@@ -999,17 +988,15 @@ class DB
      */
     public function get(): array
     {
-        # Read before run(), not inside the call: run() ends in reset(), which puts
-        # fetchType back to FETCH_ASSOC, and PHP evaluates the object operand before
-        # the argument. Written inline, the argument was whatever reset() had just
-        # written a moment earlier - so fetchType() never did anything at all.
+        # Read before the call, not inside it: run() ends in reset(), which puts
+        # fetchType back to its default, and PHP evaluates $this->run() before the
+        # argument next to it.
         $fetchType = $this->buildQuery['fetchType'];
         $rows      = $this->run()->fetchAll($fetchType);
 
-        # Both of these key things onto a row by column name, which only holds for
-        # FETCH_ASSOC. FETCH_KEY_PAIR hands back scalars - assigning a closure onto
-        # one is a fatal - and FETCH_UNIQUE moves the primary key out of the row and
-        # into the array key, leaving update()/delete() nothing to bind to.
+        # Closures and eager loading key onto a row by column name, which only
+        # works for FETCH_ASSOC. FETCH_KEY_PAIR returns scalars, and FETCH_UNIQUE
+        # moves the primary key out of the row into the array key.
         $keyed = $fetchType === \PDO::FETCH_ASSOC;
 
         if ($this->setClosures && $keyed) $rows = $this->setClosures($rows);
@@ -1030,13 +1017,9 @@ class DB
      */
     public function count(): int
     {
-        # rowCount() answers correctly on a SELECT only because every row has
-        # already been pulled into PHP - buffered queries are the default. So
-        # counting the 43k rows of a products table cost 210 ms and 10 MB to arrive
-        # at an integer the server returns in 8 ms. Worse where it is usually
-        # written: inside a foreach, once per row of the outer query.
-        #
-        # This is the same count paginate() has always done properly.
+        # Counted by the server. Reading rowCount() off a SELECT would mean
+        # fetching every row into PHP first, which is what buffered queries do -
+        # expensive on a large table, and worse inside a loop.
         $this->buildQuery['realOrder'] = null;
         $this->buildQuery['orderBy']   = [];
 
@@ -1304,11 +1287,8 @@ class DB
      */
     public function debugSQL(string $sql, array $data = []): string
     {
-        # The loop reads $data, not buildQuery directly. It used to do the latter
-        # while the line above carefully worked out which of the two to use, so
-        # passing bindings in did nothing and the placeholders came back
-        # unreplaced - which is a syntax error for anything that then tries to
-        # EXPLAIN the result.
+        # Bindings passed in win over the ones on the current query, so a caller
+        # can render a statement that is no longer being built.
         $data      = count($data) ? $data : $this->buildQuery['data'] ?? [];
         $debug_sql = $sql;
 

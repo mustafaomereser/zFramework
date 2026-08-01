@@ -7,11 +7,9 @@ class Http
     /**
      * Which set of error views abort() renders from.
      *
-     * Application code picks this per request - the skeleton's ViewDirectives
-     * middleware points it at errors.admin for an authenticated admin. There is
-     * no else branch to such a decision, so in a worker the last request that
-     * changed it decided for everyone after it: a plain visitor's 404 came back
-     * as the admin error page. Reset below.
+     * Set it from middleware to serve a different set of error pages - the
+     * skeleton points it at errors.admin for a signed-in admin. Reset after each
+     * request, so one visitor's choice does not decide for the next.
      */
     const DEFAULT_ERROR_VIEW = 'errors.app';
 

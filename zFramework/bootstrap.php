@@ -19,12 +19,12 @@ if ($app_config['debug'] ?? false) {
 // Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
 if (!isset($cron_mode)) {
-    // config/framework.php holds these now; the old separate files are still read
-    // when it does not exist or has nothing to say, so an application can move at
-    // its own pace. Config's facade is not loaded this early - hence the include.
+    // Included directly rather than through Config, which is not loaded this
+    // early. Falls back to the old standalone files for applications that have
+    // not moved their settings into framework.php.
     //
-    // Redis is read on demand: only the redis driver needs it, and an include per
-    // request is not free on a network filesystem.
+    // Redis only when the session driver asks for it - an include per request is
+    // not free on a network filesystem.
     $framework      = @include(BASE_PATH . "/config/framework.php") ?: [];
     $session_config = $framework['session'] ?? (@include(BASE_PATH . "/config/session.php") ?: []);
     $redis_config   = ($session_config['driver'] ?? 'file') === 'redis'
@@ -46,10 +46,8 @@ if (!isset($cron_mode)) {
     } else {
         $sessions_path = "$storage_path/sessions";
 
-        # A recursive mkdir() stats every segment of the path and tries to create
-        # each one, whether or not the directory is already there - which it is, on
-        # every request after the first. One is_dir() instead: 0.059 ms a request
-        # locally, and the kind of thing that costs more over a network filesystem.
+        # Checked before creating: a recursive mkdir() stats every segment of the
+        # path on every request, whether or not the directory is already there.
         if (!is_dir($sessions_path)) @mkdir($sessions_path, 0777, true);
 
         session_save_path($sessions_path);
