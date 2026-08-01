@@ -1311,10 +1311,33 @@ return [
     'public'       => '/public',
     'crypt'        => ['key' => '...', 'salt' => '...'],
     'error'        => ['logging' => true, 'callback' => null],
-    'analyze'      => false,   // enable query analyzer (DbCollector)
     'pagination'   => ['default-view' => 'partials.pagination'],
 ];
 ```
+
+**config/framework.php** — how the framework itself behaves
+
+```php
+return [
+    'view'    => ['caching' => true, 'minify' => true],
+    'route'   => ['caching' => true, 'auto-check' => false],
+    'session' => ['driver' => 'file', 'gc_probability' => 1],
+    'cache'   => ['apcu' => true],
+    'redis'   => ['enabled' => false, 'host' => '127.0.0.1', /* ... */],
+
+    'profiling' => [
+        'enabled'      => false,   // write a record per request to analysis/profiling/
+        'rate'         => 1,       // or a fraction: 0.05 records one request in twenty
+        'keep'         => 200,     // stop writing once this many records exist
+        'queryAnalyze' => false,   // EXPLAIN every SELECT (needs app.debug; re-runs the query)
+    ],
+];
+```
+
+These were once five files — `view.php`, `route.php`, `session.php`, `cache.php`,
+`redis.php` — plus `analyze` in `app.php`. They are read together and changed
+together, so they live together. The old files are still read for anything
+`framework.php` does not carry, so an application can move across when it suits.
 
 **database/connections.php**
 

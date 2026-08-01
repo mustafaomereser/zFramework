@@ -90,6 +90,45 @@ class Config
     }
 
     /**
+     * A framework setting, from config/framework.php.
+     *
+     * Falls back to the old per-subject file when framework.php has no answer:
+     * config('framework.view.caching'), then config('view.caching'). An
+     * application that has not moved its settings across keeps working, and one
+     * that has can delete the old files.
+     *
+     * The fallback is a plain get(), so a key missing from both behaves exactly
+     * as it always did.
+     *
+     * @param string $key Dotted path below the subject - 'view.caching'.
+     * @return mixed
+     */
+    public static function framework(string $key): mixed
+    {
+        static $framework = null;
+        $framework ??= self::exists('framework') ? (array) self::get('framework') : [];
+
+        $parts   = explode('.', $key);
+        $subject = $parts[0];
+
+        # framework.php says nothing about this subject, so the old file is still
+        # the source of truth for it - if there is one. exists() rather than a
+        # bare get(), which would try to include config/profiling/enabled.php and
+        # warn about a file nobody ever meant to write.
+        if (!array_key_exists($subject, $framework)) return self::exists($subject) ? self::get($key) : null;
+
+        # It does, so this file answers for the whole branch. A key missing below
+        # it is missing, not a reason to go looking on disk.
+        $value = $framework;
+        foreach ($parts as $part) {
+            if (!is_array($value) || !array_key_exists($part, $value)) return null;
+            $value = $value[$part];
+        }
+
+        return $value;
+    }
+
+    /**
      * Forget what has been read and resolved so far.
      * @return void
      */

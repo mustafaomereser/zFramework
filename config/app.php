@@ -3,11 +3,9 @@
 return [
     'debug'       => true, # turn false on production.
 
-    # Query analyzer. Only ever runs while 'debug' is true, so production is safe
-    # even if this stays on. true = every SELECT, false = off, or a sampling rate
-    # (0.01 = 1% of SELECTs) to keep the overhead down on a busy dev/staging box.
-    # Note it re-executes each analysed query via EXPLAIN ANALYZE.
-    'analyze'     => true,
+    # 'analyze' moved to config/framework.php - it belongs with the other
+    # framework behaviour, and is still read from here if you have not moved it.
+
     'error'       => [
         'logging'  => true,
 

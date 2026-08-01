@@ -201,9 +201,22 @@ class DB
         # Analyzer runs on SELECT only (EXPLAIN on a write costs a round-trip and
         # suggests nothing) and never without debug: EXPLAIN ANALYZE re-executes the
         # query, so leaving this on in production doubles the cost of every SELECT.
-        # `app.analyze` may also be a rate - 0.01 analyses 1% of queries.
+        # `framework.profiling.queryAnalyze` may also be a rate - 0.01 analyses 1%
+        # of queries. It used to be app.analyze and is still read from there when
+        # framework.php does not carry it.
         if (!$this->ignoreAnalyze && config('app.debug') && DbCollector::isSelect($sql)) {
-            $rate = (float) config('app.analyze');
+            $configured = Config::framework('profiling.queryAnalyze');
+
+            # Not in framework.php, so look where it used to live. Config::get()
+            # answers a missing key with the level above it - the whole of app.php
+            # here - and casting that to float would read as 1, turning the
+            # analyzer on for an application that never asked for it.
+            if ($configured === null) {
+                $legacy     = config('app.analyze');
+                $configured = is_scalar($legacy) ? $legacy : false;
+            }
+
+            $rate = (float) $configured;
             if ($rate > 0 && ($rate >= 1 || (mt_rand() / mt_getrandmax()) < $rate)) DbCollector::analyze($this, $sql, $data, $queryTime);
         }
         $this->reset();

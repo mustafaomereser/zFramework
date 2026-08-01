@@ -55,7 +55,7 @@ class Redis
      */
     private static function config(): array
     {
-        return self::$config ??= (array) (\zFramework\Core\Facades\Config::get('redis') ?: []);
+        return self::$config ??= (array) (\zFramework\Core\Facades\Config::framework('redis') ?: []);
     }
 
     /**

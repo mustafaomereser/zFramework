@@ -19,10 +19,17 @@ if ($app_config['debug'] ?? false) {
 // Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
 if (!isset($cron_mode)) {
-    // Read on demand: config/redis.php is only needed by the redis driver, and an
-    // include per request is not free on a network filesystem.
-    $session_config = @include(BASE_PATH . "/config/session.php") ?: [];
-    $redis_config   = ($session_config['driver'] ?? 'file') === 'redis' ? (@include(BASE_PATH . "/config/redis.php") ?: []) : [];
+    // config/framework.php holds these now; the old separate files are still read
+    // when it does not exist or has nothing to say, so an application can move at
+    // its own pace. Config's facade is not loaded this early - hence the include.
+    //
+    // Redis is read on demand: only the redis driver needs it, and an include per
+    // request is not free on a network filesystem.
+    $framework      = @include(BASE_PATH . "/config/framework.php") ?: [];
+    $session_config = $framework['session'] ?? (@include(BASE_PATH . "/config/session.php") ?: []);
+    $redis_config   = ($session_config['driver'] ?? 'file') === 'redis'
+        ? ($framework['redis'] ?? (@include(BASE_PATH . "/config/redis.php") ?: []))
+        : [];
 
     if (($session_config['driver'] ?? 'file') === 'redis' && ($redis_config['enabled'] ?? false)) {
         // Sessions in Redis: every app server reads the same store, so a user is

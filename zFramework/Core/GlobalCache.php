@@ -27,7 +27,7 @@ class GlobalCache
         if (self::$apcu !== null) return self::$apcu;
         if (!function_exists('apcu_fetch')) return self::$apcu = false;
 
-        $config = \zFramework\Core\Facades\Config::get('cache');
+        $config = \zFramework\Core\Facades\Config::framework('cache');
 
         return self::$apcu = is_array($config) ? (bool) ($config['apcu'] ?? true) : true;
     }
@@ -99,7 +99,7 @@ class GlobalCache
      */
     private static function l1Ttl(int|null $timeout): int
     {
-        $l1 = (int) (\zFramework\Core\Facades\Config::get('redis.l1_ttl') ?: 5);
+        $l1 = (int) (\zFramework\Core\Facades\Config::framework('redis.l1_ttl') ?: 5);
         return $timeout ? min($l1, $timeout) : $l1;
     }
 

@@ -228,7 +228,7 @@ class Run
                 'caches'  => "$storage_path/views",
                 'dir'     => BASE_PATH . '/resource/views',
                 'suffix'  => ''
-            ] + Config::get('view'));
+            ] + (array) Config::framework('view'));
             #
 
             # Before the route files, as it always was: a global middleware may set
@@ -240,7 +240,7 @@ class Run
             # executing every route file, which on a large project is the single
             # most repeated piece of work in a request. Module callbacks still run -
             # only their route definitions come from the cache.
-            $route_config = Config::get('route');
+            $route_config = Config::framework('route');
             $route_config = is_array($route_config) ? $route_config : [];
             \zFramework\Core\Route::$caching = (bool) ($route_config['caching'] ?? true);
 
