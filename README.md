@@ -1820,6 +1820,36 @@ The connection lines are the ones to read first. If *reopen* is no faster than
 beside it. And if *your global middlewares* dwarfs *framework overhead*, the
 framework is not what the request is waiting for.
 
+### Recording real requests
+
+`bench run` measures one moment on demand. The **Profiling** module under
+`modules/` records what actual requests cost, one file per request under
+`analysis/profiling/`, and `/profiling` compares them.
+
+```php
+// config/framework.php
+'profiling' => [
+    'enabled' => true,
+    'rate'    => 0.05,   // one request in twenty
+    'keep'    => 200,
+],
+```
+
+Two switches on purpose: the module can be disabled in its `info.php` and then
+nothing is recorded whatever the config says, and the config can be off while the
+module stays installed.
+
+Each record holds boot, handle and total, peak memory, files loaded, and whether
+opcache and apcu were on — because what a number means depends on those. The
+report groups by url and leads with the **median**: one request that waited on a
+busy disk drags a mean somewhere no request actually went. The gap between best
+and worst is how much the machine is interfering rather than the code.
+
+*boot* is everything before the route was matched; *handle* is matching, the
+controller and rendering. Those two are not split further, which would mean
+timing code inside `Route::run()` and `View::make()` — read by everyone, useful
+to almost nobody.
+
 ### Checklist
 
 - [ ] `debug => false`, `x-powered-by => false`
