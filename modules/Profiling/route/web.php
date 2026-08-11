@@ -1,6 +1,6 @@
 <?php
 
-use Modules\Profiling\Controllers\ReportController;
+use modules\Profiling\Controllers\ReportController;
 use zFramework\Core\Route;
 
 /**

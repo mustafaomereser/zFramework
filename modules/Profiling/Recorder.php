@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Profiling;
+namespace modules\Profiling;
 
 use zFramework\Core\Facades\Config;
 

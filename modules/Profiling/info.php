@@ -1,6 +1,7 @@
 <?php
 
-use Modules\Profiling\Recorder;
+use modules\Profiling\Recorder;
+use zFramework\Core\Facades\Config;
 
 /**
  * Module informations.
@@ -25,6 +26,7 @@ return [
      * this module off stops it entirely, turning it on does not start it.
      */
     'callback' => function () {
+        if (!Config::framework('profiling.enabled')) return;
         Recorder::begin();
         $GLOBALS['menu']['profiling'] = [
             'icon'  => 'fad fa-flask',
