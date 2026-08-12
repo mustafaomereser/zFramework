@@ -76,6 +76,7 @@ Route::pre('/admin')->middleware([Auth::class])->group(function () {
 - [18. cPanel](#18-cpanel)
 - [19. Going to Production](#19-going-to-production)
 - [20. RoadRunner](#20-roadrunner)
+- [21. Push Notifications](#21-push-notifications)
 
 ---
 
@@ -1391,6 +1392,10 @@ php terminal cache clear sessions
 # Security
 php terminal security key --regen         # regenerate crypt key + salt
 
+# Push notifications
+php terminal push-notification keys app   # generate a VAPID key pair
+php terminal push-notification test       # check encryption against the RFC vectors
+
 # Release
 php terminal release make --name=v1.2 --minify
 
@@ -1706,8 +1711,37 @@ display_errors = Off
 ```
 
 opcache is not optional: without it PHP recompiles every included file on every
-request. `validate_timestamps = 0` means PHP stops checking files for changes —
-reload PHP-FPM as part of your deploy, or code changes will not be picked up.
+request. Measured on the skeleton — same machine, same requests, 25-request
+medians:
+
+| | opcache off | opcache on |
+|---|---|---|
+| `/` | 19.5 ms | 7.4 ms |
+| 404 | 15.2 ms | 8.1 ms |
+
+The framework loads ~55 files and ~190 KB of code per request; compiling that is
+most of the difference. It also changes what is worth optimising — file count
+matters with opcache off, round-trips (connections, queries) with it on.
+
+`validate_timestamps = 0` means PHP stops checking files for changes — reload
+PHP-FPM as part of your deploy, or code changes will not be picked up.
+
+### Database connection
+
+```php
+// database/connections.php
+[\PDO::ATTR_TIMEOUT, 2],   // seconds to wait for the server to answer
+```
+
+Set a connect timeout, and write the host as an address. Without a timeout the
+driver's default applies, and a database that is down costs **every request** its
+full wait before the 503 goes out — measured at 2s per request with the server
+stopped, and up to the server's own `connect_timeout` (ten seconds and more) for
+a host that is unreachable rather than refusing. A host written as `localhost`
+doubles it: the name is tried over IPv6 first, then again over IPv4.
+
+This is a ceiling on connecting, not on queries. Lower it to `1` when the
+database is on the same machine or the same rack.
 
 ### Compiled routes
 
@@ -1996,3 +2030,180 @@ retried.
 
 A useful test: send two requests as different users through the same worker and
 assert the second response contains nothing of the first.
+
+---
+
+## 21. Push Notifications
+
+Reaching a user who is not on the site — with the site closed, the tab gone,
+the phone in a pocket. Web push is a browser standard: no account with a
+vendor, no SDK, no native app. Chrome, Firefox, Edge and Safari 16.4+.
+
+```php
+Notification::toUser($user['id'])->send([
+    'title' => 'Order shipped',
+    'body'  => 'Tracking number 123456789',
+    'url'   => '/orders/812',
+]);
+```
+
+### Setting it up
+
+**1. Generate a key pair** — once per application, and keep it out of the
+repository:
+
+```bash
+php terminal push-notification keys app
+```
+
+Paste both keys into `config/push-notification.php` and set `subject` to a `mailto:` url a
+push service can reach you at. Replacing a key pair invalidates every
+subscription taken with the old one.
+
+**2. Create the table:**
+
+```bash
+php terminal db migrate
+```
+
+**3. Subscribe from the browser:**
+
+```html
+<script src="/assets/js/push-notification.js"></script>
+<button id="notify">Notify me</button>
+
+<script>
+document.getElementById('notify').onclick = async () => {
+    const result = await PushNotification.subscribe({ topics: ['orders'] });
+    if (!result.status) console.log('not subscribed:', result.reason);
+};
+</script>
+```
+
+`push-notification.js` registers `/service-worker.js`, asks for permission, subscribes and posts the
+result to `/push-notification/subscribe` with the page's csrf token. The public key comes
+from `/push-notification/config`, so it is never pasted into javascript by hand.
+
+**Ask at the right moment.** A browser gives a site one good chance at the
+permission prompt — a user who says no is not asked again by anything until
+they change it in settings. Call `subscribe()` from a click on something that
+says what will be sent, never on page load.
+
+### Choosing who to notify
+
+The `to*` methods are filters and combine:
+
+```php
+Notification::toUser($id)->send('Your report is ready');   // one user's devices
+Notification::toUser([3, 9])->toTopic('billing')->send([...]); // both must match
+Notification::toTopic('news')->send([...]);                // whoever asked for it
+Notification::toAll()->send([...]);                        // every subscriber
+Notification::toSubscription($row)->send([...]);           // one known device
+```
+
+Topics are what the device subscribed with, not what the message is about — a
+device that asked for nothing is not reached by a topic send. That is what
+makes "only tell me about billing" work without a preferences table.
+
+### The payload
+
+```php
+Notification::toAll()
+    ->urgency('high')       // very-low | low | normal | high
+    ->ttl(3600)             // how long the push service holds it for an offline device
+    ->collapse('basket')    // a newer message with this topic replaces the undelivered one
+    ->send([
+        'title'  => 'Back in stock',
+        'body'   => 'The thing you wanted is available again',
+        'icon'   => '/assets/img/icon.png',
+        'url'    => '/products/12',
+        'tag'    => 'stock-12',            // replaces a notification already on screen
+        'data'   => ['product_id' => 12],  // reaches the service worker untouched
+    ]);
+```
+
+`icon`, `badge` and `url` come from the application's `defaults` in
+`config/push-notification.php` when not given. A string payload is a title:
+`Notification::toAll()->send('Deploy finished')`.
+
+**Payloads are small.** The limit is 4078 bytes after encryption headers —
+send an identifier and let the service worker fetch the rest.
+
+### Several applications
+
+An installation can serve several products, each with its own key pair and its
+own subscribers, and none of them able to notify another's users — a browser
+only accepts a message signed by the key it subscribed with.
+
+```php
+// config/push-notification.php
+'apps' => [
+    'app'   => ['channel' => 'webpush', 'subject' => 'mailto:...', 'public_key' => '...', 'private_key' => '...'],
+    'admin' => ['channel' => 'webpush', 'subject' => 'mailto:...', 'public_key' => '...', 'private_key' => '...'],
+],
+```
+
+```php
+Notification::app('admin')->toTopic('errors')->send([...]);
+```
+
+```js
+PushNotification.subscribe({ app: 'admin', topics: ['errors'] });
+```
+
+### Sending in the background
+
+A push is one HTTPS request per subscriber, 100–400 ms each — a broadcast to
+50.000 devices is not something a visitor waits for. With `push.queue` on and
+Redis available, `send()` hands the work over in chunks and returns:
+
+```bash
+php terminal queue work push-notification
+```
+
+The return value says what happened either way:
+
+```php
+['queued' => 0, 'sent' => 128, 'failed' => 3, 'removed' => 2, 'errors' => [...]]
+```
+
+`removed` is subscriptions the push service reported as gone — an uninstalled
+browser, cleared site data — deleted on the spot. Ones that merely keep failing
+are dropped after `push.max_failures` attempts. Without that a subscriber table
+is eventually mostly browsers that no longer exist.
+
+### Terminal
+
+```bash
+php terminal push-notification keys {app}          # generate a VAPID key pair
+php terminal push-notification test                # check encryption against the RFC vectors
+php terminal push-notification send {app} --all --title=Hello --body=Text
+php terminal push-notification subscribers {app}   # who is subscribed
+php terminal push-notification prune {app}         # delete subscriptions that keep failing
+```
+
+`test` is the one to run first on a new server: it encrypts the RFC 8291 §5
+worked example and compares it byte for byte, which is the only way to find out
+that openssl is wrong before a browser silently discards a message it could not
+decrypt.
+
+### What can go wrong
+
+- **https is required**, except on `localhost`. A service worker will not
+  register otherwise, so nothing subscribes.
+- **iOS only pushes to installed web apps.** Safari 16.4+ supports web push,
+  but the user has to Add to Home Screen first; a page in a Safari tab cannot
+  subscribe.
+- **`/service-worker.js` has to be at the document root.** A service worker only controls
+  pages at or below its own path, and one served from `/assets/js/` controls
+  nothing.
+- **The endpoint is a credential.** Anyone holding it can push to that device
+  through your key. It is stored, never rendered.
+
+### Another channel
+
+Web push is one implementation of
+[`Channel`](zFramework/Core/PushNotification/Channel.php) — deliver one
+message, validate one subscription, tell the client what it needs. An
+application that later wants FCM for its android build extends that class and
+names it in config; nothing in the call sites changes.
