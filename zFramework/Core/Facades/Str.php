@@ -49,6 +49,32 @@ class Str
     }
 
     /**
+     * base64url (RFC 4648 §5): `+/` become `-_` and the padding is dropped, so
+     * it survives a url, a header and a json string. VAPID keys, JWT segments
+     * and subscription keys are all in this alphabet.
+     *
+     * @param string $binary
+     * @return string
+     */
+    public static function base64UrlEncode(string $binary): string
+    {
+        return rtrim(strtr(base64_encode($binary), '+/', '-_'), '=');
+    }
+
+    /**
+     * Decode base64url back to bytes. Padding is restored first: browsers send
+     * unpadded, some libraries pad, both must read back the same.
+     *
+     * @param string $text
+     * @return string
+     */
+    public static function base64UrlDecode(string $text): string
+    {
+        $text .= str_repeat('=', (4 - strlen($text) % 4) % 4);
+        return (string) base64_decode(strtr($text, '-_', '+/'));
+    }
+
+    /**
      * Text Convert To Slug Url
      * @param string $text
      * @param string $divider

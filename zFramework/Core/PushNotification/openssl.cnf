@@ -1,0 +1,14 @@
+#
+# Fallback openssl configuration, used only when the one openssl looks for is
+# missing - which on Windows it usually is: nothing sets OPENSSL_CONF, and
+# openssl_pkey_new() then fails over a key length it never needed.
+#
+# Nothing here affects the curve or the key material.
+#
+
+[req]
+default_bits       = 2048
+default_md         = sha256
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
