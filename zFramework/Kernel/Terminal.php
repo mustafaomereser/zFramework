@@ -74,16 +74,36 @@ class Terminal
         self::clear();
 
         # `push-notification` is the class PushNotification.
-        $command = strtolower(self::$commands[0]);
+        $command = strtolower(self::$commands[0] ?? '');
         $module  = "\zFramework\Kernel\Modules\\" . str_replace(' ', '', ucwords(str_replace('-', ' ', $command)));
 
-        $module::begin(array_column(Module::$list[$command]['methods'] ?? [], 'name'));
+        if (!$command || !class_exists($module)) self::unknown($command);
+        else $module::begin(array_column(Module::$list[$command]['methods'] ?? [], 'name'));
 
         if (count(self::$textlist)) echo json_encode(self::$textlist, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         if (self::$terminate) return null;
 
         self::$textlist = [];
         return self::readline();
+    }
+
+    /**
+     * No such command. Says so, and lists the ones there are - an error page
+     * about a missing class is not an answer to a typo.
+     *
+     * @param string $command
+     * @return void
+     */
+    private static function unknown(string $command): void
+    {
+        $commands = array_keys(Module::$list);
+
+        self::text($command
+            ? "[color=red]`$command` is not a command.[/color]"
+            : "[color=red]No command given.[/color]");
+
+        if ($commands) self::text("\n[color=yellow]Available:[/color] " . implode(', ', $commands));
+        self::text("[color=dark-gray]`php terminal help` says what each one does.[/color]");
     }
 
     /**
