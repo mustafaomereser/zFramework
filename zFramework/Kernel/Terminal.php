@@ -73,9 +73,7 @@ class Terminal
     {
         self::clear();
 
-        # `push-notification` is the class PushNotification. Kept as one word on
-        # the command line it would read as pushnotification, and a terminal is
-        # typed at, not autocompleted.
+        # `push-notification` is the class PushNotification.
         $command = strtolower(self::$commands[0]);
         $module  = "\zFramework\Kernel\Modules\\" . str_replace(' ', '', ucwords(str_replace('-', ' ', $command)));
 
