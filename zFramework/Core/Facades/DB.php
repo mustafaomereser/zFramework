@@ -141,7 +141,11 @@ class DB
                 # database answers again.
                 \zFramework\Core\Facades\Response::status(503);
                 \zFramework\Core\Facades\Response::header('Retry-After', '5');
-                die(errorHandler($err));
+
+                # errorHandler() prints the page and returns it, so die() must
+                # not be given the return value - that printed it twice.
+                errorHandler($err);
+                die;
             }
 
             $new_connection = true;
