@@ -806,7 +806,7 @@ try {
 
 ```php
 // From a controller:
-return view('posts.index', compact('posts'));        // resolves to App/Views/posts/index.php
+return view('posts.index', compact('posts'));        // resolves to resource/views/posts/index.php
 return View::view('posts.index', ['posts' => $posts]);
 ```
 
