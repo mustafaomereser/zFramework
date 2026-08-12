@@ -22,6 +22,7 @@
 | 🗃️ Cache — session, APCu (L1) + Redis (L2) | 🔍 Query Analyzer — EXPLAIN + EXPLAIN ANALYZE |
 | 🎨 View / template engine (Blade-like directives) | 🔧 Terminal — Artisan-like CLI tool |
 | 📮 Queue — Redis-backed jobs + worker command | ⏭️ Defer — run work after the response is sent |
+| 🔔 Push Notifications — web push, VAPID, per-app keys | 🤖 AI assistant skill — ships in `.claude/` |
 
 ---
 
@@ -44,8 +45,29 @@ Route::pre('/admin')->middleware([Auth::class])->group(function () {
 
 ---
 
+### Working with an AI assistant
+
+This repository ships a Claude Code skill at **`.claude/skills/zframework/`**. Load it with
+`/zframework` (it also loads on its own once you touch framework code) and the assistant gets the
+whole framework up front — what already exists, the exact signatures, and the conventions — instead
+of you re-explaining it every session, or watching it hand-write a feature that already ships here.
+
+```
+.claude/skills/zframework/
+  SKILL.md                    inventory of what exists, the core API, the Laravel reflexes that break here
+  references/api.md           exact signatures for every facade, helper and DB method
+  references/recipes.md       end-to-end recipes: CRUD, protected area, API, module, upload, push, production
+  references/conventions.md   settled decisions, known traps, performance notes
+```
+
+It is written off the source, so treat it as a second index into this README rather than a
+replacement for it.
+
+---
+
 ## Table of Contents
 
+- [Working with an AI assistant](#working-with-an-ai-assistant)
 - [1. Route](#1-route)
 - [2. Model & DB](#2-model--db)
   - [2.1. Auth](#21-auth)
