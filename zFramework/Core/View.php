@@ -231,7 +231,8 @@ class View
         # Views nest - a layout renders a page, pagination renders its own view -
         # so only the outermost call is timed. Timing each would report the same
         # milliseconds several times over.
-        $timing = \zFramework\Core\Profiler::active() && self::$depth === 0 ? hrtime(true) : 0;
+        # Not loaded means nothing is profiling; see the same guard in Route::call().
+        $timing = class_exists(\zFramework\Core\Profiler::class, false) && \zFramework\Core\Profiler::active() && self::$depth === 0 ? hrtime(true) : 0;
         self::$depth++;
 
         try {

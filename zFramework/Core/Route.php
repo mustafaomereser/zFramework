@@ -576,7 +576,11 @@ class Route
         # Timed only while something is profiling; otherwise this is one
         # comparison. Covers the controller and anything it renders, so the view
         # stage reported separately is a part of this, not extra to it.
-        $started = \zFramework\Core\Profiler::active() ? hrtime(true) : 0;
+        # class_exists(..., false) does not autoload: with nothing profiling,
+        # asking would be the only reason to compile Profiler.php. A profiled
+        # request has it loaded already - the recorder calls Profiler::listen()
+        # from the module callback, before any route is matched.
+        $started = class_exists(\zFramework\Core\Profiler::class, false) && \zFramework\Core\Profiler::active() ? hrtime(true) : 0;
 
         echo call_user_func_array($callback, self::$calledRoute['parameters']);
 

@@ -26,6 +26,12 @@ if (!isset($cron_mode)) {
     // Redis only when the session driver asks for it - an include per request is
     // not free on a network filesystem.
     $framework      = @include(BASE_PATH . "/config/framework.php") ?: [];
+
+    # Config::framework() included this same file a second time for its own
+    # cache; hand it what was just read. With no file the global is never set and
+    # Config falls back to one config file per subject.
+    if (is_array($framework) && $framework) $GLOBALS['framework_config'] = $framework;
+
     $session_config = $framework['session'] ?? (@include(BASE_PATH . "/config/session.php") ?: []);
     $redis_config   = ($session_config['driver'] ?? 'file') === 'redis'
         ? ($framework['redis'] ?? (@include(BASE_PATH . "/config/redis.php") ?: []))

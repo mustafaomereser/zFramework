@@ -107,7 +107,9 @@ class Config
     public static function framework(string $key): mixed
     {
         static $framework = null;
-        $framework ??= self::exists('framework') ? (array) self::get('framework') : [];
+        # bootstrap.php already read config/framework.php and left it here, so
+        # the same file is not read and parsed twice.
+        $framework ??= $GLOBALS['framework_config'] ?? (self::exists('framework') ? (array) self::get('framework') : []);
 
         $parts   = explode('.', $key);
         $subject = $parts[0];

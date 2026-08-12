@@ -210,7 +210,11 @@ function getErrorIcon($type)
 }
 
 
-function errorHandler($data)
+/**
+ * Render an error page. Reached through errorHandler() in loader.php; this file
+ * is loaded only once something has gone wrong.
+ */
+function errorHandlerRender($data)
 {
     @ob_end_clean();
 
@@ -1762,15 +1766,8 @@ function errorHandler($data)
         abort(500, 'Beklenmedik bir hata oluştu, devam ederse lütfen yönetici ile iletişime geçiniz.');
     }
 
+    # Printed here and returned for logging. Callers must not print the return
+    # value - `die(errorHandler($e))` renders the page twice.
     echo $error_log;
     return $error_log;
 }
-
-set_exception_handler(function ($exception) {
-    # A response signal thrown outside Run::begin() - from a cron script, a
-    # terminal command, anything bootstrapping the framework on its own - still
-    # has to produce its response rather than an error page.
-    if ($exception instanceof \zFramework\Core\ResponseSignal) return $exception->send();
-
-    return errorHandler($exception);
-});

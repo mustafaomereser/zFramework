@@ -2,5 +2,5 @@
 define('BASE_PATH', __DIR__);
 include('zFramework/bootstrap.php');
 zFramework\Run::includer(FRAMEWORK_PATH . '/modules', false);
-zFramework\Run::includer(FRAMEWORK_PATH . '/modules/error_handlers/handle.php');
+zFramework\Run::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php');
 zFramework\Kernel\Terminal::begin($argv);

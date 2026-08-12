@@ -59,6 +59,7 @@ class Run
         \zFramework\Core\Facades\Alerts::class,
         \zFramework\Core\Facades\Response::class,
         \zFramework\Core\Facades\Mail::class,
+        \zFramework\Core\Facades\Notification::class,
         \zFramework\Core\Facades\cURL::class,
         \zFramework\Core\Route::class,
         \zFramework\Core\View::class,
@@ -220,7 +221,7 @@ class Run
         try {
             # includes
             self::includer(FRAMEWORK_PATH . '/modules', false);
-            self::includer(FRAMEWORK_PATH . '/modules/error_handlers/handle.php');
+            self::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php');
 
             # set view options
             \zFramework\Core\View::setSettings([
@@ -342,6 +343,11 @@ class Run
         # Release the response, then run whatever was handed to Defer::after().
         # Outside the try/catch on purpose: deferred jobs handle their own errors,
         # and an error page has already been rendered by this point anyway.
-        \zFramework\Core\Facades\Defer::flush();
+        #
+        # Only when the class is already loaded, which it is exactly when
+        # Defer::after() was called - autoload is deliberately not triggered.
+        # Unconditionally meant compiling Defer.php on every request for
+        # nothing.
+        if (class_exists(\zFramework\Core\Facades\Defer::class, false)) \zFramework\Core\Facades\Defer::flush();
     }
 }

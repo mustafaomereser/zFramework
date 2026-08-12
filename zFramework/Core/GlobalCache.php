@@ -33,6 +33,26 @@ class GlobalCache
     }
 
     /**
+     * Whether the redis config asks for it.
+     */
+    private static ?bool $redisEnabled = null;
+
+    /**
+     * Answered from config, without naming the Redis class: referring to it
+     * autoloads Facades/Redis.php on every request only to be told "disabled".
+     *
+     * @return bool
+     */
+    private static function redisEnabled(): bool
+    {
+        if (self::$redisEnabled !== null) return self::$redisEnabled;
+
+        $config = \zFramework\Core\Facades\Config::framework('redis');
+
+        return self::$redisEnabled = is_array($config) && ($config['enabled'] ?? false);
+    }
+
+    /**
      * Build cache name
      *
      * @param string   $name
@@ -71,7 +91,7 @@ class GlobalCache
 
         # L2: Redis. Shared by every server, so this is where the truth lives and
         # where remove() actually reaches everyone.
-        $redis = \zFramework\Core\Facades\Redis::available('cache');
+        $redis = self::redisEnabled() && \zFramework\Core\Facades\Redis::available('cache');
         if ($redis) {
             $data = \zFramework\Core\Facades\Redis::get($key, 'cache');
             if ($data !== null) {
@@ -115,7 +135,7 @@ class GlobalCache
 
         # Redis first: that reaches every server. The local APCu copy goes too, but
         # other servers keep theirs until l1_ttl expires - seconds, by design.
-        \zFramework\Core\Facades\Redis::delete($key, 'cache');
+        if (self::redisEnabled()) \zFramework\Core\Facades\Redis::delete($key, 'cache');
 
         if (!self::apcu()) return false;
         apcu_delete($key);
