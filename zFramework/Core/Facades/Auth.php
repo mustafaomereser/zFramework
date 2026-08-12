@@ -52,10 +52,28 @@ class Auth
 
     public static function init()
     {
-        self::$model = (new User);
-        self::$database_exists = isset($GLOBALS['databases']['connections'][self::$model->db]);
-        if ($columns = @self::$model->special_columns) self::$columns = $columns;
+        # Read from the class, not an instance of it: constructing the model
+        # opens a database connection, and init() runs on every request - paid
+        # by every visitor who never asks who they are. Reflection reads the two
+        # default properties without running the constructor.
+        $defaults = (new \ReflectionClass(User::class))->getDefaultProperties();
+        $database = $defaults['db'] ?? array_keys($GLOBALS['databases']['connections'] ?? [])[0] ?? null;
+
+        self::$database_exists = isset($GLOBALS['databases']['connections'][$database]);
+        if (!empty($defaults['special_columns'])) self::$columns = $defaults['special_columns'];
+
         if (self::$database_exists && !self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
+    }
+
+    /**
+     * The user model, built the first time something needs the database - a
+     * request that never authenticates never connects.
+     *
+     * @return User
+     */
+    public static function model(): User
+    {
+        return self::$model ??= new User;
     }
 
     /**
@@ -84,7 +102,28 @@ class Auth
      */
     private static function tokenMode(): bool
     {
-        return Redis::available('session');
+        return self::redisEnabled() && Redis::available('session');
+    }
+
+    /**
+     * Whether config asks for Redis at all.
+     */
+    private static ?bool $redisEnabled = null;
+
+    /**
+     * Answered from config, without naming the Redis class: referring to it
+     * autoloads Facades/Redis.php on every request that touches Auth, only to
+     * be told "disabled". Boot state - config does not change per request.
+     *
+     * @return bool
+     */
+    private static function redisEnabled(): bool
+    {
+        if (self::$redisEnabled !== null) return self::$redisEnabled;
+
+        $config = Config::framework('redis');
+
+        return self::$redisEnabled = is_array($config) && ($config['enabled'] ?? false);
     }
 
     /**
@@ -123,7 +162,7 @@ class Auth
      */
     public static function token_login(string $token): bool
     {
-        return self::login(self::$model->select('id, ' . self::$columns['password'])->where('api_token', $token)->first());
+        return self::login(self::model()->select('id, ' . self::$columns['password'])->where('api_token', $token)->first());
     }
 
     /**
@@ -163,7 +202,7 @@ class Auth
         if (self::tokenMode()) return self::userFromToken();
 
         if (!$user_id = (self::getMode())::get('auth-token')) return false;
-        if (self::$user == null) self::$user = self::$model->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
+        if (self::$user == null) self::$user = self::model()->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
         if (!@self::$user['id'] || !hash_equals((string) self::$user[self::$columns['password']], (string) (self::getMode())::get('auth-password'))) return self::logout();
         return self::$user;
     }
@@ -190,7 +229,7 @@ class Auth
         if (!$user) {
             # closureMode(false): relation closures cannot be serialised, and this
             # row is about to be cached. They are re-attached below either way.
-            $user = self::$model->closureMode(false)->where('id', $session['uid'])->first();
+            $user = self::model()->closureMode(false)->where('id', $session['uid'])->first();
             if (@$user['id']) Redis::set($cacheKey, $user, self::USER_TTL, 'session');
         }
 
@@ -199,7 +238,7 @@ class Auth
         # Password changed since this token was issued -> the session is over.
         if (!hash_equals((string) ($user[self::$columns['password']] ?? ''), (string) ($session['pwd'] ?? ''))) return self::logout();
 
-        return self::$user = self::$model->setClosures([$user])[0];
+        return self::$user = self::model()->setClosures([$user])[0];
     }
 
     /**
@@ -243,7 +282,7 @@ class Auth
     {
         if (self::check()) return false;
 
-        $user  = self::$model->select('id, api_token, ' . self::$columns['password']);
+        $user  = self::model()->select('id, api_token, ' . self::$columns['password']);
         $plain = $fields[self::$columns['password']] ?? null;
         unset($fields[self::$columns['password']]);
         foreach ($fields as $key => $value) $user->where($key, $value);
