@@ -13,7 +13,9 @@ class Module
     {
         $list = [];
         $path = FRAMEWORK_PATH . "/Kernel/Modules";
-        foreach (glob("$path/*.php") as $module) if (!strstr($module, '---')) $list[strtolower(str_replace(["$path/", '.php'], '', $module))] = [
+        # Class name to command name: PushNotification is typed push-notification.
+        # Single-word modules are unaffected, which is all of the older ones.
+        foreach (glob("$path/*.php") as $module) if (!strstr($module, '---')) $list[strtolower(preg_replace('/(?<!^)[A-Z]/', '-$0', str_replace(["$path/", '.php'], '', $module)))] = [
             'methods' => self::classMethods($module)
         ];
 

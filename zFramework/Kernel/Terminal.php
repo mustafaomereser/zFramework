@@ -73,8 +73,13 @@ class Terminal
     {
         self::clear();
 
-        $module = "\zFramework\Kernel\Modules\\" . ($method = ucfirst(strtolower(self::$commands[0])));
-        $module::begin(array_column(Module::$list[strtolower($method)]['methods'] ?? [], 'name'));
+        # `push-notification` is the class PushNotification. Kept as one word on
+        # the command line it would read as pushnotification, and a terminal is
+        # typed at, not autocompleted.
+        $command = strtolower(self::$commands[0]);
+        $module  = "\zFramework\Kernel\Modules\\" . str_replace(' ', '', ucwords(str_replace('-', ' ', $command)));
+
+        $module::begin(array_column(Module::$list[$command]['methods'] ?? [], 'name'));
 
         if (count(self::$textlist)) echo json_encode(self::$textlist, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         if (self::$terminate) return null;
