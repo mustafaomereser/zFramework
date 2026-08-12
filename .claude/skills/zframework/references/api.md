@@ -1,0 +1,354 @@
+# zFramework API Inventory
+
+Signatures extracted from the source. Verify here instead of guessing.
+
+## Global helpers (`zFramework/modules/Functions.php`)
+
+```php
+// Paths
+base_path(?string $add)            // absolute path from the project root
+public_dir(?string $add)           // filesystem path of the public directory
+public_path(?string $add)
+asset(string $file)                // full URL with ?v=filemtime
+path_fix(string $path)
+host()                             // scheme + host
+script_name(); uri();              // current URI (script name stripped)
+
+// Navigation (all of these die)
+redirect(string $url = "/");
+back(?string $add);                // back to REFERER, with an optional suffix
+refresh();
+abort(int $code = 418, $message = null);   // JSON on AJAX
+
+// Request
+method();                          // honours the _method override in POST
+inputMethod(string $method = "GET");        // <input type="hidden" name="_method">
+request(?string $name, $val = null);        // read / whole array / write
+getQuery(array $adds = [], array $except = [], bool $string = true);
+ip();
+getBrowser();                      // ['name','version','platform',...]
+
+// Shortcuts
+view(...); route(...); config(...); _l(...); csrf();
+e($value, bool $emptycheck = false);        // htmlspecialchars, '-' when empty
+globals(string $name, $value = null);
+
+// Filesystem
+findFile($file, $ext = null, $path = null);
+scan_dir($dir); rrmdir($dir);
+file_put_contents2($file, $content, $flags = 0);   // creates the directory
+
+// Misc
+dump(...$vars); hl(mixed $v, int $d = 0);
+secondsToHours($seconds);
+is_https_supported(string $host);
+MySQLcreateDatabase($host, $dbname, $user, $pass, $name);
+```
+
+## Route — `zFramework\Core\Route`
+
+```php
+Route::any|get|post|patch|put|delete(string $url, $callback)   // chainable with ->name()
+Route::resource(string $url, string $controller)
+Route::redirect(string $url, string $to, int $status = 302)
+Route::name(string $name)                    // names the last route
+Route::find(string $name, array $data = [], bool $return_bool = false)   // = route()
+Route::has(string $keyword): bool
+Route::pre(string $prefix, ?string $namePrefix = null)          // url + name prefix
+Route::middleware(array $list, $callback = null)
+Route::noCSRF()
+Route::group(\Closure $callback)
+```
+
+Resource mapping:
+
+| Method | URL | Controller |
+|---|---|---|
+| GET | `/` | `index` |
+| GET | `/create` | `create` |
+| GET | `/{id}` | `show` |
+| GET | `/{id}/edit` | `edit` |
+| POST | `/` | `store` |
+| PATCH/PUT | `/{id}` | `update` |
+| DELETE | `/{id}` | `delete` |
+
+Controller methods receive route parameters as arguments; type-hinted `Request` subclasses are
+validated and injected automatically.
+
+## DB / Model — `zFramework\Core\Facades\DB`, `Abstracts\Model`
+
+### Model properties
+
+```php
+public $table; public $db; public $primary; public $guard = [];
+public $created_at; public $updated_at; public $deleted_at; public $deleted_at_type;
+public $observe;                    // Observer class
+public $special_columns;            // for Auth (email/password/passwordencode)
+public $_not_found = 'Not found.';  // message for firstOrFail/findOrFail
+public function beginQuery()        // prepended to every query
+```
+
+### Building a query
+
+```php
+select(string|array $select)
+where(...)          whereOr(...)      whereNot(...)     whereOrNot(...)
+having(...)         havingOr(...)     havingNot(...)    havingOrNot(...)
+whereIn(string $column, array $in, string $prev = "AND")
+whereNotIn(string $column, array $in, string $prev = "AND")
+whereBetween(string $column, $start, $stop, string $prev = 'AND')
+whereNotBetween(string $column, $start, $stop, string $prev = 'AND')
+whereRaw(string $sql, array $data = [], string $prev = "AND")     // named bindings
+join(string $type, string $model, string $on = "")                // INNER/LEFT/RIGHT/FULL OUTER
+orderBy(array $data)     // ['created_at' => 'DESC']
+groupBy(array $data)
+limit(int $startPoint = 0, $getCount = null)
+withRealOrder(string $as = 'real_order', string $direction = 'DESC')
+fetchType(?string $type)          // 'unique' | 'keypair'
+closureMode(bool $mode = true)    // false → do not bind relation closures to rows
+sqlDebug(bool $mode)
+```
+
+`where()` is variadic: `where('a', 1)`, `where('a', '>', 1)`, or grouped
+`where([['status','published'], ['views','>',50,'OR']])`.
+
+### Running it
+
+```php
+get(): array            first(): array          count(): int
+find(string $value)      findOrFail(string $value)
+firstOrFail(mixed $exception = null)
+insert(array $sets, bool $just_insert = false): array|int
+update(array $sets): int          delete(): int
+updateOrInsert(array $sets)
+paginate(int $per_page = 20, string $page_id = 'page', ?string $cache_id = null): array
+prepare(string $sql, array $data = []): object     // raw PDO statement
+```
+
+`paginate()` returns: `items, item_count, shown, start, per_page, page_count, current_page,
+links` (`links` is a closure: `$r['links']()` or `$r['links']('partials.pagination')`).
+
+### Schema / connection
+
+```php
+table(string $table)     columns(): array        columnsLength(): array
+compareColumnsLength(array $data): array         forgetScheme()
+connection(): object|bool
+beginTransaction()  commit()  rollback()          // requires InnoDB
+```
+
+### Relations (`Traits\DB\RelationShips`)
+
+```php
+with(string ...$relations)
+hasOne / hasMany (string $model, $value, ?string $column = null)
+belongsTo(string $model, $value, ?string $column = null)
+belongsToMany(...)            belongsToManyWithPivot(...)
+hasManyThrough(...)           hasOneThrough(...)
+morphOne / morphMany (string $model, string $morphName, $value, ?string $type = null)
+morphTo(array $values, string $morphName)
+morphToMany(...)              morphedByMany(...)
+hasManyCount(string $model, $value, ?string $column = null): int
+hasRelation(string $model, $value, ?string $column = null): bool
+findRelation(string $model, string $value, ?string $column = null)
+
+// Pivot
+attach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue, array $extra = [])
+detach($pivotTable, $foreignKey, $foreignValue, ?$relatedKey = null, ?$relatedValue = null)
+sync($pivotTable, $foreignKey, $foreignValue, $relatedKey, array $relatedValues, array $extra = [])
+toggleAttach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue, array $extra = [])
+```
+
+`use zFramework\Core\Traits\DB\softDelete;` enables soft deletes. Behaviour comes from
+`config/model.php` (`deleted_at_type`: `'date'` or `'bool'`).
+
+## Facades
+
+### Auth
+```php
+Auth::attempt(array $fields = [], bool $staymein = false): bool
+Auth::login(array $user): bool          Auth::token_login(string $token): bool
+Auth::check(): bool                     Auth::user()
+Auth::id(): ?int                        Auth::logout(): bool
+Auth::model(): User                     Auth::encodePassword(?string $plain)
+Auth::forgetCache(string|int|null $id = null)
+```
+
+### Session / Alerts / Cookie / JustOneTime
+```php
+Session::set(string $key, mixed $value): self
+Session::get(string $key): mixed        Session::delete(string $key): self
+Session::flush()                        Session::callback(\Closure $cb): mixed
+
+Alerts::success|danger|warning|info(string $text): self
+Alerts::name(string $name): self        // a separate channel
+Alerts::get(bool $unset_after_get = false): array    // [[$type, $message], ...]
+Alerts::unset()
+
+Cookie::set(string $key, string $value, ?int $expires = null): bool
+Cookie::get(string $key)                Cookie::delete(string $key): bool
+
+JustOneTime::set(string $name, mixed $value): self   // lives for one request
+JustOneTime::get(string $name): mixed
+```
+
+### Response
+```php
+Response::json(array $data, ?string $flags = null)
+Response::header(string $name, string $value, bool $replace = true)
+Response::status(?int $code = null): int
+Response::addination(string $key, mixed $data)     // attach an extra field to the JSON response
+```
+
+### Cache
+```php
+Cache::cache(string $name, $callback, int $timeout = 5)       // session-scoped (per user)
+Cache::remove(string $name): bool      Cache::clear(): bool
+
+GlobalCache::cache(string $name, \Closure $cb, ?int $timeout = null)   // APCu, all requests
+GlobalCache::apcu(): bool              GlobalCache::remove()/clear()
+
+Redis::available(string $for = 'cache'): bool
+Redis::get/set/delete(string $key, ..., string $for = 'cache')
+Redis::push/pop/size(string $key, ..., string $for = 'queue')
+```
+
+### Queue / Defer
+```php
+Queue::push(array|string $job, array $payload = [], string $queue = 'default'): bool
+Queue::pop(string $queue = 'default', int $timeout = 5): ?array
+Queue::size(string $queue = 'default'): int
+Queue::run(array $entry)                Queue::retry(array $entry, int $maxAttempts = 3)
+// worker: php terminal queue work {queue}
+// shipped jobs: zFramework\Core\Jobs\SendMail, SendPushNotifications
+
+Defer::after(\Closure $job, string $label = '')   // runs after the response is sent
+Defer::pending(): bool                  Defer::flush()
+```
+
+### Mail
+```php
+Mail::to(string $mail): self   ->cc(...)  ->bcc(...)  ->clearTo()/clearCc()/clearBcc()
+Mail::set(array $mailConfig)                     // override config/mail.php
+Mail::send(array $data): bool                    // queues it when queueing is enabled
+Mail::sendNow(array $data): bool                 // always immediate
+```
+
+### Str / Date / Lang / Config / Crypter / Csrf
+```php
+Str::limit($text, 50, '...')      Str::wordLimit($text, 3, '...')
+Str::rand(int $length = 5, bool $unique = false)
+Str::slug($text, '-')             Str::base64UrlEncode/Decode()
+
+Date::now('d.m.Y H:i')            Date::format(?string $date, 'd.m.Y')
+Date::timestamp('-0 days')        Date::timeago($date)      Date::timediff($t1, $t2)
+Date::setLocale(string $set)      Date::locale()
+
+Lang::locale(?string $lang = null, bool $syncCookie = true)
+Lang::currentLocale(): string     Lang::list(): array
+Lang::get(string $name, array $data = [])        // = _l()
+
+Config::get(string $config, bool $returnbool = true)   // 'app.debug' dot notation
+Config::set(string $config, array $sets, bool $compare = false)
+Config::exists(string $config)   Config::framework(string $key)   Config::clearCache()
+
+Crypter::encode/decode(string)   Crypter::encodeArray(array, array $except = [])/decodeArray(array)
+
+Csrf::get(): string   Csrf::set()   Csrf::unset()   Csrf::compare(string $token): bool
+Csrf::check(bool $alwaysTrue = false): bool        Csrf::remainTimeOut(): int
+```
+
+### cURL / Http
+```php
+cURL::set(string $url)->post(mixed $fields = [])->headers(array $h)
+    ->file($fieldname, $filename, $content, $mime = 'text/plain')
+    ->options(array $opts)->send(?\Closure $callback = null)
+
+Http::isAjax(): bool             Http::abort(int $code = 418, $message = null)
+```
+
+### File / Folder / Assets / _Array
+```php
+File::upload(string $path, array $file, array $options = []): string|array|false
+    // options: ['accept' => ['jpg','png'], 'size' => bytes]
+File::save(string $path, string $file): string           // downloads a remote URL
+File::download(string $file): never
+File::resizeImage(string $file, array $sizes = [], ?string $new_name = null)
+File::convertImage(string $file, string $to)
+File::delete(string $file): bool
+File::humanFileSize(float $bytes, int $decimals = 2)
+File::removePublic(string $name): string
+
+Folder::make/delete(string $path): bool        Folder::size(string $path): array|false
+
+Assets::list(string $dir, array $extensions = [...])
+Assets::cssMinify($css)          Assets::jsMinify($js)
+
+_Array::paginate(array $data, int $per_page = 20, string $page_id = 'page')
+_Array::compare(array $a1, array $a2, \Closure $callback): array
+```
+
+### PushNotification
+```php
+PushNotification::app(string $app): self
+PushNotification::toUser(int|array $users): self       toTopic(string|array $topics): self
+PushNotification::toSubscription(array $subscription): self     toAll(): self
+PushNotification::ttl(int $seconds): self              urgency(string $urgency): self
+PushNotification::collapse(string $topic): self
+PushNotification::send(array|string $payload): array
+PushNotification::dispatch(string $app, array $subscriptions, array $payload, array $options = [])
+PushNotification::subscribe(array $input, ?int $user_id = null, array $topics = [], ?string $app = null)
+PushNotification::unsubscribe(string $endpoint, ?string $app = null): int
+PushNotification::client(?string $app = null): array
+```
+Usage: `references/recipes.md` → "Push notifications" and README §21.
+
+## View — `zFramework\Core\View`
+```php
+View::view(string $view_name, array $data = [])          // = view()
+View::directive(string $key, $callback)
+View::bind(string $view, \Closure $callback)
+View::clearCache()
+View::setSettings(array $config)                          // the framework sets this; leave it
+```
+Root: `resource/views`. `view('a.b.c')` → `resource/views/a/b/c.php`.
+Module view: `blog.views.client.pages.index` → `modules/blog/views/client/pages/index.php`.
+
+## Terminal — `php terminal <module> <command>`
+
+```bash
+# Scaffolding
+php terminal make model|controller|request|middleware|migration|seeder|observer {Name}
+       [--resource] [--module=blog] [--table=x] [--dbname=x]
+
+# Database
+php terminal db migrate [--fresh] [--force] [--seed] [--all] [--module=blog] [--db=x] [--path=x]
+php terminal db seed [--db=x]
+php terminal db backup [--compress] [--separate]
+php terminal db restore [--db=x]
+
+# Modules
+php terminal module create {name}
+
+# Routes
+php terminal route cache | clear | list
+
+# Cache
+php terminal cache clear views|sessions
+
+# Queue
+php terminal queue work {queue}        php terminal queue size {queue}
+
+# Push
+php terminal push-notification keys {app} | test | send {app} --title= --body= --url= --user= --all
+                              | subscribers {app} | prune {app} --failures=10
+
+# Security / release / server
+php terminal security key [--regen]
+php terminal release make [--name=x] [--date=Y-m-d] [--minify]
+php terminal run [--host=0.0.0.0] [--port=8080] [--opcache]
+php terminal run roadrunner serve|reset|workers|stop
+php terminal bench run                  # request cost measurement
+php terminal state check                # reports statics that would leak in a worker
+php terminal help
+```
