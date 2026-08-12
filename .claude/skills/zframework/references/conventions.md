@@ -55,6 +55,32 @@ findings.
 - If long-running workers (RoadRunner) are a target: `php terminal state check` reports statics
   that leak across requests — give every class that adds a static a `flushRequestState()`.
 
+## Keeping this skill current
+
+These files are hand-written prose, not generated. Nothing regenerates them, so a change to the
+framework's public surface that does not reach them leaves the skill quietly wrong — and a wrong
+signature is worse than a missing one, because it gets used without checking.
+
+**When a change touches the framework's public surface, update the matching reference in the same
+commit.** That means: a new or renamed facade/helper/model method, a changed signature or default,
+a new terminal command or flag, a new config key, a new view directive, a new validator rule.
+
+| Changed | Update |
+|---|---|
+| A method on a facade, helper, or the DB layer | `references/api.md` |
+| A terminal command or its flags | `references/api.md` (Terminal section) |
+| A config key, or a `connections.php` option | `references/config.md` |
+| AutoSSL, cPanel, analyzer, worker runtime | `references/infrastructure.md` |
+| A new subsystem worth knowing exists at all | the inventory table in `SKILL.md` |
+| A decision that should not be "fixed" later, or a trap worth warning about | this file |
+
+Application code — a new controller, model, migration, view — changes nothing here. This is about
+`zFramework/` only.
+
+Two habits that keep it honest: read the signature off the source when writing it down rather than
+from memory, and delete an entry when the thing it describes goes away. A stale entry outlives the
+code it documented and there is nothing to catch it.
+
 ## Code style
 
 - Application code lives in `App/` and `modules/`; `zFramework/` is the core, touched only to fix
