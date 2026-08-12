@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use zFramework\Core\Abstracts\Controller;
 use zFramework\Core\Facades\Auth;
-use zFramework\Core\Facades\Notification;
+use zFramework\Core\Facades\PushNotification\PushNotification;
 use zFramework\Core\Facades\Response;
 
 /**
@@ -23,7 +23,7 @@ class PushNotificationController extends Controller
      */
     public function config()
     {
-        return Response::json(Notification::client(request('app') ?: null));
+        return Response::json(PushNotification::client(request('app') ?: null));
     }
 
     /**
@@ -36,7 +36,7 @@ class PushNotificationController extends Controller
         $topics = array_filter(array_map('trim', (array) (request('topics') ?: [])));
 
         try {
-            $subscription = Notification::subscribe([
+            $subscription = PushNotification::subscribe([
                 'endpoint' => (string) request('endpoint'),
                 'keys'     => [
                     'p256dh' => (string) request('p256dh'),
@@ -62,7 +62,7 @@ class PushNotificationController extends Controller
      */
     public function unsubscribe()
     {
-        Notification::unsubscribe((string) request('endpoint'));
+        PushNotification::unsubscribe((string) request('endpoint'));
         return Response::json(['status' => 1]);
     }
 }

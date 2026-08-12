@@ -1,15 +1,16 @@
 <?php
 
-namespace zFramework\Core\Facades;
+namespace zFramework\Core\Facades\PushNotification;
 
 use App\Models\PushNotificationSubscriptions;
+use zFramework\Core\Facades\Queue;
+use zFramework\Core\Facades\Redis;
 use zFramework\Core\Helpers\Date;
-use zFramework\Core\PushNotification\Channel;
 
 /**
  * Push notifications: reach a user who is not on the site.
  *
- *   Notification::toUser($user['id'])->send([
+ *   PushNotification::toUser($user['id'])->send([
  *       'title' => 'Order shipped',
  *       'url'   => '/orders/812',
  *   ]);
@@ -18,15 +19,15 @@ use zFramework\Core\PushNotification\Channel;
  * several products can share one installation without reaching each other's
  * subscribers. The to* methods are filters and combine:
  *
- *   Notification::app('admin')->toTopic('orders')->send(...)
- *   Notification::toUser([3, 9])->toTopic('billing')->send(...)  // both must match
- *   Notification::toAll()->send(...)
+ *   PushNotification::app('admin')->toTopic('orders')->send(...)
+ *   PushNotification::toUser([3, 9])->toTopic('billing')->send(...)  // both must match
+ *   PushNotification::toAll()->send(...)
  *
  * The transport is a [Channel](../PushNotification/Channel.php). Sends go
  * through the queue when configured - a broadcast is one HTTPS request per
  * subscriber - and inline without redis, same outcome.
  */
-class Notification
+class PushNotification
 {
     /**
      * Application these filters and this send belong to.

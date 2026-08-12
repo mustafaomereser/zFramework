@@ -1,6 +1,6 @@
 <?php
 
-namespace zFramework\Core\PushNotification;
+namespace zFramework\Core\Facades\PushNotification;
 
 /**
  * What every delivery transport has to do.
@@ -11,7 +11,7 @@ namespace zFramework\Core\PushNotification;
  * Only three things differ per transport: what a subscription must contain,
  * how one message is delivered, and what the client needs to subscribe.
  * Targeting, payloads, retries and pruning are the same either way and live in
- * [Notification](../Facades/Notification.php).
+ * [PushNotification](PushNotification.php).
  */
 abstract class Channel
 {

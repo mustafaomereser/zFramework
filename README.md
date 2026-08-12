@@ -2040,7 +2040,7 @@ the phone in a pocket. Web push is a browser standard: no account with a
 vendor, no SDK, no native app. Chrome, Firefox, Edge and Safari 16.4+.
 
 ```php
-Notification::toUser($user['id'])->send([
+PushNotification::toUser($user['id'])->send([
     'title' => 'Order shipped',
     'body'  => 'Tracking number 123456789',
     'url'   => '/orders/812',
@@ -2094,11 +2094,11 @@ says what will be sent, never on page load.
 The `to*` methods are filters and combine:
 
 ```php
-Notification::toUser($id)->send('Your report is ready');   // one user's devices
-Notification::toUser([3, 9])->toTopic('billing')->send([...]); // both must match
-Notification::toTopic('news')->send([...]);                // whoever asked for it
-Notification::toAll()->send([...]);                        // every subscriber
-Notification::toSubscription($row)->send([...]);           // one known device
+PushNotification::toUser($id)->send('Your report is ready');   // one user's devices
+PushNotification::toUser([3, 9])->toTopic('billing')->send([...]); // both must match
+PushNotification::toTopic('news')->send([...]);                // whoever asked for it
+PushNotification::toAll()->send([...]);                        // every subscriber
+PushNotification::toSubscription($row)->send([...]);           // one known device
 ```
 
 Topics are what the device subscribed with, not what the message is about — a
@@ -2108,7 +2108,7 @@ makes "only tell me about billing" work without a preferences table.
 ### The payload
 
 ```php
-Notification::toAll()
+PushNotification::toAll()
     ->urgency('high')       // very-low | low | normal | high
     ->ttl(3600)             // how long the push service holds it for an offline device
     ->collapse('basket')    // a newer message with this topic replaces the undelivered one
@@ -2124,7 +2124,7 @@ Notification::toAll()
 
 `icon`, `badge` and `url` come from the application's `defaults` in
 `config/push-notification.php` when not given. A string payload is a title:
-`Notification::toAll()->send('Deploy finished')`.
+`PushNotification::toAll()->send('Deploy finished')`.
 
 **Payloads are small.** The limit is 4078 bytes after encryption headers —
 send an identifier and let the service worker fetch the rest.
@@ -2144,7 +2144,7 @@ only accepts a message signed by the key it subscribed with.
 ```
 
 ```php
-Notification::app('admin')->toTopic('errors')->send([...]);
+PushNotification::app('admin')->toTopic('errors')->send([...]);
 ```
 
 ```js
@@ -2203,7 +2203,7 @@ decrypt.
 ### Another channel
 
 Web push is one implementation of
-[`Channel`](zFramework/Core/PushNotification/Channel.php) — deliver one
+[`Channel`](zFramework/Core/Facades/PushNotification/Channel.php) — deliver one
 message, validate one subscription, tell the client what it needs. An
 application that later wants FCM for its android build extends that class and
 names it in config; nothing in the call sites changes.

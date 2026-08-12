@@ -3,10 +3,10 @@
 namespace zFramework\Kernel\Modules;
 
 use App\Models\PushNotificationSubscriptions;
-use zFramework\Core\Facades\Notification;
+use zFramework\Core\Facades\PushNotification\PushNotification as PushNotificationFacade;
 use zFramework\Core\Facades\Str;
-use zFramework\Core\PushNotification\Encryption;
-use zFramework\Core\PushNotification\VAPID;
+use zFramework\Core\Facades\PushNotification\Encryption;
+use zFramework\Core\Facades\PushNotification\VAPID;
 use zFramework\Kernel\Terminal;
 
 class PushNotification
@@ -79,7 +79,7 @@ class PushNotification
 
         if ($encryption && $signature) return Terminal::text("\n[color=green]Web push works on this installation.[/color]");
 
-        Terminal::text("\n[color=red]Web push cannot deliver here.[/color] [color=dark-gray]Both checks need ext-openssl with prime256v1;\nsee the openssl.cnf note in zFramework/Core/PushNotification/.[/color]");
+        Terminal::text("\n[color=red]Web push cannot deliver here.[/color] [color=dark-gray]Both checks need ext-openssl with prime256v1;\nsee the openssl.cnf note in zFramework/Core/Facades/PushNotification/.[/color]");
     }
 
     /**
@@ -109,12 +109,12 @@ class PushNotification
         ]);
 
         try {
-            Notification::app($app);
-            if ($user)  Notification::toUser((int) $user);
-            if ($topic) Notification::toTopic($topic);
-            if ($all)   Notification::toAll();
+            PushNotificationFacade::app($app);
+            if ($user)  PushNotificationFacade::toUser((int) $user);
+            if ($topic) PushNotificationFacade::toTopic($topic);
+            if ($all)   PushNotificationFacade::toAll();
 
-            $report = Notification::send($payload);
+            $report = PushNotificationFacade::send($payload);
         } catch (\Throwable $e) {
             return Terminal::text('[color=red]' . $e->getMessage() . '[/color]');
         }

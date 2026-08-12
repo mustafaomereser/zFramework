@@ -3,10 +3,10 @@
 namespace zFramework\Core\Jobs;
 
 use App\Models\PushNotificationSubscriptions;
-use zFramework\Core\Facades\Notification;
+use zFramework\Core\Facades\PushNotification\PushNotification;
 
 /**
- * Queue job for a chunk of subscriptions handed over by Notification::send().
+ * Queue job for a chunk of subscriptions handed over by PushNotification::send().
  * Run by `php terminal queue work push-notification`.
  *
  * Ids travel in the payload, not the rows: a device may unsubscribe before the
@@ -26,7 +26,7 @@ class SendPushNotifications
         $subscriptions = (new PushNotificationSubscriptions)->whereIn('id', $ids)->get();
         if (!$subscriptions) return;
 
-        Notification::dispatch(
+        PushNotification::dispatch(
             $payload['app'] ?? (config('push-notification.default') ?: 'app'),
             $subscriptions,
             $payload['payload'] ?? [],

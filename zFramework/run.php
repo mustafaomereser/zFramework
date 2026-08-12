@@ -59,7 +59,7 @@ class Run
         \zFramework\Core\Facades\Alerts::class,
         \zFramework\Core\Facades\Response::class,
         \zFramework\Core\Facades\Mail::class,
-        \zFramework\Core\Facades\Notification::class,
+        \zFramework\Core\Facades\PushNotification\PushNotification::class,
         \zFramework\Core\Facades\cURL::class,
         \zFramework\Core\Route::class,
         \zFramework\Core\View::class,
@@ -219,11 +219,9 @@ class Run
 
         global $storage_path;
         try {
-            # includes
             self::includer(FRAMEWORK_PATH . '/modules', false);
             self::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php');
 
-            # set view options
             \zFramework\Core\View::setSettings([
                 'caches'  => "$storage_path/views",
                 'dir'     => BASE_PATH . '/resource/views',

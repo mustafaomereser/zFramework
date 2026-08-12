@@ -1,12 +1,12 @@
 <?php
 
-namespace zFramework\Core\PushNotification\Channels;
+namespace zFramework\Core\Facades\PushNotification\Channels;
 
 use zFramework\Core\Facades\cURL;
 use zFramework\Core\Facades\Str;
-use zFramework\Core\PushNotification\Channel;
-use zFramework\Core\PushNotification\Encryption;
-use zFramework\Core\PushNotification\VAPID;
+use zFramework\Core\Facades\PushNotification\Channel;
+use zFramework\Core\Facades\PushNotification\Encryption;
+use zFramework\Core\Facades\PushNotification\VAPID;
 
 /**
  * The browser's own push standard: RFC 8030 delivery, RFC 8291 encryption,

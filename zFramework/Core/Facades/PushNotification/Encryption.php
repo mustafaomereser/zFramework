@@ -1,6 +1,6 @@
 <?php
 
-namespace zFramework\Core\PushNotification;
+namespace zFramework\Core\Facades\PushNotification;
 
 use zFramework\Core\Facades\Str;
 
