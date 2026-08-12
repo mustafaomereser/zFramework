@@ -55,9 +55,11 @@ of you re-explaining it every session, or watching it hand-write a feature that 
 ```
 .claude/skills/zframework/
   SKILL.md                    inventory of what exists, the core API, the Laravel reflexes that break here
-  references/api.md           exact signatures for every facade, helper and DB method
-  references/recipes.md       end-to-end recipes: CRUD, protected area, API, module, upload, push, production
-  references/conventions.md   settled decisions, known traps, performance notes
+  references/api.md              exact signatures for every facade, helper, DB method and job
+  references/recipes.md          end-to-end recipes: CRUD, protected area, API, module, upload, push, production
+  references/config.md           every key in every config file, and what each PDO option costs
+  references/infrastructure.md   AutoSSL, cPanel, query analyzer, RoadRunner workers, backups, error handling
+  references/conventions.md      settled decisions, known traps, performance notes
 ```
 
 It is written off the source, so treat it as a second index into this README rather than a

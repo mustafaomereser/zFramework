@@ -288,6 +288,39 @@ _Array::paginate(array $data, int $per_page = 20, string $page_id = 'page')
 _Array::compare(array $a1, array $a2, \Closure $callback): array
 ```
 
+### Jobs, ResponseSignal, kernel helpers
+```php
+// A queue job is a class with handle(array $payload): void
+zFramework\Core\Jobs\SendMail::handle(array $payload)
+zFramework\Core\Jobs\SendPushNotifications::handle(array $payload)
+// enqueue: Queue::push(SendMail::class, ['to' => ..., 'subject' => ...], 'default')
+
+// Thrown by abort()/redirect()/refresh()/downloads instead of die().
+// Extends \Error, not \Exception, so a catch(\Exception) around a controller
+// cannot swallow its own redirect.
+new ResponseSignal(int $status = 0, array $headers = [], string $body = '')
+$signal->send(): void
+
+// CLI side
+zFramework\Kernel\Helpers\Ask::do(string $question, object $callback)   // interactive prompt
+zFramework\Kernel\Helpers\Module::getModules()
+zFramework\Kernel\Helpers\Module::classMethods($class, $flags = ReflectionMethod::IS_PUBLIC)
+zFramework\Kernel\Helpers\MySQLBackup::__construct($db, $config = []) ->backup()
+zFramework\Kernel\Terminal::begin(array $commands)     // run a command from PHP; --web for html output
+```
+
+### Seeder — `database/seeders/`
+```php
+class Seeder
+{
+    public function __construct() { }
+    public function seed()    { (new User)->insert([...]); }
+    public function destroy() { (new User)->prepare('TRUNCATE users'); return $this; }  // must return $this
+}
+```
+Run with `php terminal db seed`, or `db migrate --seed`. A migration can carry its own with
+`public static function oncreateSeeder(?string $db = null)`, which runs when that table is created.
+
 ### PushNotification
 ```php
 PushNotification::app(string $app): self
@@ -302,6 +335,11 @@ PushNotification::unsubscribe(string $endpoint, ?string $app = null): int
 PushNotification::client(?string $app = null): array
 ```
 Usage: `references/recipes.md` → "Push notifications" and README §21.
+
+### AutoSSL, cPanel, Query Analyzer, RoadRunner
+Signatures live in `references/infrastructure.md` — it covers ACME certificate issuance
+(http-01 and dns-01/wildcard), the eight cPanel classes, query analysis, the worker runtime and
+its state rules, backups and releases.
 
 ## View — `zFramework\Core\View`
 ```php

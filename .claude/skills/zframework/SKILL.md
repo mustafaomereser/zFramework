@@ -71,7 +71,11 @@ README.md       73 KB full reference; section numbers below
 | cPanel management (domains, dns, cron, db, mail, ssl) | `cPanel\*` | §18 |
 | Web push notifications (VAPID) | `PushNotification::` | §21 |
 | MySQL backup/restore | `php terminal db backup/restore` | §14 |
+| Seeding | `database/seeders/` + `oncreateSeeder()` on a migration | §2.6 |
+| Query analysis (EXPLAIN, missing indexes) | `profiling.queryAnalyze`, `sqlDebug(true)` | §19 |
 | Profiling / recording real requests | `modules/Profiling` | §19 |
+| Long-running workers | RoadRunner + `php terminal state check` | §20 |
+| Routes that must not be cached | `route/dynamic/` | §1 |
 
 Full signatures: **`references/api.md`** — when unsure about a method's parameters, look there
 rather than guessing.
@@ -258,10 +262,15 @@ Keep it that way (see `references/conventions.md`).
 
 ## Reference files
 
-- **`references/api.md`** — exact signatures for every facade, helper and DB method. Check here
-  when unsure about parameter order.
+- **`references/api.md`** — exact signatures for every facade, helper, DB method, job and CLI
+  helper. Check here when unsure about parameter order.
 - **`references/recipes.md`** — end-to-end recipes: CRUD screen, protected area, JSON API,
   creating a module, file upload, mail + queue, push notifications, localisation, going to production.
+- **`references/config.md`** — every key in every config file, plus `database/connections.php`
+  and what each PDO option costs.
+- **`references/infrastructure.md`** — AutoSSL (ACME), the cPanel classes, the query analyzer,
+  profiling, RoadRunner workers and their state rules, `route/dynamic/`, backups, releases,
+  error handling.
 - **`references/conventions.md`** — deliberate design decisions (leave them alone), known traps,
   performance notes.
 
