@@ -13,6 +13,7 @@ class Run
      * @param roadrunner (optional) run under RoadRunner instead of the dev server
      * @param --host (optional)
      * @param --port (optional)
+     * @param --opcache (optional) run with opcache.
      */
     public static function begin()
     {
