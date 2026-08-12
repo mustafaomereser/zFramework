@@ -19,9 +19,14 @@ class Auth
 
     static $database_exists = false;
     /**
-     * Columns for match
+     * Column names to match on, when the user model names none.
      */
-    static private $columns = ['email' => 'email', 'password' => 'password', 'passwordencode' => 'crypter'];
+    private const COLUMNS = ['email' => 'email', 'password' => 'password', 'passwordencode' => 'crypter'];
+
+    /**
+     * What the model actually named, resolved on first use.
+     */
+    static private ?array $columns = null;
 
     private static function getMode()
     {
@@ -52,17 +57,32 @@ class Auth
 
     public static function init()
     {
-        # Read from the class, not an instance of it: constructing the model
-        # opens a database connection, and init() runs on every request - paid
-        # by every visitor who never asks who they are. Reflection reads the two
-        # default properties without running the constructor.
-        $defaults = (new \ReflectionClass(User::class))->getDefaultProperties();
-        $database = $defaults['db'] ?? array_keys($GLOBALS['databases']['connections'] ?? [])[0] ?? null;
+        # Which connection the user model declares, read from the class rather
+        # than an instance: constructing the model opens that connection, and
+        # init() runs on every request - paid by every visitor who never asks who
+        # they are. Model::__construct() reads $db off the property too, so a
+        # model that sets it anywhere later would not work in the first place.
+        $database = (new \ReflectionClass(User::class))->getDefaultProperties()['db']
+            ?? array_keys($GLOBALS['databases']['connections'] ?? [])[0]
+            ?? null;
 
         self::$database_exists = isset($GLOBALS['databases']['connections'][$database]);
-        if (!empty($defaults['special_columns'])) self::$columns = $defaults['special_columns'];
 
         if (self::$database_exists && !self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
+    }
+
+    /**
+     * Column names the user model authenticates with.
+     *
+     * Read off the model, so a model that builds them in its constructor works
+     * the same as one that declares them - but only when something actually
+     * authenticates, which is the only time they are needed.
+     *
+     * @return array
+     */
+    private static function columns(): array
+    {
+        return self::$columns ??= (array) (self::model()->special_columns ?? self::COLUMNS);
     }
 
     /**
@@ -143,14 +163,14 @@ class Auth
             # ever handing the hash to the browser.
             Redis::set("auth:$token", [
                 'uid' => $user['id'],
-                'pwd' => $user[self::$columns['password']] ?? '',
+                'pwd' => $user[self::columns()['password']] ?? '',
             ], self::TOKEN_TTL, 'session');
 
             (self::getMode())::set('auth-session', $token);
             return true;
         }
 
-        (self::getMode())::set('auth-password', $user[self::$columns['password']]);
+        (self::getMode())::set('auth-password', $user[self::columns()['password']]);
         (self::getMode())::set('auth-token', $user['id']);
         return true;
     }
@@ -162,7 +182,7 @@ class Auth
      */
     public static function token_login(string $token): bool
     {
-        return self::login(self::model()->select('id, ' . self::$columns['password'])->where('api_token', $token)->first());
+        return self::login(self::model()->select('id, ' . self::columns()['password'])->where('api_token', $token)->first());
     }
 
     /**
@@ -203,7 +223,7 @@ class Auth
 
         if (!$user_id = (self::getMode())::get('auth-token')) return false;
         if (self::$user == null) self::$user = self::model()->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
-        if (!@self::$user['id'] || !hash_equals((string) self::$user[self::$columns['password']], (string) (self::getMode())::get('auth-password'))) return self::logout();
+        if (!@self::$user['id'] || !hash_equals((string) self::$user[self::columns()['password']], (string) (self::getMode())::get('auth-password'))) return self::logout();
         return self::$user;
     }
 
@@ -236,7 +256,7 @@ class Auth
         if (!@$user['id']) return self::logout();
 
         # Password changed since this token was issued -> the session is over.
-        if (!hash_equals((string) ($user[self::$columns['password']] ?? ''), (string) ($session['pwd'] ?? ''))) return self::logout();
+        if (!hash_equals((string) ($user[self::columns()['password']] ?? ''), (string) ($session['pwd'] ?? ''))) return self::logout();
 
         return self::$user = self::model()->setClosures([$user])[0];
     }
@@ -265,7 +285,7 @@ class Auth
     public static function encodePassword(null|string $plain): string|bool
     {
         if (is_null($plain)) return false;
-        return match (self::$columns['passwordencode']) {
+        return match (self::columns()['passwordencode']) {
             'bcrypt' => password_hash($plain, PASSWORD_BCRYPT),
             'md5'    => md5($plain),
             default  => Crypter::encode($plain),
@@ -282,14 +302,14 @@ class Auth
     {
         if (self::check()) return false;
 
-        $user  = self::model()->select('id, api_token, ' . self::$columns['password']);
-        $plain = $fields[self::$columns['password']] ?? null;
-        unset($fields[self::$columns['password']]);
+        $user  = self::model()->select('id, api_token, ' . self::columns()['password']);
+        $plain = $fields[self::columns()['password']] ?? null;
+        unset($fields[self::columns()['password']]);
         foreach ($fields as $key => $value) $user->where($key, $value);
         $user = $user->first();
 
-        $hash  = $user[self::$columns['password']] ?? '';
-        $valid = self::$columns['passwordencode'] === 'bcrypt' ? password_verify($plain, $hash) : self::encodePassword($plain) === $hash;
+        $hash  = $user[self::columns()['password']] ?? '';
+        $valid = self::columns()['passwordencode'] === 'bcrypt' ? password_verify($plain, $hash) : self::encodePassword($plain) === $hash;
         if (!@$user['id'] || ($plain !== null && !$valid)) return false;
 
         if (@$user['id']) {
