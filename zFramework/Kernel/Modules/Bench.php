@@ -469,16 +469,16 @@ class Bench
         # lookup in the same request costs.
         $t = hrtime(true);
         Config::get('app');
-        Config::get('view');
-        Config::get('route');
+        Config::framework('view');
+        Config::framework('route');
         $configRead = hrtime(true) - $t;
         self::line('config files, first read (3)', self::ms($configRead), 'include - opcache territory');
         self::budget('config includes', $configRead);
 
         $t = hrtime(true);
         Config::get('app');
-        Config::get('view');
-        Config::get('route');
+        Config::framework('view');
+        Config::framework('route');
         self::line('config files, second read (3)', self::ms(hrtime(true) - $t), 'memoised');
 
         $t = hrtime(true);
