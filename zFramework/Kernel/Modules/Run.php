@@ -45,7 +45,11 @@ class Run
 
         echo "\e[33mServer running on \e[32m`" . getHostName() . "`\e[33m host: \e[31m\n";
 
-        shell_exec("php -S $server:$port");
+        $opcache = "";
+
+        if (in_array('--opcache', Terminal::$parameters)) $opcache = '-d opcache.enable=1 -d opcache.enable_cli=1 -d opcache.validate_timestamps=1 -d opcache.revalidate_freq=0 -d opcache.memory_consumption=128 -d opcache.max_accelerated_files=20000';
+
+        shell_exec("php $opcache -S $server:$port");
     }
 
     /**
@@ -110,10 +114,12 @@ class Run
     {
         $windows = str_starts_with(strtolower(PHP_OS_FAMILY), 'win');
 
-        foreach ([
-            BASE_PATH . '/rr' . ($windows ? '.exe' : ''),
-            BASE_PATH . '/zFramework/vendor/bin/rr' . ($windows ? '.exe' : ''),
-        ] as $candidate) if (is_file($candidate)) return $candidate;
+        foreach (
+            [
+                BASE_PATH . '/rr' . ($windows ? '.exe' : ''),
+                BASE_PATH . '/zFramework/vendor/bin/rr' . ($windows ? '.exe' : ''),
+            ] as $candidate
+        ) if (is_file($candidate)) return $candidate;
 
         # Fall back to whatever is on PATH.
         $which = @shell_exec(($windows ? 'where rr' : 'command -v rr') . ' 2>' . ($windows ? 'nul' : '/dev/null'));
