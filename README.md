@@ -979,7 +979,7 @@ On failure: adds `Alerts::danger()` for each error and redirects back. On AJAX r
 // App/Middlewares/Auth.php
 class Auth
 {
-    public function __construct()
+    public function attempt()
     {
         if (\Auth::check()) return true;
         // return false / nothing → middleware declined
@@ -1110,7 +1110,7 @@ eventually be a queue push rather than the task itself.
 
 ```php
 // Returns cached value if not expired, otherwise runs the closure and caches the result
-$posts = Cache::cache('recent_posts', fn() => (new Post)->limit(10)->get(), ttl: 300);
+$posts = Cache::cache('recent_posts', fn() => (new Post)->limit(10)->get(), timeout: 300);
 
 Cache::remove('recent_posts');   // invalidate one key
 Cache::clear();                  // clear all session cache
@@ -1119,7 +1119,7 @@ Cache::clear();                  // clear all session cache
 ### Global Cache (APCu — shared across all requests)
 
 ```php
-$stats = GlobalCache::cache('site_stats', fn() => computeStats(), ttl: 3600);
+$stats = GlobalCache::cache('site_stats', fn() => computeStats(), timeout: 3600);
 
 GlobalCache::remove('site_stats');
 GlobalCache::clear();
