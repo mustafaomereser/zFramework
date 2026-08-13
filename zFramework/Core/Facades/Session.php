@@ -99,6 +99,19 @@ class Session
      */
     public static function delete(string $key): self
     {
+        # A visitor with no session cookie has nothing stored under any key, so
+        # there is nothing here to delete - and finding that out through load()
+        # would cost the whole session: a file on disk, a Set-Cookie, and the
+        # no-store/no-cache headers PHP's cache limiter sends with every
+        # session_start(). That matters because Run::handle() clears alerts and
+        # one-time data after every request, including requests that never
+        # touched the session at all - a landing page ends up uncacheable, and
+        # every anonymous visitor leaves a session file behind.
+        #
+        # The status check covers a session opened by something other than
+        # load(), where $cache is null but the data is real.
+        if (self::$cache === null && session_status() === PHP_SESSION_NONE && !isset($_COOKIE[session_name()])) return new self();
+
         self::load();
 
         # Deleting a key that is not there changes nothing, so the session is not
