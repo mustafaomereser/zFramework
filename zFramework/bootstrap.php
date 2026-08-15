@@ -1,6 +1,6 @@
 <?php
 define('FRAMEWORK_PATH', __DIR__);
-define('FRAMEWORK_VERSION', '3.0.0');
+define('FRAMEWORK_VERSION', '3.1.0');
 $app_config = include(BASE_PATH . "/config/app.php");
 if ($app_config['x-powered-by'] ?? true) header("X-Powered-By: zFramework v" . FRAMEWORK_VERSION);
 
