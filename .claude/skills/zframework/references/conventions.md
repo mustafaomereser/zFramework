@@ -71,6 +71,7 @@ a new terminal command or flag, a new config key, a new view directive, a new va
 | A terminal command or its flags | `references/api.md` (Terminal section) |
 | A config key, or a `connections.php` option | `references/config.md` |
 | AutoSSL, cPanel, analyzer, worker runtime | `references/infrastructure.md` |
+| A view directive, or anything about how `resource/views` is laid out | `references/views.md`, and `templates/` if the skeletons change |
 | A new subsystem worth knowing exists at all | the inventory table in `SKILL.md` |
 | A decision that should not be "fixed" later, or a trap worth warning about | this file |
 

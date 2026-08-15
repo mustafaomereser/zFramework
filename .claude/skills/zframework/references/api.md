@@ -352,6 +352,11 @@ View::setSettings(array $config)                          // the framework sets 
 Root: `resource/views`. `view('a.b.c')` → `resource/views/a/b/c.php`.
 Module view: `blog.views.client.pages.index` → `modules/blog/views/client/pages/index.php`.
 
+**The directive list, the directory contract and the engine's real behaviour are in
+`references/views.md`.** Do not write a template from memory of Blade — several directives that
+look obvious (`@for`, `{!! !!}`, `{{-- --}}`, `@csrf`) do not exist here, and `{{ }}` does not
+escape.
+
 ## Terminal — `php terminal <module> <command>`
 
 ```bash
