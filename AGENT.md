@@ -1,60 +1,64 @@
-# zFramework — Agent Kuralları
+# zFramework — Agent Rules
 
-Laravel'e benziyor, Laravel değil. En büyük fark: **satırlar dizi, nesne değil** —
-`$post['title']`, `$post->title` değil.
+It looks like Laravel and it is not Laravel. The biggest difference: **rows are arrays,
+not objects** — `$post['title']`, never `$post->title`.
 
-Uygulama kodu yazmadan önce `zframework` skill'ini çağır
-(`.claude/skills/zframework/`): API envanteri, doğru imzalar ve "bu zaten var,
-yeniden yazma" listesi orada. Aşağıdakiler skill çağrılmasa da geçerli olan
-kurallar — hepsi pratikte tekrar tekrar bozulduğu için burada.
+Before writing application code, load the `zframework` skill
+(`.claude/skills/zframework/`) — the API inventory, the correct signatures and the
+"this already exists, don't rewrite it" list live there. What follows holds even in
+sessions that never load it, because these are the rules that keep getting broken.
 
-## View
+## Views
 
-- **Yer sabit.** `resource/views/<uygulama>/main.php` o katmanın tek layout'u.
-  Her sayfa grubu bir **dizin + `index.php`** — `pages/welcome.php` değil,
-  `pages/welcome/index.php`. Create ve edit tek dosya: `edit-or-create.php`.
-- **Yeni katman (admin/panel) üç parça birlikte gelir:** `<katman>/main.php`,
-  `errors/<katman>/{main,404}.php` ve o katmanı koruyan yetki middleware'i.
-  Hangi hata görünümünün kullanılacağını `Http::$error_view` seçiyor.
-- **`@extends` / `@section` / `@yield` / `@include` kullan.** Layout'suz sayfa,
-  render olsa bile yanlış.
-- **Çıktı ve döngüde düz PHP tercih edilir:** `<?= $x ?>`, `<?php foreach (): ?>`,
-  `<?php if (): ?>`. Sebep: `{{ }}` **escape etmiyor**, `<?= ?>`'ye derleniyor —
-  güvenlik farkı yok, sadece daha kırılgan. Escape gerekiyorsa `<?= e($x) ?>`.
-  **Kullanıcı `{{ }}` isterse ona uy**, bu bir tercih, yasak değil.
-- **Bu directive'ler framework'te yok**, yazarsan sayfaya harfiyen basılır:
-  `@for` `@while` `@switch` `{!! !!}` `{{-- --}}` `@csrf` `@method` `@auth`
-  `@guest` `@push` `@stack` `@component` `@each`.
-  Karşılıkları: `<?php for (): ?>`, `<?= csrf() ?>`, `<?= inputMethod('PATCH') ?>`.
-- Derlenmiş view'ları temizleme: `php terminal cache clear views`.
+- **The location is fixed.** `resource/views/<app>/main.php` is that layer's only layout.
+  Every page group is a **directory with `index.php` in it** — `pages/welcome.php` is
+  wrong, `pages/welcome/index.php` is right. Create and edit share one file:
+  `edit-or-create.php`.
+- **A new interface layer (admin, panel) is three things shipping together:**
+  `<layer>/main.php`, `errors/<layer>/{main,404}.php`, and the middleware guarding it.
+  `Http::$error_view` selects which error views render; without switching it, a 404
+  inside `/admin` renders the public layout.
+- **Always use `@extends` / `@section` / `@yield` / `@include`.** A page without a layout
+  is wrong even when it renders.
+- **Prefer plain PHP for output and control flow:** `<?= $x ?>`, `<?php foreach (…): ?>`,
+  `<?php if (…): ?>`. The reason is not style: `{{ }}` **does not escape** — it compiles
+  to a bare `<?= ?>` — so it buys no safety and parses more fragilely. Use `<?= e($x) ?>`
+  when you need escaping. **If the user asks for `{{ }}`, use it**; this is a default,
+  not a ban.
+- **These directives do not exist** and will be printed literally into the page:
+  `@for` `@while` `@switch` `{!! !!}` `@csrf` `@method` `@auth` `@guest` `@push`
+  `@stack` `@component` `@each`. Use `<?php for (…): ?>`, `<?= csrf() ?>`,
+  `<?= inputMethod('PATCH') ?>`.
+- Clear compiled views with `php terminal cache clear views`.
 
-## Route ve controller
+## Routes and controllers
 
-- **CRUD'u elle yazma.** `Route::resource('/posts', PostController::class)` yedi
-  route'u adlandırılmış olarak kuruyor. `$crud` gibi bir dizi kurup `foreach` ile
-  route üretmek yasak.
-- `Route::resource` iki parametre alıyor; `->only()` / `->except()` / `->names()`
-  yok. Yıkım metodu **`delete`**, `destroy` değil. Prefix `Route::pre()`,
-  `prefix()` değil. `Route::where()` yok.
-- **Controller'ı elle yazma:** `php terminal make controller X --resource` tam
-  olarak `Route::resource`'un çağırdığı yedi metodu üretiyor.
-- **Tek taban sınıf: `zFramework\Core\Abstracts\Controller`** ve bilerek boş.
-  `AbstractCrudController` benzeri bir ara katman veya interface uydurma.
-- **`php terminal route list` tam liste değil** — şartlı kayıtlı, modül `status`'üne
-  bağlı veya `route/dynamic/` altındaki route'lar görünmeyebilir. Gerçek listeyi
-  öğrenmek için `route/web.php`, `route/api.php`, `route/dynamic/*` ve etkin
-  modüllerin `route/web.php` dosyalarını oku.
+- **Never hand-write CRUD.** `Route::resource('/posts', PostController::class)` registers
+  all seven routes, named. Building a `$crud` array and looping it to generate routes is
+  not allowed.
+- `Route::resource` takes two arguments — there is no `->only()`, `->except()`,
+  `->names()`, no `apiResource`, no `Route::where()`. The destroy method is **`delete`**,
+  not `destroy`. The prefix helper is `Route::pre()`, not `prefix()`.
+- **Never hand-write the controller:** `php terminal make controller X --resource` emits
+  exactly the seven methods `Route::resource` dispatches to.
+- **The only base class is `zFramework\Core\Abstracts\Controller`**, and it is empty by
+  design. Do not invent an `AbstractCrudController` or an interface layer above it.
+- **`php terminal route list` is not the full table.** Routes registered conditionally,
+  behind a module's `status`, or under `route/dynamic/` may not appear. To know what is
+  registered, read `route/web.php`, `route/api.php`, `route/dynamic/*` and each enabled
+  module's `route/web.php`.
 
-## Genel
+## General
 
-- Controller `return view(...)` yapar, echo etmez.
-- Dosya yükleme `File::upload()` ile — elle `mkdir`/`move_uploaded_file` yok.
-- `$_SESSION`'a doğrudan dokunma; `Session::set/get` istek başına tek okuma/yazma
-  yapıyor, etrafından dolaşmak bunu bozuyor.
-- `errorHandler()` dönüşünü echo etme — sayfayı iki kez basar.
-- `zFramework/` altında public yüzeyi değiştiren her iş, **aynı commit'te** skill'i
-  de günceller. Hangi değişikliğin hangi dosyaya gittiği:
+- Controllers `return view(...)`; they do not echo it.
+- File uploads go through `File::upload()` — no hand-rolled `mkdir` /
+  `move_uploaded_file`.
+- Do not touch `$_SESSION` directly. `Session::set/get` reads once and writes once per
+  request; going around it breaks that.
+- Never echo the return value of `errorHandler()` — it prints the page a second time.
+- **Any change to the public surface under `zFramework/` updates the skill in the same
+  commit.** Which change goes to which file:
   `.claude/skills/zframework/references/conventions.md` → "Keeping this skill current".
 
-Tam kurallar ve kopyalanacak iskeletler:
-`.claude/skills/zframework/references/views.md` ve `.claude/skills/zframework/templates/`.
+Full rules and copyable skeletons: `.claude/skills/zframework/references/views.md`
+and `.claude/skills/zframework/templates/`.
