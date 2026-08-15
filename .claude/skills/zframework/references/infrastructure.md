@@ -247,7 +247,7 @@ going too fast". The body is JSON, because there is no `errors/*/429` view and a
 retry logic more often than by a person:
 
 ```json
-{"status": false, "message": "Too many requests.", "try_again_in": 59}
+{"status": 429, "message": "Too many requests. Try again in 59 seconds.", "try_again_in": 59}
 ```
 
 Sends `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After` with it.

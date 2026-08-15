@@ -1403,7 +1403,7 @@ body is JSON — there is no `errors/*/429` view, and a 429 is read by retry log
 than by a person:
 
 ```json
-{"status": false, "message": "Too many requests.", "try_again_in": 59}
+{"status": 429, "message": "Too many requests. Try again in 59 seconds.", "try_again_in": 59}
 ```
 
 `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After` go with it.

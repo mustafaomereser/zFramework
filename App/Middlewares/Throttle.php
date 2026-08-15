@@ -51,8 +51,10 @@ class Throttle
             'Content-Type' => 'application/json; charset=utf-8',
             'Retry-After'  => (string) $hit['retry_after'],
         ], json_encode([
-            'status'       => false,
-            'message'      => 'Too many requests.',
+            # The http status, not a boolean - `false` says something went wrong
+            # without saying what, and the caller has to branch on it anyway.
+            'status'       => 429,
+            'message'      => 'Too many requests. Try again in ' . $hit['retry_after'] . ' seconds.',
             'try_again_in' => $hit['retry_after'],
         ], JSON_UNESCAPED_UNICODE));
     }
