@@ -175,7 +175,13 @@ class Page
         # would keep replaying the stale token from its own cache.
         if (str_contains($body, "name='_token'") || str_contains($body, 'name="_token"')) {
             self::noCache();
-            Log::warning('Page not cached: it contains a csrf token.', ['url' => $_SERVER['REQUEST_URI'] ?? '/']);
+
+            # Debug only. The safe behaviour - staying live - is automatic, and a
+            # page that will never be cacheable would otherwise write this line on
+            # every single request forever.
+            if (Config::get('app.debug') ?? false)
+                Log::warning('Page not cached: it contains a csrf token.', ['url' => $_SERVER['REQUEST_URI'] ?? '/']);
+
             return;
         }
 

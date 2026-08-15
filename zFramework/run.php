@@ -357,9 +357,26 @@ class Run
         # Defer::after() was called - autoload is deliberately not triggered.
         # Unconditionally meant compiling Defer.php on every request for
         # nothing.
-        # Store what was rendered, if the page asked to be cached. Before Defer,
-        # so deferred work cannot change what gets stored.
-        if ($pageCache && ($ttl = \zFramework\Core\Facades\Response::cacheTtl()))
+        # A page that declared itself cacheable but did not end in 200 must not be
+        # cached anywhere - not stored, and not by the browser either. The usual
+        # way in is a controller constructor calling Page::cache() before the
+        # method aborts, so the declaration is made before the outcome is known.
+        #
+        # Checked outside the page-cache guard because the headers went out
+        # regardless of whether the store is enabled. Costs one method call on a
+        # request that never declared anything.
+        $ttl = \zFramework\Core\Facades\Response::cacheTtl();
+
+        if ($ttl && \zFramework\Core\Facades\Response::status() !== 200) {
+            \zFramework\Core\Facades\Response::header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+            \zFramework\Core\Facades\Response::header('Pragma', 'no-cache');
+            \zFramework\Core\Facades\Response::header('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT');
+            $ttl = 0;
+        }
+
+        # Store what was rendered. Before Defer, so deferred work cannot change
+        # what gets stored.
+        if ($pageCache && $ttl)
             \zFramework\Core\Facades\Page::store((string) ob_get_contents(), $ttl);
 
         if (class_exists(\zFramework\Core\Facades\Defer::class, false)) \zFramework\Core\Facades\Defer::flush();
