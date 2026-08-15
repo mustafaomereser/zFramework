@@ -14,6 +14,9 @@ function MySQLcreateDatabase($host = "localhost", $dbname = "dbname", $user = "r
 
 function e($value, $emptycheck = false)
 {
+    # Cast first: {{ }} compiles to this, so it is handed whatever a template
+    # happens to hold, and strlen(null) is deprecated as of 8.1.
+    $value = (string) $value;
     return strlen($value) ? htmlspecialchars($value) : ($emptycheck ? '-' : null);
 }
 

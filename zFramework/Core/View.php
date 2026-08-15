@@ -505,14 +505,29 @@ class View
     }
 
     /**
-     * Parse {{ $variable }} into PHP echo short tags.
-     * Example: {{ $title }} => <?=$title?>
+     * Parse the two echo forms into PHP short tags.
+     *
+     *   {{ $title }}    escaped  => <?=e($title)?>
+     *   {!! $html !!}   raw      => <?=$html?>
+     *
+     * Raw is handled first so its delimiters are gone before the {{ }} pattern
+     * runs; the two cannot overlap, but the order makes that obvious.
+     *
+     * {{ }} escapes because that is the safe default to reach for without
+     * thinking. Anything that emits markup - csrf(), inputMethod(), a rendered
+     * partial - has to say so with {!! !!}.
      */
     public static function parseVariables(): void
     {
         self::$view = preg_replace_callback(
-            '/\{\{(.*?)\}\}/',
+            '/\{!!(.*?)!!\}/s',
             fn($variable) => '<?=' . trim($variable[1]) . '?>',
+            self::$view
+        );
+
+        self::$view = preg_replace_callback(
+            '/\{\{(.*?)\}\}/',
+            fn($variable) => '<?=e(' . trim($variable[1]) . ')?>',
             self::$view
         );
     }

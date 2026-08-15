@@ -16,8 +16,8 @@ that read as familiar are exactly the ones that differ:
 |---|---|
 | `$post->title` | rows are **arrays** — `$post['title']` |
 | `Route::resource(…)->only([…])` | no options at all; and it is `delete`, not `destroy` |
-| `{{ $x }}` escapes | it does **not** — compiles to a bare `<?= ?>` |
-| `@for`, `{!! !!}`, `@csrf`, `@method` | do not exist; they print into the page |
+| `{{ $x }}` escapes | it does, and `{!! $x !!}` is the raw form — but plain `<?= ?>` is the house style |
+| `@for`, `@csrf`, `@method`, `@push` | do not exist; they print into the page |
 | `prefix()` / `where()` on routes | `Route::pre()`; no parameter constraints exist |
 | `$request->validated()` returns only valid data | it also aborts the request on failure — and via `Validator` directly it can return a value that failed |
 
@@ -310,12 +310,15 @@ resource/views/errors/<app>/{main,404}.php       every layer ships its own error
 Always use `@extends('app.main')`, `@section('body') … @endsection`, `@yield`, `@include`.
 
 Prefer plain PHP for output and control flow — `<?= $x ?>`, `<?php foreach (…): ?>`,
-`<?php if (…): ?>`. `{{ }}` and `@foreach` work, but `{{ }}` **does not escape** (it compiles
-to a bare `<?= ?>`), so it buys nothing over `<?= ?>` and parses more fragilely. Use
-`<?= e($x) ?>` when you need escaping. If the user asks for `{{ }}`, use it.
+`<?php if (…): ?>` — which is how the surrounding code is written. `{{ }}` and `@foreach`
+work too; if the user asks for them, use them.
+
+`{{ $x }}` **escapes** (compiles to `<?= e($x) ?>`) and `{!! $x !!}` is the raw form. Anything
+emitting markup must use the raw one or it renders as visible text: `{!! csrf() !!}`,
+`{!! inputMethod('PATCH') !!}`, `{!! $posts['links']() !!}`.
 
 These do **not** exist and will be printed literally into the page:
-`@for` `@while` `@switch` `{!! !!}` `@auth` `@guest` `@csrf` `@method` `@push`
+`@for` `@while` `@switch` `@auth` `@guest` `@csrf` `@method` `@push`
 `@stack` `@component` `@each`. Use `<?= csrf() ?>` and `<?= inputMethod('PATCH') ?>`.
 
 What does exist: `@if @elseif @else @endif`, `@foreach @endforeach`,

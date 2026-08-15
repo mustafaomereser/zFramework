@@ -183,7 +183,7 @@ layer stays one layer.
 
 ### Does not exist — writing these prints them literally into the HTML
 
-`@for` · `@while` · `@switch` · `{!! !!}` · `@auth` · `@guest` · `@csrf` · `@method` ·
+`@for` · `@while` · `@switch` · `@auth` · `@guest` · `@csrf` · `@method` ·
 `@push` · `@stack` · `@component` · `@each` · `@endphp` inside a nested `@php` ·
 `@section` nested in another `@section`
 
@@ -196,13 +196,22 @@ Method spoof → `<?= inputMethod('PATCH') ?>`.
 |---|---|
 | `@foreach($x as $y) … @endforeach` | `<?php foreach ($x as $y): ?> … <?php endforeach ?>` |
 | `@if(…) … @endif` | `<?php if (…): ?> … <?php endif ?>` |
-| `{{ $x }}` | `<?= $x ?>` |
+| `{{ $x }}` | `<?= e($x) ?>` — what it compiles to |
+| `{!! $x !!}` | `<?= $x ?>` — what it compiles to |
 
-Why, since it looks like a downgrade: **`{{ }}` does not escape.** `View.php:480-487`
-compiles `{{ $x }}` to `<?= $x ?>` and nothing else — no `htmlspecialchars`, and there is no
-`{!! !!}` to opt out of. So the directive buys zero safety over `<?= ?>` and costs
-single-quote-only parsing plus regex fragility. When output must be escaped, that is
-`<?= e($x) ?>` either way.
+**The two echo forms are not interchangeable.** `{{ }}` escapes, `{!! !!}` does not, so
+anything that emits markup must use the raw form or it renders as visible text:
+
+```php
+{!! csrf() !!}                  {{-- an <input> tag --}}
+{!! inputMethod('PATCH') !!}
+{!! $posts['links']() !!}       {{-- rendered pagination --}}
+{{ $post['title'] }}            {{-- plain value: escaped, correct --}}
+```
+
+Plain PHP stays the default here for style, not safety — `<?= e($x) ?>` and `<?= csrf() ?>`
+say exactly what they do without a regex in between, and the surrounding code is written that
+way. Both spellings accept single quotes only inside `{{ }}`.
 
 **If the user asks for `{{ }}` or `@foreach`, use them.** This is a default, not a ban. The
 ban is only on directives the engine does not implement.

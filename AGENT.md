@@ -25,12 +25,12 @@ sessions that never load it, because these are the rules that keep getting broke
 - **Always use `@extends` / `@section` / `@yield` / `@include`.** A page without a layout
   is wrong even when it renders.
 - **Prefer plain PHP for output and control flow:** `<?= $x ?>`, `<?php foreach (…): ?>`,
-  `<?php if (…): ?>`. The reason is not style: `{{ }}` **does not escape** — it compiles
-  to a bare `<?= ?>` — so it buys no safety and parses more fragilely. Use `<?= e($x) ?>`
-  when you need escaping. **If the user asks for `{{ }}`, use it**; this is a default,
-  not a ban.
+  `<?php if (…): ?>` — plain PHP is the house style and parses without a regex in between.
+  `{{ $x }}` escapes and `{!! $x !!}` does not, so anything printing markup (`csrf()`,
+  `inputMethod()`, a rendered partial) must use `{!! !!}`. **If the user asks for `{{ }}`,
+  use it**; this is a default, not a ban.
 - **These directives do not exist** and will be printed literally into the page:
-  `@for` `@while` `@switch` `{!! !!}` `@csrf` `@method` `@auth` `@guest` `@push`
+  `@for` `@while` `@switch` `@csrf` `@method` `@auth` `@guest` `@push`
   `@stack` `@component` `@each`. Use `<?php for (…): ?>`, `<?= csrf() ?>`,
   `<?= inputMethod('PATCH') ?>`.
 - **Templates render; they do not fetch or calculate.** No `new Post`, no

@@ -935,17 +935,21 @@ goes **inside** the section.
 @json($var)              — outputs json_encode($var)
 @dump($var)              — var_dump($var); does not die
 @dd($var)                — print_r($var); does not die either
-{{ $var }}               — echo, NOT escaped (compiles to <?= $var ?>)
+{{ $var }}               — escaped echo (compiles to <?= e($var) ?>)
+{!! $var !!}             — raw echo, for markup
 {{-- comment --}}        — stripped before anything else parses
 {{/* comment */}}        — the same thing, other spelling
 ```
 
-**`{{ }}` does not escape.** It compiles to a bare `<?= ?>`, so it is exactly as safe as
-writing one — use `<?= e($var) ?>` when the value must be escaped. There is no `{!! !!}`
-syntax, because there is nothing to opt out of.
+`{{ }}` escapes, so it is the one to reach for without thinking. Anything that emits markup —
+`csrf()`, `inputMethod()`, a rendered partial — has to say so with `{!! !!}`.
+
+> **Changed in 3.1.0.** `{{ }}` used to be a bare `<?= ?>` that escaped nothing, and `{!! !!}`
+> did not exist. Upgrading an older project: every `{{ }}` that prints markup needs to become
+> `{!! !!}`, or it will render as visible text. Plain values need no change.
 
 **These do not exist** and are printed into the page verbatim if you write them:
-`@for` `@while` `@switch` `{!! !!}` `@csrf` `@method` `@auth` `@guest` `@push` `@stack`
+`@for` `@while` `@switch` `@csrf` `@method` `@auth` `@guest` `@push` `@stack`
 `@component` `@each`. Use `<?php for (…): ?>`, `<?= csrf() ?>`, `<?= inputMethod('PATCH') ?>`.
 
 A comment is removed before any other parsing, so it may safely contain a `{{ }}` echo or an

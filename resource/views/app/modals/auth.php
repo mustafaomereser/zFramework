@@ -21,7 +21,7 @@
     <div class="tab-content">
         <div class="tab-pane fade show active" id="tab-signin" role="tabpanel" aria-labelledby="pills-home-tab">
             <form id="signin-form">
-                {{ csrf() }}
+                {!! csrf() !!}
                 <div class="form-group mb-2">
                     <input type="email" class="form-control" name="email"
                         placeholder="{{ _l('lang.email') }}" required>
@@ -45,7 +45,7 @@
 
         <div class="tab-pane fade" id="tab-signup" role="tabpanel" aria-labelledby="pills-profile-tab">
             <form id="signup-form">
-                {{ csrf() }}
+                {!! csrf() !!}
                 <div class="form-group mb-2">
                     <input type="text" class="form-control" name="username"
                         placeholder="{{ _l('lang.username') }}" required>
