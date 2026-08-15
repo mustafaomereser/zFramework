@@ -10,6 +10,13 @@ return [
         'same'      => 'value is not match {attribute-name}',
         'unique'    => 'already using.',
         'exists'    => 'that\'s not exists.',
+        'in'        => 'is not in the list. accepted: {allowed}.',
+        'not-in'    => 'cannot be used.',
+        'regex'     => 'is not in the expected format.',
+        'url'       => 'must be a valid http or https address.',
+        'date'      => 'is not a valid date.',
+        'between'   => 'is {now-val}, but must be between {min-val} and {max-val}.',
+        'confirmed' => 'does not match {other}.',
     ],
 
     'attributes' => [

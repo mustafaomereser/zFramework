@@ -10,6 +10,13 @@ return [
         'same'      => 'değer {attribute-name} ile aynı değil.',
         'unique'    => 'zaten kullanımda.',
         'exists'    => 'böyle bir veri yok.',
+        'in'        => 'listede yok. kabul edilenler: {allowed}.',
+        'not-in'    => 'kullanilamaz.',
+        'regex'     => 'istenen bicimde degil.',
+        'url'       => 'gecerli bir adres olmalidir (http veya https).',
+        'date'      => 'gecerli bir tarih degil.',
+        'between'   => 'girdiginiz {now-val}, {min-val} ile {max-val} arasinda olmalidir.',
+        'confirmed' => '{other} ile ayni degil.',
     ],
 
     'attributes' => [

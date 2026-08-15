@@ -11,15 +11,22 @@ use zFramework\Core\Validator\Rule;
 class Validator
 {
     private static array $ruleMap = [
-        'required' => Validator\Rules\Required::class,
-        'nullable' => Validator\Rules\Nullable::class,
-        'max'      => Validator\Rules\Max::class,
-        'min'      => Validator\Rules\Min::class,
-        'type'     => Validator\Rules\Type::class,
-        'email'    => Validator\Rules\Email::class,
-        'same'     => Validator\Rules\Same::class,
-        'exists'   => Validator\Rules\Exists::class,
-        'unique'   => Validator\Rules\Unique::class,
+        'required'  => Validator\Rules\Required::class,
+        'nullable'  => Validator\Rules\Nullable::class,
+        'max'       => Validator\Rules\Max::class,
+        'min'       => Validator\Rules\Min::class,
+        'type'      => Validator\Rules\Type::class,
+        'email'     => Validator\Rules\Email::class,
+        'same'      => Validator\Rules\Same::class,
+        'exists'    => Validator\Rules\Exists::class,
+        'unique'    => Validator\Rules\Unique::class,
+        'in'        => Validator\Rules\In::class,
+        'not-in'    => Validator\Rules\NotIn::class,
+        'regex'     => Validator\Rules\Regex::class,
+        'url'       => Validator\Rules\Url::class,
+        'date'      => Validator\Rules\Date::class,
+        'between'   => Validator\Rules\Between::class,
+        'confirmed' => Validator\Rules\Confirmed::class,
     ];
 
     /**
@@ -73,7 +80,10 @@ class Validator
 
             foreach ($validateList as $ruleString) {
                 if (str_contains($ruleString, ':')) {
-                    preg_match_all('/([\w$.()]+):(?:"([^"]*)"|([^\s;]+))/', $ruleString, $m, PREG_SET_ORDER);
+                    # The name charclass has to allow '-', or `not-in:a,b` is read
+                    # as `in:a,b` - the rule name is silently swapped for another
+                    # one that exists, and the check runs inverted.
+                    preg_match_all('/([\w$.()-]+):(?:"([^"]*)"|([^\s;]+))/', $ruleString, $m, PREG_SET_ORDER);
                     $out = [];
                     foreach ($m as $match) $out[$match[1]] = isset($match[2]) && $match[2] !== '' ? $match[2] : $match[3];
                     $case       = array_key_first($out);
