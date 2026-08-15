@@ -303,12 +303,16 @@ class Run
     {
         ob_start();
 
-        # Full-page cache. Off by default, and the config read is what keeps
-        # Page.php from being autoloaded while it is - a disabled feature
-        # must not cost a file. A hit ends the request here: no middlewares, no
-        # route matching, no session.
-        $pageCache = (bool) (\zFramework\Core\Facades\Config::framework('response.page-cache') ?? false);
-        if ($pageCache && \zFramework\Core\Facades\Page::serve()) return;
+        # Full-page cache. Nothing is stored unless a page called Page::cache(),
+        # so this config is a kill switch rather than a second opt-in.
+        #
+        # is_dir() before the class: until something has actually been cached the
+        # directory does not exist, so a site that never declares a cacheable
+        # page pays one stat and never loads Page.php. A hit ends the request
+        # here - no middlewares, no route matching, no session.
+        global $storage_path;
+        $pageCache = (bool) (\zFramework\Core\Facades\Config::framework('response.page-cache') ?? true);
+        if ($pageCache && is_dir("$storage_path/pages") && \zFramework\Core\Facades\Page::serve()) return;
 
         try {
             # autoload.php executes the global middlewares rather than declaring

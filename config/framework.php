@@ -90,7 +90,11 @@ return [
         # without running the route. Headers alone only reach the browser and
         # any CDN; this is what stops PHP re-rendering. Never applies to a
         # request carrying an auth cookie, or to anything but GET.
-        'page-cache' => false,
+        #
+        # A kill switch, not an opt-in: nothing is stored unless a page calls
+        # Page::cache(). Turn it off to take the whole mechanism out of the
+        # request path.
+        'page-cache' => true,
     ],
 
     /**
