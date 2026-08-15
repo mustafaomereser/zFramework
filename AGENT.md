@@ -72,6 +72,19 @@ sessions that never load it, because these are the rules that keep getting broke
   registered, read `route/web.php`, `route/api.php`, `route/dynamic/*` and each enabled
   module's `route/web.php`.
 
+## Updating the framework
+
+- **Never run `php terminal update` unless the user asked for it, in words, in this
+  conversation.** It replaces the framework core; `--config`, `--force` and `--rollback` all
+  change files too. Seeing that a newer version exists is not permission to install it — say so
+  and wait.
+- `--check` is read-only. Even so, at most once or twice in a session, and only when the
+  version is relevant to what is being asked.
+- **After the user updates, reconciling the application is your job.** Read the config report:
+  a setting that moved to another file, a key the new version added that should be set, a key
+  it dropped that is still being read. The merge stops where it would have to guess, and that
+  is exactly the part that needs someone who can read the code.
+
 ## General
 
 - Controllers `return view(...)`; they do not echo it.

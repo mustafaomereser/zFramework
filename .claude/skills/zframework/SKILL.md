@@ -56,6 +56,14 @@ produces code that fights the framework.
    layer, `main.php` as that layer's only layout, and every page group a directory with
    `index.php` in it. See `references/views.md` — it is the most-violated part of this skill.
 
+And one that is not a mistake but a rule:
+
+10. **Never run `php terminal update` unless the user asked for it in words.** It replaces the
+    framework core, and so do `--config`, `--force` and `--rollback`. Noticing that a newer
+    version exists is not permission to install it — say so and wait. `--check` is read-only,
+    but even that belongs at most once or twice in a session, when the version actually
+    matters to the question.
+
 ## Directory map
 
 ```
@@ -115,7 +123,7 @@ README.md       73 KB full reference; section numbers below
 | Rate limiting | `RateLimit::` + `Throttle` middleware | §6.1 |
 | Scheduled tasks, one crontab line | `Schedule::` + `schedule/` | §14.1 |
 | A cron job in its own process | `cron/` + `cron/cron.php` | §14.2 |
-| Updating the framework core | `php terminal update` | §14.3 |
+| Updating the framework core | `php terminal update` — **only when asked** | §14.3 |
 
 Full signatures: **`references/api.md`** — when unsure about a method's parameters, look there
 rather than guessing.

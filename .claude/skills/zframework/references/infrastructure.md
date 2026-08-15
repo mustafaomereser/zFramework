@@ -259,6 +259,22 @@ should not share a tick with anything else.
 
 ## Updating the framework — `php terminal update`
 
+> **Never run this unless the user asked for it, in this conversation, in words.**
+>
+> It replaces the framework core. "The version looks old", "there is an update available" and
+> "it would fix this bug" are not permission — say so and wait. The same goes for `--config`,
+> `--force` and `--rollback`: all four change files.
+>
+> `--check` is read-only and safe. Even so, run it at most once or twice in a session, when the
+> version is actually relevant to what is being asked. It is not a thing to do on arrival, and
+> not a thing to do again because the conversation got long.
+>
+> **After the user runs an update, reconciling the application is your job.** Read the config
+> report and act on it: a setting that moved to another file, a key the new version added that
+> the application should set, a key it dropped that is still being read. The merge deliberately
+> stops where it would have to guess, and what it leaves is exactly the part that needs someone
+> who can read the code.
+
 ```bash
 php terminal update --check       # is a newer version out
 php terminal update               # update the core, report config drift
