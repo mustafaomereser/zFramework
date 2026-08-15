@@ -109,7 +109,7 @@ replacement for it.
 ### HTTP Methods
 
 ```php
-Route::get('/posts', fn() => view('posts.index'));
+Route::get('/posts', [PostController::class, 'index']);
 Route::post('/posts', [PostController::class, 'store']);
 Route::put('/posts/{id}', [PostController::class, 'update']);
 Route::patch('/posts/{id}', [PostController::class, 'update']);
@@ -145,6 +145,15 @@ Route::get('/posts', function (PostRepository $repo) {
 });
 ```
 
+This is a bare `new $type`, not a container — the class must be constructible with no
+arguments. It is how `Request` subclasses are injected and validated.
+
+URL parameters arrive as **named** arguments, so the handler's parameter name must match the
+placeholder: `/posts/{id}` needs `$id`, not `$postId`.
+
+The controller itself is built as `new $class($method)` — the constructor receives the name of
+the method about to run, as a string. Accept it or leave the parameter off.
+
 ### Redirect
 
 ```php
@@ -166,8 +175,25 @@ Registers 7 routes automatically:
 | /posts/create | GET | create() | posts.create |
 | /posts/{id} | GET | show($id) | posts.show |
 | /posts/{id}/edit | GET | edit($id) | posts.edit |
-| /posts/{id} | PUT / PATCH | update($id) | posts.update |
+| /posts/{id} | PATCH | update($id) | posts.update |
+| /posts/{id} | PUT | update($id) | *(unnamed)* |
 | /posts/{id} | DELETE | delete($id) | posts.delete |
+
+A route name is the table's array key, so naming both PATCH and PUT would have one overwrite
+the other — the PUT route is deliberately left unnamed. The destroy method is **`delete`**.
+
+`resource()` takes exactly two arguments: there is no `->only()`, `->except()` or `->names()`.
+For a subset, write those routes individually.
+
+**Write the root and resource routes last.** `Route::resource('/', HomeController::class)`
+registers `/{id}`, which matches every one-segment url and lets `show()` claim it — that is
+the point of mounting a resource at the root, and it means anything more specific must be
+defined above it. `route/dynamic/` is included after `route/web.php`, so a one-segment route
+there can never win against a root resource.
+
+```php
+php terminal make controller PostController --resource   # emits exactly these seven methods
+```
 
 ### Named Routes
 
@@ -215,19 +241,42 @@ route('admin.settings.general');
 Route::has('/admin');   // true if the current URI contains '/admin'
 ```
 
+**Splitting the name from the URL.** `pre()` takes a second argument that replaces the name
+segment for that level, so a URL can change without touching a single `route()` call site:
+
+```php
+Route::pre('/devices', '/assets')->group(fn() => Route::get('/list', …)->name('list'));
+// URL /devices/list  —  name assets.list
+
+Route::pre('/panel', '')->group(...);   // URL prefix that adds nothing to the name
+```
+
+That is what makes a translated URL practical:
+
+```php
+Route::pre('/' . _l('routes.admin.route'), '/admin')->group(function () {
+    Route::resource('/posts', Admin\PostController::class);   // always admin.posts.*
+});
+```
+
+The global middlewares run before the route files, so `_l()` already knows the visitor's
+locale. **This cannot be cached** — the route cache stores URLs as literal strings, so it
+would freeze whatever language the CLI had. Put groups like this in `route/dynamic/`, or leave
+`route.caching` off if most of the routing is dynamic.
+
 ### Forms
 
 ```html
 <!-- POST -->
 <form method="POST">
-    {{ csrf() }}
+    <?= csrf() ?>
     ...
 </form>
 
 <!-- PUT / PATCH / DELETE via hidden field -->
 <form action="/posts/1" method="POST">
-    {{ csrf() }}
-    {{ inputMethod('PATCH') }}
+    <?= csrf() ?>
+    <?= inputMethod('PATCH') ?>
     ...
 </form>
 ```
@@ -485,7 +534,25 @@ Auth::id();      // int|null — authenticated user's id
 
 // Hash a password using the configured method (bcrypt / md5 / crypter)
 Auth::encodePassword('plain-password');
+
+// Drop the cached user row after updating the current user (no-op without Redis)
+Auth::forgetCache();
 ```
+
+**Three things about `attempt()`:**
+
+1. The key named by `special_columns['password']` is verified; **every other key becomes a
+   `where()`** on the users table. So the array means "find the user by these columns, then
+   check this password".
+2. **With no password key there is no password check** — `Auth::attempt(['id' => 7])` logs that
+   user in. That is the impersonation path, and it means you must never pass unfiltered input:
+   `Auth::attempt(request())` with a body of `{"id":1}` logs the caller in as user 1. Name the
+   fields explicitly.
+3. **It returns `false` when someone is already logged in.** A false result is not always bad
+   credentials; call `Auth::logout()` first if you mean to switch users.
+
+Always write passwords through `Auth::encodePassword()` rather than `password_hash()` directly,
+or changing `passwordencode` silently breaks every login.
 
 **Password encode method** is configured via `App\Models\User::$special_columns['passwordencode']`:
 
@@ -830,9 +897,27 @@ try {
 
 ```php
 // From a controller:
-return view('posts.index', compact('posts'));        // resolves to resource/views/posts/index.php
-return View::view('posts.index', ['posts' => $posts]);
+return view('app.pages.posts.index', compact('posts'));   // resource/views/app/pages/posts/index.php
+return View::view('app.pages.posts.index', ['posts' => $posts]);
 ```
+
+`resource/views/` has a shape worth keeping: one directory per interface layer with that
+layer's only layout as `main.php`, and every page group a directory containing `index.php`.
+
+```
+resource/views/app/main.php                        the layout pages extend
+resource/views/app/pages/posts/index.php           list
+resource/views/app/pages/posts/edit-or-create.php  one file for both
+resource/views/errors/app/{main,404}.php           per-layer error pages
+```
+
+A page and its layout compile into **one file with a single `extract()`**, so they share every
+variable — a value set in the layout is visible inside the sections and the other way round,
+and a layout assignment overwrites what the controller passed under the same key. Name view
+data specifically (`$post`, not `$item`).
+
+Anything outside a `@section` in a template that `@extends` is discarded, so per-page setup
+goes **inside** the section.
 
 ### Directives
 
@@ -844,44 +929,75 @@ return View::view('posts.index', ['posts' => $posts]);
 @empty($var)                                          @endempty
 @php                                                  @endphp
 @include('partials.nav')
-@extends('layouts.app')
-@section('content')                                   @endsection
-@yield('content')
+@extends('app.main')
+@section('body')                                      @endsection
+@yield('body')
 @json($var)              — outputs json_encode($var)
-@dump($var)              — visual dump (does not die)
-@dd($var)                — visual dump + die
-{{ $var }}               — escaped output (htmlspecialchars)
-{!! $var !!}             — raw unescaped output
+@dump($var)              — var_dump($var); does not die
+@dd($var)                — print_r($var); does not die either
+{{ $var }}               — echo, NOT escaped (compiles to <?= $var ?>)
+{{-- comment --}}        — stripped before anything else parses
+{{/* comment */}}        — the same thing, other spelling
 ```
+
+**`{{ }}` does not escape.** It compiles to a bare `<?= ?>`, so it is exactly as safe as
+writing one — use `<?= e($var) ?>` when the value must be escaped. There is no `{!! !!}`
+syntax, because there is nothing to opt out of.
+
+**These do not exist** and are printed into the page verbatim if you write them:
+`@for` `@while` `@switch` `{!! !!}` `@csrf` `@method` `@auth` `@guest` `@push` `@stack`
+`@component` `@each`. Use `<?php for (…): ?>`, `<?= csrf() ?>`, `<?= inputMethod('PATCH') ?>`.
+
+A comment is removed before any other parsing, so it may safely contain a `{{ }}` echo or an
+`@include` that you do not want to run.
 
 ### Custom Directives
 
-```php
-// App/Providers/ViewProvider.php
-View::directive('alert', fn($type, $msg) => "<div class='alert alert-{$type}'>{$msg}</div>");
+The callback receives **one** argument — the single-quoted string inside the parentheses, or
+`null` when the directive is written without any. Opening and closing tags are two separate
+registrations.
 
-// Usage in .php view file:
-// @alert('success', 'Saved!')
+```php
+// App/Middlewares/ViewDirectives.php
+View::directive('page', fn($page) => '<?php if (($_GET["page"] ?? null) === ' . var_export($page, true) . '): ?>');
+View::directive('endpage', fn() => '<?php endif; ?>');
+
+// Usage in a view:
+// @page('2') ... @endpage
 ```
+
+Matching is by prefix, so registering `pag` would also swallow `@page`.
 
 ### View::bind — ViewProvider
 
-Inject variables automatically into specific views without passing them from every controller:
+Inject variables automatically into specific views without passing them from every controller.
+Bind the **layout** and every page that `@extends` it is covered — the bind runs when the
+parent is compiled, and again on a cache hit, so the data is never stale.
 
 ```php
 // App/Providers/ViewProvider.php
-View::bind('layouts.app', fn() => [
-    'user'   => Auth::user(),
-    'locale' => Lang::locale(),
+View::bind('app.main', fn() => [
+    'lang_list' => Lang::list(),
+    'user'      => Auth::user(),
 ]);
 ```
+
+This is where data the layout needs belongs. A layout that queries or computes cannot be
+rendered from a second controller without repeating the work.
 
 ---
 
 ## 4. Controller
 
+Generate one with `php terminal make controller PostController --resource`. The only base class
+is `zFramework\Core\Abstracts\Controller` and it is deliberately empty — there is no CRUD
+parent to build and no interface to implement.
+
 ```php
-class PostController
+use zFramework\Core\Abstracts\Controller;
+
+#[\AllowDynamicProperties]
+class PostController extends Controller
 {
     public function __construct()
     {
@@ -895,12 +1011,12 @@ class PostController
             ->orderBy(['created_at' => 'DESC'])
             ->paginate(20, 'page');
 
-        return view('posts.index', compact('posts'));
+        return view('app.pages.posts.index', compact('posts'));
     }
 
     public function show(int $id): mixed
     {
-        return view('posts.show', [
+        return view('app.pages.posts.show', [
             'post' => $this->post->findOrFail($id),
         ]);
     }
@@ -933,6 +1049,50 @@ class PostController
 }
 ```
 
+### Validating the input
+
+Two ways, both fine — pick per case rather than generating a Request class for every action.
+
+**A Request class** when the rules are endpoint-specific. Type-hint it and it is built,
+validated and injected; `validated()` returns only the listed keys, so passing it straight to
+`insert()` is safe from mass assignment.
+
+```php
+php terminal make request Post/StoreRequest
+```
+```php
+public function store(StoreRequest $request)
+{
+    $post = $this->post->insert($request->validated());
+    Alerts::success('Post created.');
+    return redirect(route('posts.index'));
+}
+```
+
+**A `setAll()` method** when store and update validate the same columns and share derived
+fields. `$except` is the point — on update the row being edited would otherwise collide with
+its own value on a `unique` rule:
+
+```php
+public function setAll($except = null)
+{
+    $v = Validator::validate($_REQUEST, [
+        'title' => ['required'],
+        'slug'  => ['nullable', 'unique:App\Models\Post' . ($except ? ";ex:$except" : '')],
+    ]);
+
+    $v['slug']    = Str::slug($v['title']);
+    $v['user_id'] = Auth::id();
+    return $v;
+}
+
+public function store()          { $this->post->insert($this->setAll()); … }
+public function update($id)      { $this->post->where('id', $id)->update($this->setAll($id)); … }
+```
+
+Either way, keep the derived fields in one place — never duplicate them across `store()` and
+`update()`.
+
 ---
 
 ## 5. Validator
@@ -949,27 +1109,55 @@ Validator::validate($_REQUEST, [
 // Custom attribute names in error messages
 Validator::validate($_REQUEST, ['email' => ['required', 'email']], ['email' => 'E-mail Address']);
 
-// With a callback — custom logic when validation fails
-Validator::validate($_REQUEST, ['title' => ['required']], [], function (array $errors) {
-    return Response::json($errors);
+// With a callback — custom logic when validation fails.
+// It receives ($errors, $passed). Its return value is discarded and execution
+// CONTINUES, so send a response from the calling code, not from in here.
+Validator::validate($_REQUEST, ['title' => ['required']], [], function (array $errors, array $passed) {
+    Alerts::danger('Could not save.');
 });
 ```
 
-On failure: adds `Alerts::danger()` for each error and redirects back. On AJAX requests, aborts with 400 + JSON errors.
+On failure an `Alerts::danger()` is raised where the rule failed, then one of three things
+happens:
+
+| Situation | What happens |
+|---|---|
+| AJAX request | `abort(400, Response::json($errors))` |
+| Normal request | `back()` — redirect to the referer, alerts waiting |
+| A callback was passed | the callback runs and **execution continues** |
+
+Without a callback the request is already over, which is why controllers do not check the
+result. **With one, check `$errors` yourself** — the returned array collects a field as soon as
+*any* rule on it passes, so a value that failed a later rule is still in there:
+
+```php
+$r = Validator::validate(['age' => '150'], ['age' => ['required', 'max:100']], [], fn($e, $s) => null);
+// $r === ['age' => '150'] — 'required' passed and wrote it, 'max' failed afterwards
+```
 
 **Rules:**
 
 | Rule | Description |
 |---|---|
 | `required` | Field must be present and non-empty |
-| `nullable` | Field may be empty or absent; skips further rules if empty |
-| `type:string` / `type:int` / `type:float` / `type:array` | PHP type check |
-| `min:N` | Minimum value (int/float) or minimum string/array length |
-| `max:N` | Maximum value (int/float) or maximum string/array length |
+| `nullable` | Field may be empty or absent. Every rule but `required` passes on an empty value anyway |
+| `type:string` / `type:int` / `type:float` / `type:bool` / `type:array` | Declares the type, and asserts the value can be read as it |
+| `min:N` | Minimum value for a number, minimum length for a string/array |
+| `max:N` | Maximum value for a number, maximum length for a string/array |
 | `same:other_field` | Must exactly match the value of `other_field` |
 | `email` | Must be a valid e-mail address |
 | `unique:Model;key:column` | Value must not already exist in the model's column |
 | `exists:Model;key:column` | Value must exist in the model's column |
+
+`unique` and `exists` also take `ex:` to exclude a row — `unique:App\Models\User;key:email;ex:5`
+is the update-form spelling, without which editing a row collides with its own value.
+
+**`type:` decides how `min`/`max` read the value.** Everything arriving from a form is a
+string, so `'150'` is detected as a number and `max:100` rejects it; `type:string` makes the
+same rule mean "at most 100 characters" and it passes. `int`, `str`, `bool` and `double` are
+accepted spellings.
+
+**`required` and `nullable` together throw** — an exception, not a validation failure. Pick one.
 
 ---
 
@@ -1011,6 +1199,21 @@ Route::pre('/admin')
     ->middleware([Auth::class, IsAdmin::class], fn($declines) => abort(403))
     ->group(function () { ... });
 ```
+
+Two things to know before relying on this:
+
+- **Pass the fallback closure.** On a route group, `error()` is never called — the router
+  supplies its own callback, and `error()` only runs in the no-callback branch, i.e. when you
+  call `Middleware::middleware()` yourself. A decline with no fallback simply leaves the route
+  unmatched, so the request ends as a plain **404**.
+- **Every middleware in the list runs**, even after one declines. There is no short-circuit;
+  the ones that failed arrive together in `$declines`.
+
+Group settings only apply through `->group()`, and they accumulate inward: a nested group
+inherits the outer prefix and middleware list, and the outer settings are restored afterwards.
+A `pre()` or `middleware()` written without a `->group()` stays pending and is picked up by the
+next group. Two `middleware()` calls chained at the same level keep only the second — put them
+in one array instead.
 
 ---
 
@@ -1437,8 +1640,12 @@ php terminal help
 
 ```php
 // route/api.php
-Route::get('/user', fn() => Response::json(['user' => Auth::user()]));
-Route::post('/posts', [PostController::class, 'store'])->noCSRF();
+Route::pre('/api')->middleware([App\Middlewares\API::class])->noCSRF()->group(function () {
+    Route::pre('/v1')->group(function () {
+        Route::get('/user', [Api\UserController::class, 'show'])->name('api.user.show');
+        Route::post('/posts', [Api\PostController::class, 'store'])->name('api.posts.store');
+    });
+});
 ```
 
 Authenticate via request header:
@@ -1447,7 +1654,22 @@ Authenticate via request header:
 Auth-Token: {api_token}
 ```
 
-The token is matched against the `api_token` column in the `users` table.
+The token is matched against the `api_token` column in the `users` table — but **only because
+`App\Middlewares\API` is on the group.** That middleware puts `Auth` in api mode, drops any
+inherited login, and calls `Auth::token_login()` with the header. Without it the header is
+ignored and `Auth::check()` is false. Do not hand-roll a token check.
+
+It always passes, because it authenticates rather than authorises. To require a logged-in
+caller, add the auth middleware after it and give the group a fallback:
+
+```php
+Route::pre('/api')->middleware([API::class, App\Middlewares\Auth::class], fn($d) => Response::status(401))
+     ->noCSRF()->group(...);
+```
+
+`noCSRF()` and `middleware()` are **group** settings — they take effect through `->group()`.
+Chaining `noCSRF()` onto a single route definition does nothing to that route, and leaves the
+setting pending for the next group that runs.
 
 ---
 
@@ -1483,7 +1705,7 @@ getQuery([], [], false);        // returns array instead of string
 Response::json(['key' => 'value']);   // sets Content-Type: application/json and echoes
 
 // View / Route shortcuts
-view('posts.index', compact('posts'));
+view('app.pages.posts.index', compact('posts'));
 route('posts.show', ['id' => 1]);
 csrf();
 _l('lang.key', ['name' => 'Ali']);
@@ -1772,7 +1994,7 @@ database is on the same machine or the same rack.
 ```bash
 php terminal route cache    # compile the route table
 php terminal route clear    # drop it - run after changing a route file
-php terminal route list     # show every registered route
+php terminal route list     # list the registered routes — see the caveat below
 ```
 
 Route files are parsed **and executed** on every request: with 1000 routes that
@@ -1780,9 +2002,11 @@ is 1000 `Route::get()` calls before the one being served is even found. Caching
 the table replaces all of it with a single `include`.
 
 ```php
-// config/route.php
-'caching'    => true,   // false: ignore the cache file even if one exists
-'auto-check' => true,   // ignore it when a route file changed
+// config/framework.php
+'route' => [
+    'caching'    => true,   // false: ignore the cache file even if one exists
+    'auto-check' => true,   // ignore it when a route file changed
+],
 ```
 
 `auto-check` records the route files the cache was built from and compares their
@@ -1795,6 +2019,15 @@ The rebuild writes to a temporary file and renames it into place, so a request
 reading the cache never sees a partial one and two requests racing to refresh it
 converge on the same table. opcache is invalidated for that file, which matters
 under the recommended `opcache.validate_timestamps = 0`.
+
+**`route list` is not the whole table.** Routes registered conditionally — behind a module's
+`status`, inside `route/dynamic/`, or behind any runtime condition — may not appear. To know
+what is really registered, read `route/web.php`, `route/api.php`, `route/dynamic/*` and each
+enabled module's `route/web.php`.
+
+**URLs are stored as literal strings**, so a prefix built from request state — a locale, a
+tenant — is frozen at build time. Those groups belong in `route/dynamic/`; if most of the
+routing is dynamic, leave `caching` off rather than maintaining the split.
 
 **The assumption this makes:** a route is declared unconditionally, or under a
 condition identical for every request. A route wrapped in something
@@ -1907,7 +2140,7 @@ and worst is how much the machine is interfering rather than the code.
 
 *boot* is everything before the route was matched; *handle* is matching, the
 controller and rendering. Those two are not split further, which would mean
-timing code inside `Route::run()` and `View::make()` — read by everyone, useful
+timing code inside `Route::run()` and `View::view()` — read by everyone, useful
 to almost nobody.
 
 ### Checklist
