@@ -57,7 +57,7 @@ Route::has(string $keyword): bool
 Route::pre(string $prefix, ?string $namePrefix = null)          // url + name prefix
 Route::middleware(array $list, $callback = null)
 Route::noCSRF()
-Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
+Route::throttle(?int $limit = null, ?int $window = null, ?string $by = null, ?int $block = null)
 Route::group(\Closure $callback)
 ```
 

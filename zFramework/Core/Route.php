@@ -714,15 +714,24 @@ class Route
      * becomes "refused for this long" - the answer to someone hammering an
      * endpoint, who would otherwise get a fresh allowance every window.
      *
-     * @param int    $limit  Requests per window.
-     * @param int    $window Seconds.
-     * @param string $by     ip | token
-     * @param int    $block  Seconds to refuse outright once the limit is passed.
+     * Every argument may be left out; anything omitted comes from the throttle
+     * defaults in config/framework.php, so bare `->throttle()` means "limit this
+     * group the usual amount".
+     *
+     * @param int|null    $limit  Requests per window.
+     * @param int|null    $window Seconds.
+     * @param string|null $by     ip | token
+     * @param int|null    $block  Seconds to refuse outright once the limit is passed.
      * @return self
      */
-    public static function throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
+    public static function throttle(?int $limit = null, ?int $window = null, ?string $by = null, ?int $block = null)
     {
-        self::$add_groups['throttle'] = compact('limit', 'window', 'by', 'block');
+        # Only what was actually given: Throttle merges the rest over the config
+        # defaults, so a null here has to mean "not said" rather than "zero".
+        self::$add_groups['throttle'] = array_filter(
+            compact('limit', 'window', 'by', 'block'),
+            fn($value) => $value !== null
+        );
 
         $middlewares = self::$add_groups['middlewares'][0] ?? self::$groups['middlewares'][0] ?? [];
         $callback    = self::$add_groups['middlewares'][1] ?? self::$groups['middlewares'][1] ?? null;

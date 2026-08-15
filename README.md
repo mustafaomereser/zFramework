@@ -1385,7 +1385,7 @@ Opt-in per route group. **Which routes are limited is where you attach the middl
 hard, in config.**
 
 ```php
-Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
+Route::throttle(?int $limit = null, ?int $window = null, ?string $by = null, ?int $block = null)
 ```
 
 ```php
@@ -1393,6 +1393,9 @@ Route::pre('/api')->throttle(120)->middleware([API::class])->noCSRF()->group(...
 Route::throttle(5, 300)->group(fn() => Route::post('/sign-in', ...));
 Route::pre('/search')->throttle(100, 10, block: 600)->group(...);
 ```
+
+Every argument is optional — anything left out comes from the config defaults, so a bare
+`->throttle()` means "limit this group the usual amount".
 
 `throttle()` attaches the middleware as well, so it is the only call needed, and the number
 sits next to the routes it governs. There is deliberately **no url-prefix table in config** —

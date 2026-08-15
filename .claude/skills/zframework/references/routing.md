@@ -91,7 +91,7 @@ Three group settings, all applied by wrapping in `->group(fn() => …)`:
 Route::pre(string $prefix, ?string $namePrefix = null)   // url prefix + name prefix
 Route::middleware(array $list, ?Closure $onDecline = null)
 Route::noCSRF()
-Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
+Route::throttle(?int $limit = null, ?int $window = null, ?string $by = null, ?int $block = null)
 ```
 
 `throttle()` attaches `App\Middlewares\Throttle` as well as carrying the numbers, so it is the

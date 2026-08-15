@@ -407,7 +407,7 @@ Log::error('Gateway refused', ['code' => $e->getCode()]);
 ### Rate limiting
 
 ```php
-Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
+Route::throttle(?int $limit = null, ?int $window = null, ?string $by = null, ?int $block = null)
 ```
 
 ```php

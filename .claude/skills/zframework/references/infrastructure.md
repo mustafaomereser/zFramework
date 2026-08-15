@@ -223,7 +223,7 @@ and a read of it on every request.
 **The limit lives on the route group**, next to the routes it governs:
 
 ```php
-Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
+Route::throttle(?int $limit = null, ?int $window = null, ?string $by = null, ?int $block = null)
 ```
 
 ```php
@@ -231,6 +231,9 @@ Route::pre('/api')->throttle(120)->middleware([API::class])->noCSRF()->group(...
 Route::throttle(5, 300)->group(fn() => Route::post('/sign-in', ...));
 Route::pre('/search')->throttle(100, 10, block: 600)->group(...);
 ```
+
+Every argument is optional — anything left out comes from the config defaults, so a bare
+`->throttle()` means "limit this group the usual amount".
 
 `throttle()` attaches the middleware as well, so it is the only call needed. There is
 deliberately **no url-prefix table in config** - that is a second copy of the routing, and it
