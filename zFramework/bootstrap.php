@@ -4,6 +4,18 @@ define('FRAMEWORK_VERSION', '3.1.2');
 $app_config = include(BASE_PATH . "/config/app.php");
 if ($app_config['x-powered-by'] ?? true) header("X-Powered-By: zFramework v" . FRAMEWORK_VERSION);
 
+// A response is live unless the page says otherwise - guessing the other way
+// serves one visitor's page to the next. Sent here rather than at the end of the
+// request so it still applies when something fatals before that, and so
+// Response::cache() can replace it from a controller.
+//
+// header() is a no-op under the CLI SAPI, which is what a RoadRunner worker
+// runs as; there Response::headers() supplies the same default.
+if (PHP_SAPI !== 'cli') {
+    header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+    header("Pragma: no-cache");
+}
+
 // Initalize settings
 date_default_timezone_set('Europe/Istanbul');
 

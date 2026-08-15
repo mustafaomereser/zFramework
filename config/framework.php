@@ -82,6 +82,9 @@ return [
         'ajax' => [
             'include-alerts' => true,
         ],
+
+        # How long Response::cache() caches for when called without a number.
+        'cache-ttl' => 600,
     ],
 
     /**

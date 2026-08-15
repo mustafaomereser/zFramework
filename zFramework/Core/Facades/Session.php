@@ -14,7 +14,15 @@ class Session
     private static function load(): void
     {
         if (self::$cache !== null) return;
-        if (session_status() === PHP_SESSION_NONE) session_start();
+        if (session_status() === PHP_SESSION_NONE) {
+            # PHP's session module sends its own Cache-Control and a 1981 Expires
+            # unless the limiter is empty. Those landed on top of whatever the
+            # page had declared, so a cacheable page that happened to touch the
+            # session silently became uncacheable. Caching is the framework's
+            # call now - see Response::cache().
+            session_cache_limiter('');
+            session_start();
+        }
         self::$cache = $_SESSION ?? [];
         session_write_close();
         register_shutdown_function([self::class, 'flush']);
