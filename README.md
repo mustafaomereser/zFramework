@@ -1998,15 +1998,10 @@ Then one crontab entry per script, in cPanel or wherever the host keeps them:
 session setup and the `force-https` redirect — neither means anything without a browser. It
 also never loads routes, providers or modules, so the route table is empty.
 
-**One gap to know about:** unlike `terminal`, `cron.php` does not load the error handler. An
-uncaught throwable gets PHP's default handling — a message on stderr, nothing in `error_logs/`.
-For an unattended job that is usually the wrong way round; wrap the work in try/catch and
-`Log::error()` it, or add the handler to your script:
-
-```php
-include(__DIR__ . '/cron.php');
-zFramework\Run::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php');
-```
+**Errors follow `config/app.php` like everywhere else.** `cron.php` installs the same handler
+`terminal` does, so an uncaught throwable in a cron script is written to `error_logs/` when
+`error.logging` is on. Without that it went to stderr only — and a crontab line ending in
+`>> /dev/null 2>&1`, which is how they are usually written, threw that away too.
 
 **Which of the two to use**
 

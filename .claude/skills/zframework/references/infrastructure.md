@@ -231,13 +231,10 @@ facades all work. `$cron_mode` makes `bootstrap.php` skip session setup and the 
 redirect - neither means anything without a browser - and routes, providers and modules are
 never loaded, so the route table is empty.
 
-**`cron.php` does not load the error handler**, where `terminal` does. An uncaught throwable
-gets PHP's default handling: stderr, nothing in `error_logs/`. For an unattended job wrap the
-work in try/catch and `Log::error()` it, or add the handler yourself:
-
-```php
-zFramework\Run::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php');
-```
+`cron.php` installs the same error handler `terminal` does, so a cron script obeys
+`config/app.php` `error.logging` and an uncaught throwable lands in `error_logs/`. It did not
+until recently: the throwable went to stderr, and a crontab line ending in `>> /dev/null 2>&1`
+threw that away as well, so an unattended job could fail nightly and leave nothing behind.
 
 ### Choosing between `cron/` and `schedule/`
 
