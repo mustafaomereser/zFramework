@@ -23,6 +23,8 @@
 | 🎨 View / template engine (Blade-like directives) | 🔧 Terminal — Artisan-like CLI tool |
 | 📮 Queue — Redis-backed jobs + worker command | ⏭️ Defer — run work after the response is sent |
 | 🔔 Push Notifications — web push, VAPID, per-app keys | 🤖 AI assistant skill — ships in `.claude/` |
+| 🚀 Page cache — HTTP headers + server-side store, tag invalidation | 🚦 Rate limiting — opt-in per route group |
+| ⏰ Scheduler — one crontab line, tasks in `schedule.php` | 📝 Application log — daily files, levels, retention |
 
 ---
 
@@ -80,20 +82,24 @@ replacement for it.
   - [2.6. Seeders](#26-seeders)
   - [2.7. Transactions](#27-transactions)
 - [3. View](#3-view)
+  - [3.1. Page Caching](#31-page-caching)
 - [4. Controller](#4-controller)
 - [5. Validator](#5-validator)
 - [6. Middleware](#6-middleware)
+  - [6.1. Rate Limiting](#61-rate-limiting)
 - [7. Mail](#7-mail)
   - [7.1. Defer](#71-defer)
 - [8. Cache](#8-cache)
   - [8.1. Redis](#81-redis)
   - [8.2. Queue](#82-queue)
+  - [8.3. Application Log](#83-application-log)
 - [9. Alerts](#9-alerts)
 - [10. Csrf](#10-csrf)
 - [11. Language](#11-language)
 - [12. Crypter](#12-crypter)
 - [13. Config](#13-config)
 - [14. Terminal](#14-terminal)
+  - [14.1. Scheduled Tasks](#141-scheduled-tasks)
 - [15. API](#15-api)
 - [16. Helper Methods](#16-helper-methods)
 - [17. AutoSSL](#17-autossl)
@@ -131,9 +137,44 @@ The controller is resolved by `findFile()` — it searches recursively in `App/C
 ### URL Parameters
 
 ```php
-Route::get('/user/{id}', fn($id) => ...);                         // required
-Route::get('/user/{id}/{?name}', fn($id, $name = null) => ...);   // optional
+Route::get('/posts/{id}', [PostController::class, 'show']);        // required
+Route::get('/posts/{?id}', [PostController::class, 'show']);       // optional
+Route::get('/posts/{id:int}', [PostController::class, 'show']);    // required, digits only
 ```
+
+Handler parameters are matched **by name**, so `{id}` needs `$id`, not `$postId`.
+
+A parameter may carry a type. **Omitting it is exactly the old behaviour** — `{id}` still
+matches any segment.
+
+| Type | Matches |
+|---|---|
+| `int` | `-?\d+` |
+| `uint` | `\d+` |
+| `float` | `-?\d+(.\d+)?` |
+| `alpha` | letters |
+| `alnum` | letters and digits |
+| `slug` | letters, digits, `-` and `_` |
+| `uuid` | a canonical uuid |
+
+An unrecognised name constrains nothing, so a typo weakens a route rather than making it match
+nothing at all. There is no `Route::where()` and no raw regex.
+
+**A type that does not match is not a 404** — the route simply does not apply and the next one
+gets its turn. That is the point:
+
+```php
+Route::get('/urun/{id:int}', [ProductController::class, 'show']);
+Route::get('/urun/{slug}',   [ProductController::class, 'bySlug']);
+// /urun/42 reaches the first, /urun/mavi-tisort falls through to the second
+```
+
+The type is split off the url when the route is registered, so `route('...', ['id' => 42])`
+substitutes a plain `{id}` and the compiled route cache stays a table of strings.
+
+There is **no route model binding**: rows are arrays, so `show(Post $post)` would hand an array
+to a parameter typed as `Post` and TypeError before the body runs. Take the id and look the row
+up.
 
 ### Dependency Injection
 
@@ -991,6 +1032,99 @@ rendered from a second controller without repeating the work.
 
 ---
 
+### 3.1. Page Caching
+
+`Page::cache()` declares a page cacheable. Two layers behind the one call: the HTTP headers,
+which the browser and any CDN honour, and a server-side store that replays the rendered output
+without running the route at all.
+
+```php
+use zFramework\Core\Facades\Page;
+
+Page::cache();                      // response.cache-ttl seconds (default 600), shared
+Page::cache(600);                   // 10 minutes
+Page::cache(600, shared: false);    // this visitor's browser only, never a CDN
+Page::cache(600, name: 'post-5');   // tagged, so it can be dropped by name
+Page::vary('Cookie');               // the response depends on the request's cookies
+Page::noCache();                    // back to live
+```
+
+**A response nobody declared is live.** `no-store` goes out at bootstrap, before anything else
+runs, so it still applies when something fatals later. Guessing the other way serves one
+visitor's page to the next.
+
+Usually declared in a controller constructor, which covers every method on it:
+
+```php
+class BlogController extends Controller
+{
+    public function __construct()
+    {
+        Page::cache(600, name: 'blog-index');
+    }
+}
+```
+
+**What is never stored**, whatever the page declared — the headers still go out:
+
+| | Why |
+|---|---|
+| anything but GET | never the same for the next visitor |
+| a request with an auth cookie | a logged-in page must not be handed to someone else |
+| a response that is not 200 | `Page::cache()` in a constructor runs before the method aborts |
+| a body containing a csrf token | per-session; the copy breaks every form that receives it |
+| `shared: false` | "for this visitor" and "one copy for everyone" are opposites |
+| after `Page::vary(...)` | the store is keyed by url alone and cannot hold variants |
+
+The csrf case is caught by the framework and, with `app.debug` on, logged with the url — the
+failure is otherwise remote from its cause: the page renders fine and only the *next*
+visitor's POST breaks.
+
+**Per-visitor fragments** — a header showing who is logged in, a cart count:
+
+```php
+Page::cache(300, shared: false);
+Page::vary('Cookie');
+```
+
+The browser keeps it and nothing else does. You cannot reach into a browser and delete what it
+stored, and with `Vary: Cookie` you do not need to: signing in or out changes the cookie, the
+cookie is part of the cache key, so the old entry stops matching by itself.
+
+**Invalidation:**
+
+```php
+Page::forget('post-5');            // every url tagged 'post-5'; returns how many
+Page::forgetUrl('/blog/hello');    // by url, when it was never tagged
+Page::clear();                     // everything
+php terminal cache clear pages     // the same, from the CLI
+```
+
+Prefer the tag — rebuilding the url with its query string where a model is saved is the part
+nobody gets right, and one tag can cover several urls. An observer is the tidy place:
+
+```php
+public function onupdated(array $row)
+{
+    Page::forget('post-' . $row['id']);
+}
+```
+
+```php
+// config/framework.php
+'response' => [
+    'cache-ttl'  => 600,
+    'page-cache' => true,   // a kill switch; nothing is stored unless a page declares it
+],
+```
+
+`X-Page-Cache: HIT` is sent on a served entry only while `app.debug` is on. A hit ends the
+request before middlewares, matching and the session — measured at 21.7 ms → 16.2 ms on the
+welcome page. With nothing cached, the cost is one `is_dir()` per request and the class is
+never loaded.
+
+---
+
 ## 4. Controller
 
 Generate one with `php terminal make controller PostController --resource`. The only base class
@@ -1152,6 +1286,23 @@ $r = Validator::validate(['age' => '150'], ['age' => ['required', 'max:100']], [
 | `email` | Must be a valid e-mail address |
 | `unique:Model;key:column` | Value must not already exist in the model's column |
 | `exists:Model;key:column` | Value must exist in the model's column |
+| `in:a,b,c` | Must be one of these, compared as strings |
+| `not-in:a,b` | Must not be one of these |
+| `regex:"^[a-z0-9_]+$"` | Quoted, and without delimiters - they are added for you |
+| `url` | A valid **http or https** address |
+| `date` / `date:Y-m-d` | Parseable, or that exact format and a real date in it |
+| `between:18,65` | The same measure min/max use, both ends inclusive |
+| `confirmed` / `confirmed:field` | Equal to `<field>_confirmation`, or the named field |
+
+A few that are not obvious:
+
+- **`url` rejects anything but http and https.** `FILTER_VALIDATE_URL` on its own accepts
+  `javascript:` and `data:`, which is how a "website" field becomes an XSS hole.
+- **`date:Y-m-d` re-formats what it parsed and compares**, or `2026-02-31` parses happily and
+  becomes the 3rd of March.
+- **`confirmed` goes on the field itself** and defaults to `<field>_confirmation`, where `same`
+  goes on the second field and names the first - so the error lands where the user is looking.
+- **`regex` needs the pattern quoted**: unquoted, the rule parser stops at the first space.
 
 `unique` and `exists` also take `ex:` to exclude a row — `unique:App\Models\User;key:email;ex:5`
 is the update-form spelling, without which editing a row collides with its own value.
@@ -1218,6 +1369,50 @@ inherits the outer prefix and middleware list, and the outer settings are restor
 A `pre()` or `middleware()` written without a `->group()` stays pending and is picked up by the
 next group. Two `middleware()` calls chained at the same level keep only the second — put them
 in one array instead.
+
+---
+
+### 6.1. Rate Limiting
+
+Opt-in per route group. **Which routes are limited is where you attach the middleware; how
+hard, in config.**
+
+```php
+Route::pre('/api')->middleware([API::class, Throttle::class])->noCSRF()->group(...);
+Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...));
+```
+
+```php
+// config/framework.php
+'throttle' => [
+    'enabled' => true,
+    'limit'   => 60,
+    'window'  => 60,         // seconds
+    'by'      => 'ip',       // ip | token - `token` counts a logged-in caller by identity,
+                             // so one account cannot spread its quota across addresses
+    'rules'   => [           // per url prefix, longest match wins
+        '/api'     => ['limit' => 120],
+        '/sign-in' => ['limit' => 5, 'window' => 300],
+    ],
+],
+```
+
+`Throttle` **aborts 429 itself** rather than declining, because a declined middleware with no
+fallback closure ends as a 404 and that is the wrong answer to "you are going too fast". It
+sends `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After`.
+
+The counter underneath is usable directly:
+
+```php
+$hit = RateLimit::hit('login:' . ip(), 5, 300);
+if (!$hit['allowed']) abort(429);
+
+RateLimit::clear('login:' . ip());   // after a successful login
+```
+
+Backed by redis `INCR` when redis is configured, otherwise one `flock`'d file per key under
+`storage/ratelimit`. Fixed window, not sliding: a caller can send up to twice the limit across
+a boundary, which is the standard trade.
 
 ---
 
@@ -1438,6 +1633,43 @@ development and on shared hosting; it simply does not get the benefit.
 
 ---
 
+### 8.3. Application Log
+
+```php
+use zFramework\Core\Facades\Log;
+
+Log::debug('...');
+Log::info('Order paid', ['order' => $id]);
+Log::warning('Webhook arrived twice', ['id' => $webhookId]);
+Log::error('Gateway refused', ['code' => $e->getCode()]);
+```
+
+One file per day at `storage/logs/Y-m-d.log`, appended with `LOCK_EX` so concurrent requests
+do not interleave a line. Context is written as JSON:
+
+```
+[2026-08-15 07:02:22] WARNING: Webhook arrived twice {"id":"evt_129"}
+```
+
+**This is not the error handler.** Uncaught throwables still go through `errorHandler()` and
+its error page. `Log` is for what you want to read at 03:00 that was never an exception.
+
+```php
+// config/framework.php
+'log' => [
+    'enabled' => true,
+    'level'   => 'debug',   // debug | info | warning | error - below it is dropped before
+                            // the message is formatted
+    'days'    => 14,        // day files kept; pruned on the first write of a process,
+                            // 0 keeps everything
+],
+```
+
+A request that never logs pays nothing: the class is referenced from nowhere in the request
+path, so it is never loaded.
+
+---
+
 ## 9. Alerts
 
 Flash messages stored in session. Displayed once and cleared on the next request.
@@ -1553,8 +1785,10 @@ return [
 return [
     'view'     => ['caching' => true, 'minify' => true],
     'route'    => ['caching' => true, 'auto-check' => false],
+    'log'      => ['enabled' => true, 'level' => 'debug', 'days' => 14],
+    'throttle' => ['enabled' => true, 'limit' => 60, 'window' => 60, 'by' => 'ip', 'rules' => [...]],
     'session'  => ['driver' => 'file', 'gc_probability' => 1],
-    'response' => ['ajax' => ['include-alerts' => true]],
+    'response' => ['ajax' => ['include-alerts' => true], 'cache-ttl' => 600, 'page-cache' => true],
     'cache'    => ['apcu' => true],
     'redis'    => ['enabled' => false, 'host' => '127.0.0.1', /* ... */],
 
@@ -1637,6 +1871,46 @@ php terminal run --host=127.0.0.1 --port=8080
 # Help
 php terminal help
 ```
+
+---
+
+### 14.1. Scheduled Tasks
+
+One crontab line drives everything:
+
+```
+* * * * * cd /path/to/app && php terminal schedule run >> /dev/null 2>&1
+```
+
+Tasks live in `schedule.php` at the project root, in code you can read:
+
+```php
+use zFramework\Core\Facades\Schedule;
+
+Schedule::everyMinute(fn() => ..., 'heartbeat');
+Schedule::everyMinutes(5, fn() => ..., 'queue-drain');
+Schedule::hourly(15, fn() => ..., 'sync');            // every hour at :15
+Schedule::daily('03:00', fn() => ..., 'backup');
+Schedule::weekly(1, '09:00', fn() => ..., 'report');  // Mondays; 0 = Sunday
+Schedule::monthly(1, '00:30', fn() => ..., 'invoice');
+Schedule::cron('*/5 9-17 * * 1-5', fn() => ..., 'business-hours');
+```
+
+Five standard cron fields with `*`, `*/n`, `a,b` and `a-b`; day-of-week 0-6 with 0 as Sunday,
+and 7 also accepted.
+
+```bash
+php terminal schedule run     # everything due this minute - also how you test a task
+php terminal schedule list    # what is registered, and when each next runs
+```
+
+Two things a raw crontab does not do: a task still running from the previous tick is **skipped
+rather than started again** — two copies of a backup are worse than a late one — and a task
+**will not run twice in the same minute**, however many times `schedule run` is invoked. A task
+that throws is logged through `Log::error` and does not stop the others.
+
+`schedule.php` is included by the terminal command and by nothing else, so a served request
+pays nothing for it.
 
 ---
 
