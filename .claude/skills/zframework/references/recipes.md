@@ -154,29 +154,43 @@ class PostController extends Controller
 Route::resource('/posts', App\Controllers\PostController::class);
 ```
 
-**`resource/views/app/pages/posts/index.php`**
+**Views** — three files, in a directory named after the resource. Copy them from
+`templates/views/pages/` rather than typing them out; the section names must match what
+`app/main.php` yields (`header`, `body`, `footer`), and a mismatched name renders nothing.
+
+```
+resource/views/app/pages/posts/index.php            list
+resource/views/app/pages/posts/edit-or-create.php   create AND edit, one file
+resource/views/app/pages/posts/show.php             detail
+```
+
 ```php
 @extends('app.main')
-@section('content')
-    @forelse($posts['items'] as $post)
+@section('body')
+    <?php foreach ($posts['items'] as $post) : ?>
         <article>
-            <a href="{{ route('posts.show', ['id' => $post['id']]) }}">{{ $post['title'] }}</a>
-            <small>{{ $post['author']()['username'] ?? '-' }}</small>
+            <a href="<?= route('posts.show', ['id' => $post['id']]) ?>"><?= e($post['title']) ?></a>
+            <small><?= $post['author']()['username'] ?? '-' ?></small>
         </article>
-    @empty
+    <?php endforeach ?>
+
+    <?php if (!$posts['item_count']) : ?>
         <p>No posts yet.</p>
-    @endforelse
+    <?php endif ?>
 
     <?= $posts['links']() ?>
 @endsection
 ```
 
-Forms (use `inputMethod` for PATCH/DELETE):
+Forms — `csrf()` always, `inputMethod()` for PATCH/DELETE, and the same file serves create and
+edit by reading through `??`:
+
 ```php
-<form action="{{ route('posts.update', ['id' => $post['id']]) }}" method="POST">
-    {{ csrf() }}
-    {{ inputMethod('PATCH') }}
-    <input name="title" value="{{ e($post['title'] ?? '') }}">
+<?php $editing = isset($post['id']); ?>
+<form action="<?= route('posts.' . ($editing ? 'update' : 'store'), ['id' => $post['id'] ?? null]) ?>" method="POST">
+    <?= csrf() ?>
+    <?= $editing ? inputMethod('PATCH') : null ?>
+    <input name="title" value="<?= e($post['title'] ?? '') ?>">
     <button>Save</button>
 </form>
 ```
@@ -218,6 +232,55 @@ Also usable outside routing:
 ```php
 Middleware::middleware([Auth::class, IsAdmin::class], fn(array $declined) => abort(403));
 ```
+
+---
+
+## 2b. A second interface layer (admin, panel, …)
+
+"Behind login" above is a route group. A second *interface layer* is more than that: it has its
+own chrome, its own error pages and its own guard. Those three ship together — a layer missing
+any one of them leaks the public layout into itself.
+
+**1. Its own layout.** Copy `templates/views/main.php` to `resource/views/admin/main.php` and
+give it the admin chrome. Do not reuse or fork `app/main.php`; one layout per layer.
+
+**2. Its own error views.**
+
+```
+resource/views/errors/admin/main.php    layout for error pages in this layer
+resource/views/errors/admin/404.php     @extends('errors.admin.main')
+```
+
+Which set gets used is `Http::$error_view` (default `errors.app`). Switch it in a middleware
+that runs for this layer — `App/Middlewares/ViewDirectives.php` already does this for `/admin`:
+
+```php
+if (Route::has('/admin') && Auth::check()) Http::$error_view = "errors.admin";
+```
+
+Without this, a 404 inside `/admin` renders in the public layout, which usually also means it
+renders the public navigation to someone who should not see it.
+
+**3. Its guard**, as a group — never per route:
+
+```php
+Route::pre('/admin')
+    ->middleware([App\Middlewares\Auth::class, App\Middlewares\IsAdmin::class], fn($declines) => abort(403))
+    ->group(function () {
+        Route::resource('/posts', App\Controllers\Admin\PostController::class);
+    });
+```
+
+`Route::pre()` prefixes names too, so these are `admin.posts.index`, `admin.posts.edit`, …
+
+**4. Its pages**, under the layer's own directory, extending the layer's own layout:
+
+```
+resource/views/admin/pages/posts/{index,edit-or-create,show}.php   @extends('admin.main')
+```
+
+Controllers go under `App/Controllers/Admin/` — `php terminal make controller Admin/PostController --resource`
+creates the sub-namespace for you.
 
 ---
 
