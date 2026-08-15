@@ -34,6 +34,12 @@ class Response
     private static int $cacheTtl = 0;
 
     /**
+     * The name Page::cache() tagged this page with, so it can be dropped by
+     * something other than its url.
+     */
+    private static ?string $cacheName = null;
+
+    /**
      * Send a response header, or collect it when there is nothing to send to.
      *
      * Under FPM this is header(). Under the CLI SAPI - which is what a
@@ -78,6 +84,18 @@ class Response
         ], self::$headers);
 
         return self::$headers;
+    }
+
+    /**
+     * The name this response was tagged with, or null.
+     *
+     * @param string|null $set
+     * @return string|null
+     */
+    public static function cacheName(?string $set = null): ?string
+    {
+        if ($set !== null) self::$cacheName = $set;
+        return self::$cacheName;
     }
 
     /**
@@ -138,6 +156,7 @@ class Response
         self::$headers       = [];
         self::$cacheDeclared = false;
         self::$cacheTtl      = 0;
+        self::$cacheName     = null;
 
         # http_response_code() is process-wide, not request-wide. In a worker a 404
         # set by one request stays set, and every later response carries it - the

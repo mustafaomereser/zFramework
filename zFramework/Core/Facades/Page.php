@@ -23,6 +23,13 @@ namespace zFramework\Core\Facades;
  *   - a response that is not 200
  *   - a body containing a csrf token - it is per-session, and the copy would be
  *     wrong for everybody who receives it
+ *   - anything declared private, or declared to vary: the store is keyed by url
+ *     alone, so it can only hold a response that is the same for everyone
+ *
+ * Those last two are how a per-visitor fragment works - Page::cache(300,
+ * shared: false) plus Page::vary('Cookie') caches in the browser and nowhere
+ * else, and signing in or out changes the cookie, so the entry stops matching
+ * by itself.
  */
 class Page
 {
@@ -50,11 +57,20 @@ class Page
      * is the usual thing that quietly breaks that - it is per-session, so a
      * stored one is wrong for everybody who gets it afterwards.
      *
-     * @param int|null $seconds null → response.cache-ttl from config/framework.php.
-     * @param bool     $shared  false → private, browser only.
+     * $name tags the entry so it can be dropped without rebuilding the url:
+     *
+     *   Page::cache(600, name: 'post-' . $post['id']);
+     *   Page::forget('post-' . $post['id']);          // later, when it changes
+     *
+     * The url stays the lookup key - serve() runs before the route and only has
+     * the request to go on - so the name is a second way in, not a replacement.
+     *
+     * @param int|null    $seconds null → response.cache-ttl from config/framework.php.
+     * @param bool        $shared  false → private, browser only.
+     * @param string|null $name    Tag for forget().
      * @return void
      */
-    public static function cache(?int $seconds = null, bool $shared = true): void
+    public static function cache(?int $seconds = null, bool $shared = true, ?string $name = null): void
     {
         $seconds ??= (int) (Config::framework('response.cache-ttl') ?? 600);
 
@@ -72,7 +88,12 @@ class Page
             Response::dropHeader('Pragma');
         }
 
-        Response::cacheTtl($seconds);
+        # The ttl is what the server-side store reads, so a private response must
+        # not set one: "for this visitor only" and "keep one copy and hand it to
+        # everybody" are opposites. The headers still go out - the browser is
+        # exactly who should keep it.
+        Response::cacheTtl($shared ? $seconds : 0);
+        if ($name !== null && $shared) Response::cacheName($name);
         Response::header('Cache-Control', ($shared ? 'public' : 'private') . ", max-age=$seconds");
         Response::header('Expires', gmdate('D, d M Y H:i:s', time() + $seconds) . ' GMT');
     }
@@ -89,6 +110,43 @@ class Page
         Response::header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         Response::header('Pragma', 'no-cache');
         Response::header('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT');
+    }
+
+    /**
+     * Tell caches that the response depends on these request headers.
+     *
+     * The one that matters here is Cookie, and it is what makes a per-visitor
+     * fragment cacheable at all:
+     *
+     *   Page::cache(300, shared: false);   // this browser only, never a CDN
+     *   Page::vary('Cookie');              // a different cookie set is a different entry
+     *
+     * You cannot reach into a browser and delete what it stored. Vary is how
+     * you avoid needing to: signing in or out changes the auth cookie, the
+     * cookie is part of the cache key, so the old entry simply stops matching
+     * and the browser fetches again. No invalidation call, nothing to forget.
+     *
+     * Conservative by nature - any cookie changing busts it, analytics included.
+     * That is the right way round for something that shows who you are.
+     *
+     * Never pair Vary: Cookie with shared: true. A shared cache keying on the
+     * cookie is one entry per visitor sitting in a CDN, and any cache that
+     * ignores Vary hands the first visitor's copy to everyone.
+     *
+     * @param string ...$headers
+     * @return void
+     */
+    public static function vary(string ...$headers): void
+    {
+        if (!$headers) return;
+
+        # A stored entry is keyed by url alone, so it cannot represent a response
+        # that varies by anything else - storing one would serve the wrong
+        # variant to everybody. Declaring Vary takes it out of the store and
+        # leaves it to the browser, which does honour the header.
+        Response::cacheTtl(0);
+
+        Response::header('Vary', implode(', ', $headers));
     }
 
     /**
@@ -198,11 +256,75 @@ class Page
         $temporary = self::path() . '.' . getmypid() . '.tmp';
 
         if (@file_put_contents($temporary, $meta . "\n" . $body) === false) return;
-        if (!@rename($temporary, self::path())) @unlink($temporary);
+
+        if (!@rename($temporary, self::path())) {
+            @unlink($temporary);
+            return;
+        }
+
+        # A marker per tagged entry, named after the entry it points at. forget()
+        # then reads one directory instead of opening every cached page to look
+        # for a tag it probably does not carry.
+        if ($name = Response::cacheName()) {
+            $tagDir = self::tagDir($name);
+
+            if (is_dir($tagDir) || @mkdir($tagDir, 0755, true))
+                @file_put_contents($tagDir . '/' . self::key($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/'), '');
+        }
     }
 
     /**
-     * Drop every stored entry - `php terminal cache clear pages`.
+     * Drop every entry tagged with a name.
+     *
+     *   Page::cache(600, name: 'post-' . $id);   // where the page is rendered
+     *   Page::forget('post-' . $id);             // where the post is saved
+     *
+     * Invalidation is the weak point of caching a page: the entry stays correct
+     * until the content behind it changes, and nothing tells it so. An observer
+     * on the model is the tidy place to call this.
+     *
+     * A name can cover several urls - the same post at /blog/x and /blog/x?ref=y
+     * are two entries and one tag - so this drops all of them.
+     *
+     * @param string $name
+     * @return int How many entries were removed.
+     */
+    public static function forget(string $name): int
+    {
+        $tagDir  = self::tagDir($name);
+        $removed = 0;
+
+        foreach ((array) glob($tagDir . '/*') as $marker) {
+            if (@unlink(self::dir() . '/' . basename($marker) . '.cache')) $removed++;
+            @unlink($marker);
+        }
+
+        @rmdir($tagDir);
+
+        return $removed;
+    }
+
+    /**
+     * Drop the stored copy of one url, when it was never tagged.
+     *
+     * The url has to match what the visitor requests, query string included,
+     * because that is what the key is built from.
+     *
+     * @param string $url    e.g. /blog/hello or /blog?page=2
+     * @param string $method
+     * @return bool Whether an entry was there to remove.
+     */
+    public static function forgetUrl(string $url, string $method = 'GET'): bool
+    {
+        $file = self::dir() . '/' . self::key($method, $url) . '.cache';
+
+        return is_file($file) && @unlink($file);
+    }
+
+    /**
+     * Drop every stored entry - the blunt version of forget(), for a deploy or
+     * a change wide enough that working out which pages it touched is not worth
+     * it. Also `php terminal cache clear pages`.
      *
      * @return int How many were removed.
      */
@@ -211,7 +333,21 @@ class Page
         $removed = 0;
         foreach ((array) glob(self::dir() . '/*.cache') as $file) if (@unlink($file)) $removed++;
 
+        foreach ((array) glob(self::dir() . '/tags/*') as $tagDir) {
+            foreach ((array) glob($tagDir . '/*') as $marker) @unlink($marker);
+            @rmdir($tagDir);
+        }
+
         return $removed;
+    }
+
+    /**
+     * @param string $name
+     * @return string
+     */
+    private static function tagDir(string $name): string
+    {
+        return self::dir() . '/tags/' . sha1($name);
     }
 
     /**
@@ -256,6 +392,16 @@ class Page
      */
     private static function path(): string
     {
-        return self::dir() . '/' . sha1(($_SERVER['REQUEST_METHOD'] ?? 'GET') . '|' . ($_SERVER['REQUEST_URI'] ?? '/')) . '.cache';
+        return self::dir() . '/' . self::key($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/') . '.cache';
+    }
+
+    /**
+     * @param string $method
+     * @param string $uri
+     * @return string
+     */
+    private static function key(string $method, string $uri): string
+    {
+        return sha1(strtoupper($method) . '|' . $uri);
     }
 }
