@@ -56,6 +56,31 @@ return [
     ],
 
     /**
+     * Rate limiting - App\Middlewares\Throttle.
+     *
+     * Nothing is limited until you put the middleware on a route group; this
+     * only says how hard. Counters go to redis when it is configured, otherwise
+     * to storage/ratelimit.
+     *
+     * limit/window  Requests per seconds, for anything without its own rule.
+     * by            ip | token. `token` counts a logged-in caller by identity
+     *               and everyone else by ip.
+     * rules         Per url prefix, longest match wins. Any key may be
+     *               overridden; the rest fall back to the values above.
+     */
+    'throttle' => [
+        'enabled' => true,
+        'limit'   => 60,
+        'window'  => 60,
+        'by'      => 'ip',
+        'rules'   => [
+            '/api'      => ['limit' => 120],
+            '/sign-in'  => ['limit' => 5, 'window' => 300],
+            '/sign-up'  => ['limit' => 5, 'window' => 900],
+        ],
+    ],
+
+    /**
      * Sessions.
      *
      * driver          file | redis. Use redis when more than one machine serves

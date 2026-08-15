@@ -26,6 +26,23 @@ findings.
 - **Never echo what `errorHandler()` returns.** `handle.php` already prints it, so
   `die(errorHandler($e))` renders the page twice. Correct form: `errorHandler($err); die;`
 - **Rows are arrays.** `$row->col` does not work — it yields `null` plus a warning.
+- **`@include` is inlined, so `return` in a partial kills the rest of the page.** The compiler
+  merges every partial into one compiled file, so a guard clause like
+  `if (!$show) return;` at the top of an included view aborts the *parent* view too — the table
+  below it, the buttons, everything, silently and with a 200. Wrap the partial body in
+  `<?php if ($show) : ?> … <?php endif ?>` instead. Measured: a list screen rendered empty while
+  the query behind it returned 15 rows.
+- **A model's static method shadows a column of the same name.** Row-level closures are bound
+  for every public static method, so `Content::data()`, `::type()` and `::lang()` overwrote the
+  `data`, `type` and `lang` keys of every row read *with* closure mode — `$row['data']` came back
+  as a Closure and `json_decode` on it silently produced `[]`, i.e. all JSON fields vanished.
+  Name helpers so they cannot collide (`field()`, `config()`, `langCode()`), or read with
+  `closureMode(false)`.
+- **`Str::slug()` keeps Latin only.** An Arabic or Cyrillic title reduces to the divider alone
+  (`"-"`), and `Str::slug($t) ?: 'fallback'` does *not* catch it because `"-"` is truthy. Strip
+  the dividers before testing, and keep `\p{L}` if you want non-Latin slugs.
+- **`Route` matches the raw `REQUEST_URI`.** Route parameters arrive percent-encoded, so a
+  non-ASCII slug has to be `rawurldecode()`d before it is compared with a database value.
 - **`json_encode($row)`** writes relation closures as `{}`. Use `closureMode(false)` or
   `array_filter(..., fn($v) => !$v instanceof Closure)`.
 - **Closure routes** block `php terminal route cache`. Use the controller-array form.

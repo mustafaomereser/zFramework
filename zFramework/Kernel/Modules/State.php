@@ -56,6 +56,7 @@ class State
         'zFramework\Core\Facades\Lang::$path'          => 'the language directory',
         'zFramework\Core\Facades\Log::$config'         => 'log settings from config, identical every request',
         'zFramework\Core\Facades\Page::$dir'          => 'the page cache directory, derived from the storage path',
+        'zFramework\Core\Facades\RateLimit::$dir'     => 'the counter directory, derived from the storage path',
         'zFramework\Core\Facades\Log::$dir'            => 'the log directory, and the prune-once flag with it',
         'zFramework\Core\Facades\Mail::$security'      => 'transport constants',
         'zFramework\Core\Helpers\File::$mimeMap'       => 'a lookup table',
