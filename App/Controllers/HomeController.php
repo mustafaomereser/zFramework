@@ -18,7 +18,7 @@ class HomeController extends Controller
      */
     public function index()
     {
-        return view('app.pages.welcome');
+        return view('app.pages.welcome.index');
     }
 
     /** Show page | GET: /id
