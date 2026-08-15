@@ -28,6 +28,12 @@ class Response
     private static bool $cacheDeclared = false;
 
     /**
+     * Seconds the page asked to be cached for, 0 when it did not ask. Read by
+     * PageCache after the route has run.
+     */
+    private static int $cacheTtl = 0;
+
+    /**
      * Send a response header, or collect it when there is nothing to send to.
      *
      * Under FPM this is header(). Under the CLI SAPI - which is what a
@@ -110,6 +116,8 @@ class Response
             self::$headers = array_values(array_filter(self::$headers, fn($header) => strcasecmp($header[0], 'Pragma') !== 0));
         }
 
+        self::$cacheTtl = $seconds;
+
         self::header('Cache-Control', ($shared ? 'public' : 'private') . ", max-age=$seconds");
         self::header('Expires', gmdate('D, d M Y H:i:s', time() + $seconds) . ' GMT');
     }
@@ -122,10 +130,21 @@ class Response
      */
     public static function noCache(): void
     {
+        self::$cacheTtl = 0;
+
         self::header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         self::header('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT');
     }
 
+
+    /**
+     * Seconds this response declared, or 0.
+     * @return int
+     */
+    public static function cacheTtl(): int
+    {
+        return self::$cacheTtl;
+    }
 
     /**
      * Set the response status.
@@ -155,6 +174,7 @@ class Response
         self::$addinationals = [];
         self::$headers       = [];
         self::$cacheDeclared = false;
+        self::$cacheTtl      = 0;
 
         # http_response_code() is process-wide, not request-wide. In a worker a 404
         # set by one request stays set, and every later response carries it - the

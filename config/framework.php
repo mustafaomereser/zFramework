@@ -85,6 +85,12 @@ return [
 
         # How long Response::cache() caches for when called without a number.
         'cache-ttl' => 600,
+
+        # Serve pages that declared themselves cacheable from storage/pages,
+        # without running the route. Headers alone only reach the browser and
+        # any CDN; this is what stops PHP re-rendering. Never applies to a
+        # request carrying an auth cookie, or to anything but GET.
+        'page-cache' => false,
     ],
 
     /**
