@@ -23,6 +23,28 @@ class Validator
     ];
 
     /**
+     * Spellings accepted by `type:x`, mapped to the canonical name.
+     *
+     * Without this, `type:int` fell through to the string branch and min/max
+     * measured its length instead of its value - the opposite of what the rule
+     * was asking for. Anything not listed here declares nothing: length is
+     * measured as a string and the type rule does not assert.
+     */
+    private const TYPE_ALIASES = [
+        'int'     => 'integer',
+        'integer' => 'integer',
+        'float'   => 'float',
+        'double'  => 'float',
+        'real'    => 'float',
+        'str'     => 'string',
+        'string'  => 'string',
+        'bool'    => 'boolean',
+        'boolean' => 'boolean',
+        'array'   => 'array',
+        'object'  => 'object',
+    ];
+
+    /**
      * Validate an array
      * @param array $data
      * @param array $validate
@@ -42,8 +64,9 @@ class Validator
 
             $typeRule     = preg_grep('/^type:/', $validateList);
             $declaredType = $typeRule ? substr(reset($typeRule), 5) : null;
+            $declaredType = $declaredType !== null ? (self::TYPE_ALIASES[strtolower($declaredType)] ?? null) : null;
 
-            [$type, $length] = self::resolveTypeAndLength($value, $declaredType);
+            [$type, $length, $detectedType] = self::resolveTypeAndLength($value, $declaredType);
 
             $equivalent = null;
             $parameters = [];
@@ -59,7 +82,7 @@ class Validator
                     foreach ($out as $param_key => $param) $parameters[$param_key] = $param;
                 } else $case = $ruleString;
 
-                $ruleData = compact('value', 'equivalent', 'length', 'type', 'key', 'parameters', 'validateList', 'data') + [
+                $ruleData = compact('value', 'equivalent', 'length', 'type', 'detectedType', 'key', 'parameters', 'validateList', 'data') + [
                     'required' => in_array('required', $validateList),
                     'nullable' => in_array('nullable', $validateList),
                 ];
@@ -95,16 +118,25 @@ class Validator
      */
     private static function resolveTypeAndLength(mixed $value, ?string $declared): array
     {
-        if (is_array($value))  return ['array',  count($value)];
-        if (is_object($value)) return ['object', count((array) $value)];
+        if (is_array($value))  return ['array',  count($value), 'array'];
+        if (is_object($value)) return ['object', count((array) $value), 'object'];
 
-        $type = $declared ?? match (true) {
+        $detected = match (true) {
             is_int($value)                              => 'integer',
             is_float($value)                            => 'float',
-            preg_match('/^-?\d+$/', (string) $value)    => 'integer',
+            is_bool($value)                             => 'boolean',
+            # === 1: match compares strictly, and preg_match returns an int - so
+            # this arm never fired and every numeric string was detected as float.
+            preg_match('/^-?\d+$/', (string) $value) === 1 => 'integer',
             is_numeric($value)                          => 'float',
             default                                     => 'string',
         };
+
+        # What min/max measure. A declared type wins: `type:string` on "150" asks
+        # for three characters, `type:integer` asks for the number 150. Detection
+        # only decides when nothing was declared - every value off a form is a
+        # string, so "150" would otherwise always be read as a number.
+        $type = $declared ?? $detected;
 
         $length = match ($type) {
             'integer' => (int) $value,
@@ -112,7 +144,7 @@ class Validator
             default   => is_string($value) ? strlen($value) : 0,
         };
 
-        return [$type, $length];
+        return [$type, $length, $detected];
     }
 
     /**
