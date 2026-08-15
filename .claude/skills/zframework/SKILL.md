@@ -149,8 +149,10 @@ conditionally — behind a module's `status`, inside `route/dynamic/`, or behind
 condition — may not appear in it. To know what is actually registered, read `route/web.php`,
 `route/api.php`, `route/dynamic/*` and each enabled module's `route/web.php`.
 
-Two group traps, both verified: a `pre()`/`middleware()` left without `->group()` leaks into
-the *next* group, and two `middleware()` calls chained at the same level keep only the second.
+Groups inherit inward as you would expect — a nested group gets the outer prefix, name prefix
+and middleware list, and the outer settings are restored afterwards. Two traps, both verified:
+a `pre()`/`middleware()` left **without any `->group()`** stays pending and is picked up by the
+*next* group, and two `middleware()` calls chained at the same level keep only the second.
 And a declined middleware with **no fallback closure gives a 404** — the middleware's own
 `error()` never runs on the routing path. Pass `fn($declines) => abort(403)` if you want
 anything else. Full detail in `references/routing.md`.

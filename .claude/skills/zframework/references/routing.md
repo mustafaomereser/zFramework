@@ -96,18 +96,34 @@ Look routes up with the full name: `route('admin.blog.posts')`, `route('posts.sh
 
 ### Two traps, both confirmed
 
-**1. A `pre()` (or `middleware()`) that is never `->group()`ed leaks into the next group.**
-The pending settings are only cleared inside `group()`, so:
+**1. A group setting that never gets a `->group()` is left dangling, and the next group picks
+it up.** This is not about nesting — a properly closed group inherits inward, which is the
+point, and does not affect anything after it:
 
 ```php
-Route::pre('/forgotten');                    // no ->group(...)
-Route::get('/innocent', …)->name('innocent');           // unaffected: /innocent
-Route::middleware([X::class])->group(fn() =>
-    Route::get('/victim', …)->name('victim'));          // becomes /forgotten/victim !
+Route::pre('/admin')->middleware([Auth::class])->group(function () {
+    Route::get('/dash', …)->name('dash');               // /admin/dash        [Auth]   inherited, correct
+    Route::pre('/blog')->group(fn() =>
+        Route::get('/posts', …)->name('posts'));        // /admin/blog/posts  [Auth]   inherited, correct
+});
+Route::get('/public', …)->name('public');               // /public            []       clean
+Route::middleware([Other::class])->group(fn() =>
+    Route::get('/other', …)->name('other'));            // /other             [Other]  clean
 ```
 
-The route defined in between is untouched, which is what makes this hard to spot. Never write
-a group setting without immediately chaining `->group()`.
+The trap is a call with **no `->group()` at all**. Pending settings are only cleared inside
+`group()`, so they sit there waiting:
+
+```php
+Route::pre('/dangling');                                // ->group() never called
+Route::get('/public', …)->name('public');               // /public           unaffected
+Route::middleware([Other::class])->group(fn() =>
+    Route::get('/other', …)->name('other'));            // /dangling/other  <- picked it up
+```
+
+Plain routes defined in between are untouched — only the next `group()` inherits it, which is
+what makes it hard to spot. Never write `pre()`, `middleware()` or `noCSRF()` without
+immediately chaining `->group()`.
 
 **2. Two `middleware()` calls at the same level: the first is lost.**
 
