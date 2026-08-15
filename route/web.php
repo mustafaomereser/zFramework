@@ -18,7 +18,9 @@ Route::pre('/push-notification')->group(function () {
     Route::post('/unsubscribe', [PushNotificationController::class, 'unsubscribe'])->name('unsubscribe');
 });
 
-Route::middleware([App\Middlewares\Guest::class])->group(function () {
+# Five attempts per five minutes, per ip. A login form is the one place on a web
+# app worth limiting by default - everything else here is cheap to serve.
+Route::throttle(5, 300)->middleware([App\Middlewares\Guest::class])->group(function () {
     Route::get('/auth', [AuthController::class, 'auth'])->name('auth-form');
     Route::post('/sign-in', [AuthController::class, 'signin'])->name('sign-in');
     Route::post('/sign-up', [AuthController::class, 'signup'])->name('sign-up');

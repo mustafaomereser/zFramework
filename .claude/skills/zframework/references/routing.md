@@ -91,7 +91,12 @@ Three group settings, all applied by wrapping in `->group(fn() => …)`:
 Route::pre(string $prefix, ?string $namePrefix = null)   // url prefix + name prefix
 Route::middleware(array $list, ?Closure $onDecline = null)
 Route::noCSRF()
+Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
 ```
+
+`throttle()` attaches `App\Middlewares\Throttle` as well as carrying the numbers, so it is the
+only call needed — the limit sits with the routes it governs rather than in a config table
+keyed by url. See `references/infrastructure.md`.
 
 They chain in any order, because each one only writes into the pending-group array:
 
@@ -247,14 +252,19 @@ Plain routes defined in between are untouched — only the next `group()` inheri
 what makes it hard to spot. Never write `pre()`, `middleware()` or `noCSRF()` without
 immediately chaining `->group()`.
 
-**2. Two `middleware()` calls at the same level: the first is lost.**
+**2. ~~Two `middleware()` calls at the same level: the first is lost.~~ Fixed.**
+
+`middleware()` used to merge only against the enclosing group, so a second call at the same
+level threw the first away — and `->throttle()->middleware([...])` silently dropped the
+middleware `throttle()` had just added. It now merges with what is already pending too, so
+chaining accumulates:
 
 ```php
-Route::middleware([A::class])->middleware([B::class])->group(…);   // ends up [B] only
+Route::middleware([A::class])->middleware([B::class])->group(…);   // [A, B]
+Route::pre('/api')->throttle(120)->middleware([API::class])->group(…);   // [Throttle, API]
 ```
 
-Each call merges against the *active* group, not against the pending one, so the second
-overwrites the first. Put them in one array — `middleware([A::class, B::class])` — or nest.
+Order still matters — see the middleware section.
 
 ## Middleware
 

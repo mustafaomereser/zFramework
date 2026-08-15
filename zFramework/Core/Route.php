@@ -32,6 +32,13 @@ class Route
     static $add_groups  = [];
 
     /**
+     * The matched route's group settings, published just before its middlewares
+     * run - they are handed no arguments, and this is how one reads what its
+     * group asked for. Cleared per request.
+     */
+    static $matchedGroups = [];
+
+    /**
      * Find was setted route.
      * @param string $name
      * @param array $array
@@ -262,6 +269,7 @@ class Route
         self::$calledRoute = null;
         self::$groups      = [];
         self::$add_groups  = [];
+        self::$matchedGroups = [];
     }
 
     /**
@@ -559,6 +567,8 @@ class Route
 
         if (!Csrf::check(isset($groups['no-csrf']))) abort(406, Lang::get('errors.csrf.no-verify'));
 
+        self::$matchedGroups = $groups;
+
         if (@$groups['middlewares']) {
             $middleware = Middleware::middleware($groups['middlewares'][0], function ($declines) use ($groups) {
                 if (!count($declines)) return true;
@@ -670,7 +680,57 @@ class Route
      */
     public static function middleware(array $list, $callback = null)
     {
-        self::$add_groups['middlewares'] = [array_merge((self::$groups['middlewares'][0] ?? []), $list), $callback];
+        # Merge with whatever is already pending, then with the enclosing group.
+        # Reading only the enclosing group meant a second call at the same level
+        # threw the first away - and made `->throttle()->middleware([...])` drop
+        # the middleware throttle() had just added. Chaining accumulates now,
+        # which is what it looks like it does.
+        $existing = self::$add_groups['middlewares'][0] ?? self::$groups['middlewares'][0] ?? [];
+
+        self::$add_groups['middlewares'] = [array_merge($existing, $list), $callback];
+
+        return new self();
+    }
+
+    /**
+     * Rate limit this group.
+     *
+     *   Route::pre('/api')->throttle(120)->noCSRF()->group(...);
+     *   Route::throttle(5, 300)->group(fn() => Route::post('/sign-in', ...));
+     *
+     * The limit belongs where the routes it governs are declared, not in a
+     * config file keyed by url prefix - a prefix table is a second copy of the
+     * routing, and it stops matching silently the moment a url changes. That
+     * bites hardest with a translated prefix, where the url is not even a
+     * constant.
+     *
+     * Attaches the middleware as well, so this is the only call needed. The
+     * settings ride along in the group and Throttle reads them back from
+     * Route::$matchedGroups.
+     *
+     *   Route::pre('/api')->throttle(100, 10, block: 600)->group(...);
+     *
+     * With $block, passing the limit stops being "wait for the next window" and
+     * becomes "refused for this long" - the answer to someone hammering an
+     * endpoint, who would otherwise get a fresh allowance every window.
+     *
+     * @param int    $limit  Requests per window.
+     * @param int    $window Seconds.
+     * @param string $by     ip | token
+     * @param int    $block  Seconds to refuse outright once the limit is passed.
+     * @return self
+     */
+    public static function throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
+    {
+        self::$add_groups['throttle'] = compact('limit', 'window', 'by', 'block');
+
+        $middlewares = self::$add_groups['middlewares'][0] ?? self::$groups['middlewares'][0] ?? [];
+        $callback    = self::$add_groups['middlewares'][1] ?? self::$groups['middlewares'][1] ?? null;
+
+        if (!in_array(\App\Middlewares\Throttle::class, $middlewares, true)) $middlewares[] = \App\Middlewares\Throttle::class;
+
+        self::$add_groups['middlewares'] = [$middlewares, $callback];
+
         return new self();
     }
 

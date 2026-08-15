@@ -25,6 +25,7 @@
 | 🔔 Push Notifications — web push, VAPID, per-app keys | 🤖 AI assistant skill — ships in `.claude/` |
 | 🚀 Page cache — HTTP headers + server-side store, tag invalidation | 🚦 Rate limiting — opt-in per route group |
 | ⏰ Scheduler — one crontab line, tasks in `schedule.php` | 📝 Application log — daily files, levels, retention |
+| 🚫 Throttle blocking — refuse a flood outright for N seconds | |
 
 ---
 
@@ -1378,22 +1379,34 @@ Opt-in per route group. **Which routes are limited is where you attach the middl
 hard, in config.**
 
 ```php
-Route::pre('/api')->middleware([Throttle::class, API::class])->noCSRF()->group(...);
-Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...));
+Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
 ```
 
 ```php
-// config/framework.php
+Route::pre('/api')->throttle(120)->middleware([API::class])->noCSRF()->group(...);
+Route::throttle(5, 300)->group(fn() => Route::post('/sign-in', ...));
+Route::pre('/search')->throttle(100, 10, block: 600)->group(...);
+```
+
+`throttle()` attaches the middleware as well, so it is the only call needed, and the number
+sits next to the routes it governs. There is deliberately **no url-prefix table in config** —
+that is a second copy of the routing, and it stops matching the moment a url changes, which
+with a translated prefix is every request.
+
+**`block` is the answer to a flood.** Without it, passing the limit means "wait for the next
+window", so someone hammering an endpoint gets a fresh allowance every window forever. With
+it, passing the limit means refused for that long — answered on a single read, counter left
+alone, before any route is matched or session touched.
+
+```php
+// config/framework.php - only the fallback, for a group that names no number
 'throttle' => [
-    'enabled' => true,
+    'enabled' => true,       // false turns every limit off, wherever it was declared
     'limit'   => 60,
     'window'  => 60,         // seconds
     'by'      => 'ip',       // ip | token - `token` counts a logged-in caller by identity,
                              // so one account cannot spread its quota across addresses
-    'rules'   => [           // per url prefix, longest match wins
-        '/api'     => ['limit' => 120],
-        '/sign-in' => ['limit' => 5, 'window' => 300],
-    ],
+    'block'   => 0,
 ],
 ```
 
@@ -1416,7 +1429,7 @@ The counter underneath is usable directly:
 
 ```php
 $hit = RateLimit::hit('login:' . ip(), 5, 300);
-if (!$hit['allowed']) abort(429);
+if (!$hit['allowed']) abort(429);          // $hit: allowed, blocked, count, remaining, retry_after
 
 RateLimit::clear('login:' . ip());   // after a successful login
 ```
@@ -1797,7 +1810,7 @@ return [
     'view'     => ['caching' => true, 'minify' => true],
     'route'    => ['caching' => true, 'auto-check' => false],
     'log'      => ['enabled' => true, 'level' => 'debug', 'days' => 14],
-    'throttle' => ['enabled' => true, 'limit' => 60, 'window' => 60, 'by' => 'ip', 'rules' => [...]],
+    'throttle' => ['enabled' => true, 'limit' => 60, 'window' => 60, 'by' => 'ip', 'block' => 0],
     'session'  => ['driver' => 'file', 'gc_probability' => 1],
     'response' => ['ajax' => ['include-alerts' => true], 'cache-ttl' => 600, 'page-cache' => true],
     'cache'    => ['apcu' => true],

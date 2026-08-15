@@ -57,6 +57,7 @@ Route::has(string $keyword): bool
 Route::pre(string $prefix, ?string $namePrefix = null)          // url + name prefix
 Route::middleware(array $list, $callback = null)
 Route::noCSRF()
+Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
 Route::group(\Closure $callback)
 ```
 
@@ -251,10 +252,12 @@ Log::debug|info|warning|error(string $message, array $context = []): void
 
 ### RateLimit
 ```php
-RateLimit::hit(string $key, int $limit, int $window): array   // allowed, count, remaining, retry_after
+RateLimit::hit(string $key, int $limit, int $window, int $block = 0): array
+        // allowed, blocked, count, remaining, retry_after
 RateLimit::clear(string $key): void
 ```
-Usually reached through `App\Middlewares\Throttle`, which is opt-in per route group.
+Usually reached through `Route::throttle()`, which carries the numbers and attaches the
+`App\Middlewares\Throttle` middleware in one call.
 
 ### Schedule
 ```php

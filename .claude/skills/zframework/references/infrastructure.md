@@ -209,7 +209,8 @@ command and by nothing else, so a served request pays nothing for it.
 ## Rate limiting — `RateLimit::` and the `Throttle` middleware
 
 ```php
-RateLimit::hit(string $key, int $limit, int $window): array   // allowed, count, remaining, retry_after
+RateLimit::hit(string $key, int $limit, int $window, int $block = 0): array
+        // allowed, blocked, count, remaining, retry_after
 RateLimit::clear(string $key): void
 ```
 
@@ -219,27 +220,49 @@ across every worker and machine; otherwise to one `flock`'d file per key under
 send up to twice the limit across a boundary, and buying accuracy past that costs a sorted set
 and a read of it on every request.
 
-**Which routes are limited is decided by where you attach the middleware:**
+**The limit lives on the route group**, next to the routes it governs:
 
 ```php
-Route::pre('/api')->middleware([Throttle::class, API::class])->noCSRF()->group(...);
-Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...));
+Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
 ```
 
-**How hard, by config:**
+```php
+Route::pre('/api')->throttle(120)->middleware([API::class])->noCSRF()->group(...);
+Route::throttle(5, 300)->group(fn() => Route::post('/sign-in', ...));
+Route::pre('/search')->throttle(100, 10, block: 600)->group(...);
+```
+
+`throttle()` attaches the middleware as well, so it is the only call needed. There is
+deliberately **no url-prefix table in config** - that is a second copy of the routing, and it
+stops matching the moment a url changes, which with a translated prefix
+(`pre('/' . _l('routes.admin.route'), '/admin')`) is every request.
+
+`config/framework.php` carries only the fallback, for a group that attaches the middleware
+without naming a number:
 
 ```php
 'throttle' => [
-    'enabled' => true,
+    'enabled' => true,   // false turns every limit off, wherever it was declared
     'limit'   => 60,
     'window'  => 60,
-    'by'      => 'ip',       // ip | token - `token` counts a logged-in caller by identity
-    'rules'   => [           // per url prefix, longest match wins
-        '/api'     => ['limit' => 120],
-        '/sign-in' => ['limit' => 5, 'window' => 300],
-    ],
+    'by'      => 'ip',   // ip | token - `token` counts a logged-in caller by identity
+    'block'   => 0,
 ],
 ```
+
+**`block` is the answer to someone hammering an endpoint.** Without it, passing the limit means
+"wait for the next window", and a flood gets a fresh allowance every window forever. With it,
+passing the limit means refused for that long - answered on a single read, with the counter
+left alone, before any route is matched or session touched:
+
+```php
+Route::pre('/search')->throttle(100, 10, block: 600)->group(...);
+// 100 requests in 10 seconds is not a person - the next 10 minutes are refused outright
+```
+
+Measured with `throttle(3, 10, block: 15)`: requests 1-3 pass, the 4th returns 429 with
+`try_again_in: 15`, the counter stops moving while blocked, the wait counts 15 → 10 → 5, and
+the request after that is served.
 
 `Throttle` **answers 429 itself** rather than declining. A declined middleware with no fallback
 closure ends as a 404 (see `references/routing.md`), and a 404 is the wrong answer to "you are

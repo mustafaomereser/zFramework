@@ -56,28 +56,31 @@ return [
     ],
 
     /**
-     * Rate limiting - App\Middlewares\Throttle.
+     * Rate limiting defaults.
      *
-     * Nothing is limited until you put the middleware on a route group; this
-     * only says how hard. Counters go to redis when it is configured, otherwise
-     * to storage/ratelimit.
+     * The limit itself belongs on the route group that needs it:
      *
-     * limit/window  Requests per seconds, for anything without its own rule.
-     * by            ip | token. `token` counts a logged-in caller by identity
-     *               and everyone else by ip.
-     * rules         Per url prefix, longest match wins. Any key may be
-     *               overridden; the rest fall back to the values above.
+     *     Route::pre('/api')->throttle(120)->group(...);
+     *     Route::throttle(5, 300)->group(fn() => Route::post('/sign-in', ...));
+     *
+     * These values are only the fallback, for a group that attaches the
+     * middleware without naming a number. There is no url-prefix table here on
+     * purpose - that would be a second copy of the routing, and it would stop
+     * matching the moment a url changed.
+     *
+     * enabled  false turns every limit off, wherever it was declared.
+     * by       ip | token. `token` counts a logged-in caller by identity, so one
+     *          account cannot spread its quota across addresses.
+     * block    Seconds to refuse a caller outright once the limit is passed, on
+     *          a single read - no counter, no route, no session. 0 keeps the
+     *          plain window, where the next one lets them straight back in.
      */
     'throttle' => [
         'enabled' => true,
         'limit'   => 60,
         'window'  => 60,
         'by'      => 'ip',
-        'rules'   => [
-            '/api'      => ['limit' => 120],
-            '/sign-in'  => ['limit' => 5, 'window' => 300],
-            '/sign-up'  => ['limit' => 5, 'window' => 900],
-        ],
+        'block'   => 0,
     ],
 
     /**

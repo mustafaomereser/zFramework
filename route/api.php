@@ -1,18 +1,17 @@
 <?php
 
 use App\Middlewares\API;
-use App\Middlewares\Throttle;
 use zFramework\Core\Facades\Auth;
 use zFramework\Core\Facades\Response;
 use zFramework\Core\Route;
 
-# Throttle first, deliberately. It aborts 429 rather than declining, and an abort
-# unwinds out of the middleware loop - so a caller over the limit never reaches
-# API::class and never costs the token lookup it would have done.
+# throttle() attaches the middleware and carries the limit with it, so the number
+# lives next to the routes it governs rather than in a config table keyed by url.
 #
-# Limits come from config/framework.php throttle, where `/api` has its own rule.
-# Throttle aborts itself, so the group needs no fallback closure.
-Route::pre('/api')->middleware([Throttle::class, API::class])->noCSRF()->group(function () {
+# It runs before API::class: the 429 unwinds out of the middleware loop, so a
+# caller over the limit never costs the Auth-Token lookup. The group needs no
+# fallback closure either - Throttle answers 429 itself.
+Route::pre('/api')->throttle(120)->middleware([API::class])->noCSRF()->group(function () {
     Route::pre('/v1')->group(function () {
         Route::get('/', fn() => Response::json([
             'status'    => rand(0, 999),

@@ -6,17 +6,22 @@ use zFramework\Core\Facades\Auth;
 use zFramework\Core\Facades\Config;
 use zFramework\Core\Facades\RateLimit;
 use zFramework\Core\Facades\Response;
+use zFramework\Core\Route;
 use zFramework\Core\ResponseSignal;
 
 /**
  * Rate limit, opt-in per route group:
  *
- *   Route::pre('/api')->middleware([Throttle::class, API::class])->noCSRF()->group(...);
- *   Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...));
+ *   Route::pre('/api')->throttle(120)->middleware([API::class])->noCSRF()->group(...);
+ *   Route::throttle(5, 300)->group(fn() => Route::post('/sign-in', ...));
  *
- * Limits come from config/framework.php under `throttle`, matched by url prefix
- * with the longest match winning, falling back to the default. Which pages are
- * limited is decided by where you attach the middleware; how hard, by config.
+ * The limit comes from the route group - `Route::pre('/api')->throttle(120)` -
+ * so it sits with the routes it governs. config/framework.php carries only the
+ * defaults, for a group that attaches the middleware without saying a number.
+ *
+ * Deliberately not a url-prefix table in config: that is a second copy of the
+ * routing, and it stops matching silently the moment a url changes - which with
+ * a translated prefix it does on every request.
  *
  * It answers 429 itself rather than declining. A declined middleware with no
  * fallback closure ends as a 404 - see references/routing.md - and a 404 is the
@@ -34,9 +39,9 @@ class Throttle
         $config = (array) (Config::framework('throttle') ?: []);
         if (!($config['enabled'] ?? true)) return true;
 
-        $rule = self::rule($config, uri());
+        $rule = self::rule($config);
 
-        $hit = RateLimit::hit(self::caller($rule['by'] ?? 'ip'), (int) $rule['limit'], (int) $rule['window']);
+        $hit = RateLimit::hit(self::caller($rule['by']), (int) $rule['limit'], (int) $rule['window'], (int) $rule['block']);
 
         Response::header('X-RateLimit-Limit', (string) $rule['limit']);
         Response::header('X-RateLimit-Remaining', (string) $hit['remaining']);
@@ -54,7 +59,8 @@ class Throttle
             # The http status, not a boolean - `false` says something went wrong
             # without saying what, and the caller has to branch on it anyway.
             'status'       => 429,
-            'message'      => 'Too many requests. Try again in ' . $hit['retry_after'] . ' seconds.',
+            'message'      => ($hit['blocked'] ? 'Blocked for sending too many requests. Try again in ' : 'Too many requests. Try again in ')
+                . $hit['retry_after'] . ' seconds.',
             'try_again_in' => $hit['retry_after'],
         ], JSON_UNESCAPED_UNICODE));
     }
@@ -65,31 +71,21 @@ class Throttle
     }
 
     /**
-     * Longest matching url prefix wins, so `/api/upload` can be stricter than
-     * `/api` without repeating the rest of it.
+     * What this group asked for, falling back to the config defaults.
      *
-     * @param array  $config
-     * @param string $uri
-     * @return array{limit: int, window: int, by: string}
+     * @param array $config
+     * @return array{limit: int, window: int, by: string, block: int}
      */
-    private static function rule(array $config, string $uri): array
+    private static function rule(array $config): array
     {
-        $rule = [
-            'limit'  => (int) ($config['limit'] ?? 60),
-            'window' => (int) ($config['window'] ?? 60),
-            'by'     => (string) ($config['by'] ?? 'ip'),
+        $group = (array) (Route::$matchedGroups['throttle'] ?? []);
+
+        return [
+            'limit'  => (int) ($group['limit']  ?? $config['limit']  ?? 60),
+            'window' => (int) ($group['window'] ?? $config['window'] ?? 60),
+            'by'     => (string) ($group['by']  ?? $config['by']     ?? 'ip'),
+            'block'  => (int) ($group['block']  ?? $config['block']  ?? 0),
         ];
-
-        $best = -1;
-
-        foreach ((array) ($config['rules'] ?? []) as $prefix => $override) {
-            if (!str_starts_with($uri, $prefix) || strlen($prefix) <= $best) continue;
-
-            $best = strlen($prefix);
-            $rule = ((array) $override) + $rule;
-        }
-
-        return $rule;
     }
 
     /**
