@@ -1,8 +1,10 @@
 # zFramework Validation
 
-Two entry points. Prefer the first.
+Two entry points, both fine. A Request class per endpoint when the rules are endpoint-specific;
+a `setAll()` method on the controller when store and update share them. Pick per case — do not
+generate a Request class reflexively for every action.
 
-## A Request class — the normal way
+## A Request class
 
 ```bash
 php terminal make request Post/StoreRequest      # App/Requests/Post/StoreRequest.php
@@ -65,14 +67,61 @@ $request->validated($id);
 
 Nothing in the repo does this yet; the mechanism is in `Abstracts/Request::validated()`.
 
-## `Validator::validate` — when there is no Request class
+## `Validator::validate` — the `setAll()` pattern
 
 ```php
 Validator::validate(?array $data, array $rules, array $attributeNames = [], ?Closure $callback = null): array
 ```
 
-Used directly in `modules/blog`, and fine for a small case. Note the callback changes the
-control flow — see below.
+**A Request class per endpoint is not required.** When store and update validate the same
+columns and both need the same derived fields, one method on the controller is less code and
+keeps the derivation next to the rules. `modules/blog` does this and it is a good pattern to
+copy:
+
+```php
+public function setAll($except = null)
+{
+    $validate = Validator::validate($_REQUEST, [
+        'title'   => ['required'],
+        'content' => ['required'],
+        'slug'    => ['nullable', 'unique:Modules\Blog\Models\Blogs' . ($except ? ";ex:$except" : '')],
+        'publish' => ['nullable'],
+    ]);
+
+    # Everything the row needs but the form does not send.
+    $validate['publish'] = $validate['publish'] ? 1 : 0;
+    $validate['slug']    = Str::slug($validate['title']);
+    $validate['user_id'] = Auth::id();
+
+    if (isset($_FILES['image']['name']) && strlen($_FILES['image']['name']))
+        $validate['image'] = File::upload('/uploads/blog', $_FILES['image']);
+
+    return $validate;
+}
+
+public function store()
+{
+    $post = $this->posts->insert($this->setAll());
+    …
+}
+
+public function update($id)
+{
+    $this->posts->where('id', $id)->update($this->setAll($id));   // ← excludes this row
+    …
+}
+```
+
+The `$except` parameter is the point: on update the row being edited would otherwise collide
+with its own `slug` on the `unique` rule. Passing the id appends `;ex:$id`, which is exactly
+what the rule's `ex` parameter is for. Without it, every update of an unchanged title fails.
+
+Reach for a Request class instead when the rules differ per endpoint, when you want
+`authorize`/`htmlencode`, or when the same rules are used from more than one controller.
+Either way the derived fields belong in one place — never duplicate them across `store()` and
+`update()`.
+
+Note the callback argument changes the control flow — see "What happens on failure" below.
 
 ## Rules
 

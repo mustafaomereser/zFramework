@@ -34,7 +34,10 @@ findings.
   the intended behaviour, not a bug — so the rule is ordering: every other route is defined
   **above** the root resource. A one-segment static route placed after it (or in
   `route/dynamic/`, which is included last) is out-ranked and served by `show($id)`.
-- **`oninsert`/`onupdate` observers must return `$sets`**, otherwise the data is lost.
+- **`oninsert`/`onupdate` observers return the sets they want written.** A returned array
+  replaces `$sets`; an empty or falsy return leaves the original data intact — it is *not*
+  lost (`if ($new_sets = $this->trigger(…)) $sets = $new_sets;`). The generated stub declares
+  `: array` though, so a body that returns nothing at all is a TypeError. Both measured.
 - **`Auth::model()` is lazy.** Do not construct the model inside `Auth::init()` — the model
   constructor opens a DB connection and loads the schema, and every visitor pays for it including
   those who are never asked for an identity. `special_columns` and `db` are read via
