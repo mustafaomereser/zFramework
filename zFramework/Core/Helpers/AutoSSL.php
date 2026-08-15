@@ -410,7 +410,7 @@ class AutoSSL
     public function issue(array $domains, string $challenge_type = "http-01"): array
     {
         // dns-01 needs manual TXT publishing between requests, so it cannot be fully automated here.
-        if ($challenge_type === 'dns-01') throw new \Exception("dns-01 cannot be issued automatically (manual TXT publishing required). Use newOrder/challenge/notifyChallenge/challengeAuth/finalize/getCertificate step by step — see HomeController for an example.");
+        if ($challenge_type === 'dns-01') throw new \Exception("dns-01 cannot be issued automatically (manual TXT publishing required). Use newOrder/challenge/notifyChallenge/challengeAuth/finalize/getCertificate step by step.");
 
         #region order and challenge
         $order      = $this->newOrder($domains);

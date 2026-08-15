@@ -122,8 +122,8 @@ Route::any('/ping', fn() => 'pong');   // matches any HTTP method
 Both forms are equivalent:
 
 ```php
-Route::get('/', [HomeController::class, 'index']);
-Route::get('/', 'HomeController@index');
+Route::get('/', [WelcomeController::class, 'index']);
+Route::get('/', 'WelcomeController@index');
 ```
 
 The controller is resolved by `findFile()` — it searches recursively in `App/Controllers/`.

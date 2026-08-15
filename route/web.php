@@ -2,7 +2,7 @@
 
 use App\Controllers\AuthController;
 use zFramework\Core\Route;
-use App\Controllers\HomeController;
+use App\Controllers\WelcomeController;
 use App\Controllers\LanguageController;
 use App\Controllers\PushNotificationController;
 
@@ -27,4 +27,4 @@ Route::middleware([App\Middlewares\Guest::class])->group(function () {
 Route::middleware([App\Middlewares\Auth::class])->group(fn() => Route::any('/sign-out', [AuthController::class, 'signout'])->name('sign-out'));
 
 Route::get('/auth-content', [AuthController::class, 'content'])->name('auth-content');
-Route::resource('/', HomeController::class);
+Route::resource('/', WelcomeController::class);

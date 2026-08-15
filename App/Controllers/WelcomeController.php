@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
 
-class HomeController extends Controller
+class WelcomeController extends Controller
 {
 
     public function __construct($method)
