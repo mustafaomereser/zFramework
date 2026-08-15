@@ -1,11 +1,11 @@
 <a href="https://buymeacoffee.com/mustafaomereser" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;" ></a>
 
-# zFramework v3.1.0
+# zFramework v3.1.2
 
 **Easiest, fastest PHP framework. (Simple)**
 
 ![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-blue)
-![Version](https://img.shields.io/badge/version-3.1.0-green)
+![Version](https://img.shields.io/badge/version-3.1.2-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
 ---
@@ -944,7 +944,7 @@ goes **inside** the section.
 `{{ }}` escapes, so it is the one to reach for without thinking. Anything that emits markup —
 `csrf()`, `inputMethod()`, a rendered partial — has to say so with `{!! !!}`.
 
-> **Changed in 3.1.0.** `{{ }}` used to be a bare `<?= ?>` that escaped nothing, and `{!! !!}`
+> **Changed in 3.1.2.** `{{ }}` used to be a bare `<?= ?>` that escaped nothing, and `{!! !!}`
 > did not exist. Upgrading an older project: every `{{ }}` that prints markup needs to become
 > `{!! !!}`, or it will render as visible text. Plain values need no change.
 
