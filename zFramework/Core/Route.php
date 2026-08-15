@@ -394,6 +394,12 @@ class Route
         $url = @self::$groups['pre'] . $args[0];
         while (strstr($url, '//')) $url = str_replace(['//'], ['/'], $url);
 
+        # `{id:int}` is split here: the type goes into its own map and the url
+        # keeps a plain `{id}`, so route() substitutes it exactly as before and
+        # a cached table stays a table of strings.
+        $types = self::parameterTypes($url);
+        if ($types) $url = preg_replace('/\{(\??)([\w]+):[\w]+\}/', '{$1$2}', $url);
+
         $segments   = self::segments($url);
         $parameters = array_values(array_filter($segments, fn($segment) => strstr($segment, '{') && strstr($segment, '}')));
 
@@ -401,6 +407,7 @@ class Route
             'url'        => $url,
             'method'     => strtoupper($method ?? ''),
             'parameters' => $parameters,
+            'types'      => $types,
             'groups'     => self::$groups,
             'callback'   => $args[1] ?? null,
             'segments'   => $segments,
@@ -441,13 +448,44 @@ class Route
     }
 
     /**
+     * What `{id:int}` may contain. An unrecognised name constrains nothing, so
+     * a typo weakens the route rather than making it match nothing at all.
+     */
+    private const PARAMETER_TYPES = [
+        'int'   => '/^-?\d+$/',
+        'uint'  => '/^\d+$/',
+        'float' => '/^-?\d+(?:\.\d+)?$/',
+        'alpha' => '/^[a-zA-Z]+$/',
+        'alnum' => '/^[a-zA-Z0-9]+$/',
+        'slug'  => '/^[a-zA-Z0-9_-]+$/',
+        'uuid'  => '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+    ];
+
+    /**
+     * Read the types out of a url, before they are stripped from it.
+     *
+     * @param string $url
+     * @return array<string, string> parameter name → type
+     */
+    private static function parameterTypes(string $url): array
+    {
+        if (!preg_match_all('/\{\??([\w]+):([\w]+)\}/', $url, $matches, PREG_SET_ORDER)) return [];
+
+        $types = [];
+        foreach ($matches as $match) $types[$match[1]] = strtolower($match[2]);
+
+        return $types;
+    }
+
+    /**
      * Compare a route's segments against the request's.
      *
-     * @param array $URL Route segments, may contain {id} / {?id}
-     * @param array $URI Request segments
+     * @param array $URL   Route segments, may contain {id} / {?id}
+     * @param array $URI   Request segments
+     * @param array $types Parameter name → type, for the constrained ones
      * @return array|false Extracted parameters, or false when it does not match.
      */
-    private static function matchSegments(array $URL, array $URI): array|false
+    private static function matchSegments(array $URL, array $URI, array $types = []): array|false
     {
         $parameters = [];
 
@@ -462,8 +500,18 @@ class Route
                 continue;
             }
 
-            $URL[$key] = $column;
-            $parameters[str_replace(['{?', '{', '}'], '', $row)] = $column;
+            $name = str_replace(['{?', '{', '}'], '', $row);
+
+            # A typed parameter that does not match is not a 404 - the route
+            # simply does not apply, and a later one gets its turn. That is what
+            # lets /{id:int} and /{slug} live side by side.
+            if (isset($types[$name])) {
+                $pattern = self::PARAMETER_TYPES[$types[$name]] ?? null;
+                if ($pattern && !preg_match($pattern, $column)) return false;
+            }
+
+            $URL[$key]        = $column;
+            $parameters[$name] = $column;
         }
 
         return array_values($URL) == array_values($URI) ? $parameters : false;
@@ -496,7 +544,7 @@ class Route
             $route = self::$routes[$key];
             if (!empty($route['method']) && $route['method'] != $method) continue;
 
-            $parameters = self::matchSegments($route['segments'], $URI);
+            $parameters = self::matchSegments($route['segments'], $URI, $route['types'] ?? []);
             if ($parameters === false) continue;
 
             $found = ['key' => $key, 'parameters' => $parameters];
@@ -566,6 +614,11 @@ class Route
         foreach ($parameters as $parameter) {
             $name       = $parameter->getName();
             $dependence = (string) $parameter->getType();
+
+            # No route model binding here, and it is not an oversight: rows are
+            # arrays, so `show(Post $post)` would have to hand an array to a
+            # parameter typed as Post - a TypeError before the method body runs.
+            # Binding would mean giving up array rows, and that is the framework.
             if (!empty(self::$calledRoute['parameters'][$name]) || !class_exists($dependence)) continue;
             self::$calledRoute['parameters'][$name] = new $dependence;
         }
