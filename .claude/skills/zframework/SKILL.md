@@ -285,12 +285,13 @@ to a bare `<?= ?>`), so it buys nothing over `<?= ?>` and parses more fragilely.
 `<?= e($x) ?>` when you need escaping. If the user asks for `{{ }}`, use it.
 
 These do **not** exist and will be printed literally into the page:
-`@for` `@while` `@switch` `{!! !!}` `{{-- --}}` `@auth` `@guest` `@csrf` `@method` `@push`
+`@for` `@while` `@switch` `{!! !!}` `@auth` `@guest` `@csrf` `@method` `@push`
 `@stack` `@component` `@each`. Use `<?= csrf() ?>` and `<?= inputMethod('PATCH') ?>`.
 
 What does exist: `@if @elseif @else @endif`, `@foreach @endforeach`,
 `@forelse @empty @endforelse`, `@isset @endisset`, `@empty @endempty`, `@php @endphp`,
-`@json($x)`, `@dump($x)`, `@dd($x)`.
+`@json($x)`, `@dump($x)`, `@dd($x)`, and `{{-- comment --}}` (stripped before anything else
+parses, so it may contain directives).
 
 Custom directive: `View::directive('page', fn($x) => ...)` in `App/Middlewares/ViewDirectives.php`.
 Auto-injected view data: `View::bind('app.main', fn() => ['user' => Auth::user()])`.

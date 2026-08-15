@@ -1,13 +1,11 @@
 @extends('app.main')
 
-<?php
-/**
- * Copy to resource/views/<app>/pages/<resource>/index.php
- *
- * The directory name matches the Route::resource url, so the route() names line up.
- * $posts comes from ->paginate(): items, item_count, current_page, links (a callable).
- */
-?>
+{{--
+    Copy to resource/views/<app>/pages/<resource>/index.php
+
+    The directory name matches the Route::resource url, so the route() names line up.
+    $posts comes from ->paginate(): items, item_count, current_page, links (a callable).
+--}}
 
 @section('body')
 <div class="my-4">

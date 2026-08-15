@@ -1,6 +1,6 @@
 @extends('app.main')
 
-<?php /* Copy to resource/views/<app>/pages/<resource>/show.php */ ?>
+{{-- Copy to resource/views/<app>/pages/<resource>/show.php --}}
 
 @section('body')
 <div class="my-4">

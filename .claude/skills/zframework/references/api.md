@@ -354,8 +354,7 @@ Module view: `blog.views.client.pages.index` → `modules/blog/views/client/page
 
 **The directive list, the directory contract and the engine's real behaviour are in
 `references/views.md`.** Do not write a template from memory of Blade — several directives that
-look obvious (`@for`, `{!! !!}`, `{{-- --}}`, `@csrf`) do not exist here, and `{{ }}` does not
-escape.
+look obvious (`@for`, `{!! !!}`, `@csrf`) do not exist here, and `{{ }}` does not escape.
 
 ## Terminal — `php terminal <module> <command>`
 
