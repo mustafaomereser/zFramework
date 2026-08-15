@@ -362,6 +362,7 @@ class View
      */
     private static function parse(): void
     {
+        self::parseComments();
         self::parseIncludes();
         self::maskCssAtRules();
         self::parsePHP();
@@ -474,6 +475,31 @@ class View
     }
 
     /**
+     * Strip {{-- comment --}} blocks.
+     *
+     * Runs before everything else, so a comment can hold anything the compiler
+     * would otherwise act on - a {{ }} echo, an @include, a half-written tag.
+     * Nothing reaches the compiled file, so comments cost nothing at runtime and
+     * never show up in the page source.
+     *
+     * @param string $template
+     * @return string
+     */
+    private static function stripComments(string $template): string
+    {
+        return preg_replace('/\{\{--.*?--\}\}/s', '', $template);
+    }
+
+    /**
+     * Parse {{-- comment --}} out of the template.
+     * Example: {{-- this line is gone before anything else runs --}}
+     */
+    public static function parseComments(): void
+    {
+        self::$view = self::stripComments(self::$view);
+    }
+
+    /**
      * Parse {{ $variable }} into PHP echo short tags.
      * Example: {{ $title }} => <?=$title?>
      */
@@ -548,7 +574,9 @@ class View
 
                 if (!is_file($path)) throw new \RuntimeException('View: @include(\'' . $viewName[1] . '\') in `' . self::$view_name . '` - no such view (' . $path . ').');
 
-                return file_get_contents($path);
+                # Strip the partial's own comments as it comes in: parse() already
+                # ran parseComments over the parent, and this text arrives after.
+                return self::stripComments(file_get_contents($path));
             }, self::$view);
 
             if (self::$view === $before) return;
