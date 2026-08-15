@@ -695,6 +695,7 @@ class View
             fn($expression) => '<?php if (isset(' . $expression[1] . ')): ?>',
             self::$view
         );
+        self::$view = preg_replace('/@endisset/', '<?php endif; ?>', self::$view);
     }
 
     /**
