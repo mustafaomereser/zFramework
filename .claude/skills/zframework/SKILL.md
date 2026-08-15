@@ -149,6 +149,12 @@ conditionally — behind a module's `status`, inside `route/dynamic/`, or behind
 condition — may not appear in it. To know what is actually registered, read `route/web.php`,
 `route/api.php`, `route/dynamic/*` and each enabled module's `route/web.php`.
 
+Two group traps, both verified: a `pre()`/`middleware()` left without `->group()` leaks into
+the *next* group, and two `middleware()` calls chained at the same level keep only the second.
+And a declined middleware with **no fallback closure gives a 404** — the middleware's own
+`error()` never runs on the routing path. Pass `fn($declines) => abort(403)` if you want
+anything else. Full detail in `references/routing.md`.
+
 ### Model
 
 ```php
@@ -330,6 +336,9 @@ Keep it that way (see `references/conventions.md`).
 
 - **`references/api.md`** — exact signatures for every facade, helper, DB method, job and CLI
   helper. Check here when unsure about parameter order.
+- **`references/routing.md`** — groups and prefixes (`Route::pre`, `middleware`, `noCSRF`),
+  how they nest, the two ways a group leaks, the middleware contract, and what a declined
+  middleware actually does. Read it before building a protected area.
 - **`references/views.md`** — the `resource/views` directory contract, which directives exist and
   which only look like they do, and how the compiler actually behaves. Read it before writing
   a template.

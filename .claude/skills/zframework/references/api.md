@@ -60,6 +60,9 @@ Route::noCSRF()
 Route::group(\Closure $callback)
 ```
 
+**Groups, prefixes, the middleware contract and the two ways a group leaks are in
+`references/routing.md`.** Signatures here; behaviour there.
+
 Resource mapping:
 
 | Method | URL | Controller |

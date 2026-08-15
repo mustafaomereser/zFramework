@@ -210,6 +210,11 @@ Route::pre('/admin')
     });
 ```
 
+**Pass the fallback closure.** Without it a declined middleware produces a 404, and the
+middleware's own `error()` method does not run — it is only reached when you call
+`Middleware::middleware()` yourself. See `references/routing.md` for that and for the two ways
+a group leaks into the next one.
+
 Your own middleware:
 ```bash
 php terminal make middleware IsAdmin
