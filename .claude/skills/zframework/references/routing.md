@@ -82,12 +82,56 @@ Route::pre('/admin')->middleware([Auth::class])->group(function () {
 The inner group inherits the outer prefix and its middleware list, and the outer settings are
 restored afterwards — `/after` is back to `[Auth]`.
 
-The second argument splits the name from the url, which is how a url can be renamed without
-touching any `route()` call site:
+#### The name is built top-down, one segment per `pre()`
+
+This is the part that differs most from Laravel, where `prefix()` touches only the url and the
+name prefix is a separate call. Here **`pre()` contributes a name segment by itself** — you
+never write a name prefix, you only write the last piece on the route:
 
 ```php
-Route::pre('/devices', '/assets')->group(fn() => Route::get('/list', …)->name('list'));
-// url /devices/list, name assets.list
+Route::pre('/admin')->group(function () {
+    Route::get('/dash', …)->name('dash');                    // admin.dash
+    Route::get('/no-name', …);                               // no name at all — key stays numeric
+    Route::get('/slashed', …)->name('sub/leaf');             // admin.sub.leaf
+    Route::pre('/blog')->group(function () {
+        Route::get('/posts', …)->name('posts');              // admin.blog.posts
+        Route::resource('/category', CategoryController::class);
+        //   admin.blog.category.index / .create / .show / .edit / .store / .update / .delete
+        Route::pre('/deep')->group(fn() =>
+            Route::get('/x', …)->name('x'));                 // admin.blog.deep.x
+    });
+});
+```
+
+Every `/` becomes a `.` — in the prefixes and in the name you pass, which is why
+`->name('sub/leaf')` comes out as `sub.leaf`. Leading and doubled dots are trimmed.
+
+Always look a route up by its **full** name: `route('admin.blog.category.edit', ['id' => 5])`.
+There is no "current group" shorthand.
+
+A route with no `->name()` keeps a numeric array key and cannot be looked up by name at all.
+
+#### Splitting the name from the url
+
+The second argument replaces the name segment for that level, which is how a url can change
+without touching a single `route()` call site:
+
+```php
+Route::pre('/devices', '/assets')->group(function () {
+    Route::get('/list', …)->name('list');                    // url /devices/list      name assets.list
+    Route::pre('/sub')->group(fn() =>
+        Route::get('/y', …)->name('y'));                     // url /devices/sub/y     name assets.sub.y
+});
+```
+
+Only that level is substituted — nested levels still contribute their own url prefix to the
+name (`/sub` → `.sub`).
+
+Pass an empty string to add a url prefix that contributes **nothing** to the name:
+
+```php
+Route::pre('/panel', '')->group(fn() => Route::get('/a', …)->name('a'));
+// url /panel/a, name just "a"
 ```
 
 `noCSRF` is inherited by nested groups too.

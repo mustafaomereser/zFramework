@@ -125,7 +125,9 @@ the directory contract they follow.
 Route::get('/posts/{id}', [PostController::class, 'show'])->name('posts.show');
 Route::resource('/posts', PostController::class);   // index/show/create/edit/store/update/delete
 
-Route::pre('/admin')                                 // prefixes BOTH url and name (accumulates)
+Route::pre('/admin')            // one name segment per level, built top-down: admin.posts.index
+                                // Route::pre('/devices', '/assets') renames without touching the url
+                                // Route::pre('/panel', '')          url prefix, no name segment
     ->middleware([Auth::class], fn($declines) => abort(403))
     ->group(function () {
         Route::resource('/posts', AdminPostController::class);  // admin.posts.index ...
