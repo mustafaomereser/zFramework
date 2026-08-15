@@ -1,0 +1,22 @@
+{
+    // Extensions this project talks to but does not require at runtime. Without
+    // them here, intelephense reports "Undefined type 'Redis'" on the two places
+    // Redis.php touches the real class - the code is correct, the editor just
+    // does not know the class exists unless the extension is installed locally.
+    //
+    // "redis" and "apcu" are the two the framework guards behind availability
+    // checks; the rest are intelephense's own defaults, which get replaced
+    // rather than extended when this key is set.
+    "intelephense.stubs": [
+        "apache", "bcmath", "bz2", "calendar", "com_dotnet", "Core", "ctype", "curl",
+        "date", "dba", "dom", "enchant", "exif", "FFI", "fileinfo", "filter", "fpm",
+        "ftp", "gd", "gettext", "gmp", "hash", "iconv", "imap", "intl", "json", "ldap",
+        "libxml", "mbstring", "meta", "mysqli", "oci8", "odbc", "openssl", "pcntl",
+        "pcre", "PDO", "pdo_ibm", "pdo_mysql", "pdo_pgsql", "pdo_sqlite", "pgsql",
+        "Phar", "posix", "pspell", "readline", "Reflection", "session", "shmop",
+        "SimpleXML", "snmp", "soap", "sockets", "sodium", "SPL", "sqlite3", "standard",
+        "superglobals", "sysvmsg", "sysvsem", "sysvshm", "tidy", "tokenizer", "xml",
+        "xmlreader", "xmlrpc", "xmlwriter", "xsl", "zip", "zlib",
+        "redis", "apcu"
+    ]
+}
