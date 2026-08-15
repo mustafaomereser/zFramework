@@ -6,10 +6,13 @@ use zFramework\Core\Facades\Auth;
 use zFramework\Core\Facades\Response;
 use zFramework\Core\Route;
 
-# API::class authenticates from the Auth-Token header; Throttle::class limits the
-# caller. Limits come from config/framework.php throttle - `/api` has its own rule
-# there. Throttle aborts 429 itself, so the group needs no fallback closure.
-Route::pre('/api')->middleware([API::class, Throttle::class])->noCSRF()->group(function () {
+# Throttle first, deliberately. It aborts 429 rather than declining, and an abort
+# unwinds out of the middleware loop - so a caller over the limit never reaches
+# API::class and never costs the token lookup it would have done.
+#
+# Limits come from config/framework.php throttle, where `/api` has its own rule.
+# Throttle aborts itself, so the group needs no fallback closure.
+Route::pre('/api')->middleware([Throttle::class, API::class])->noCSRF()->group(function () {
     Route::pre('/v1')->group(function () {
         Route::get('/', fn() => Response::json([
             'status'    => rand(0, 999),
