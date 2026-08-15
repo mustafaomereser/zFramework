@@ -5,26 +5,24 @@ namespace zFramework\Core\Facades;
 /**
  * Server-side full-page cache.
  *
- * Response::cache() sets the HTTP headers - it tells the browser and any CDN in
- * front of you to reuse their copy. It does nothing for a request that actually
- * reaches PHP: the page is rendered again every time. This stores the rendered
- * output and serves it back without running the route at all.
+ * Page::cache() declares a page cacheable. That alone sets the HTTP headers -
+ * the browser and any CDN reuse their copy, but a request that reaches PHP still
+ * re-renders. With response.page-cache on, the rendered output is stored here
+ * and replayed without running the route at all.
  *
- * Off by default (response.page-cache). While off, nothing here is loaded - the
- * calls in Run::handle() are behind a config check, so the class is never
- * autoloaded.
+ * Nothing is stored unless a page declares it, so the config is a kill switch
+ * rather than a second opt-in. Run::handle() checks for the directory before
+ * touching this class, so an application that never declares a cacheable page
+ * pays one stat and never loads the file.
  *
- * What is never cached, regardless of what the page declared:
+ * What is never stored, whatever the page said:
  *
  *   - anything but GET
  *   - a request carrying an auth cookie, so a logged-in page can never be
  *     stored and handed to the next visitor
  *   - a response that is not 200
- *
- * That leaves the developer one rule to hold: a page declared cacheable must be
- * the same for everyone. A csrf token in the body is the usual thing that
- * quietly breaks it - the token is per-session, so a cached one is wrong for
- * everybody who gets it afterwards.
+ *   - a body containing a csrf token - it is per-session, and the copy would be
+ *     wrong for everybody who receives it
  */
 class Page
 {
@@ -89,6 +87,7 @@ class Page
     {
         Response::cacheTtl(0);
         Response::header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        Response::header('Pragma', 'no-cache');
         Response::header('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT');
     }
 
@@ -134,8 +133,19 @@ class Page
             return false;
         }
 
+        # A stored page is cacheable by definition, so the live default sent at
+        # bootstrap has to go - Pragma: no-cache is HTTP/1.0 and outranks the
+        # Cache-Control being replayed on the intermediaries that read it.
+        if (PHP_SAPI !== 'cli') {
+            if (!headers_sent()) header_remove('Pragma');
+        } else {
+            Response::dropHeader('Pragma');
+        }
+
         foreach ((array) ($meta['headers'] ?? []) as [$name, $value]) Response::header($name, $value);
-        Response::header('X-Page-Cache', 'HIT');
+        # Debug only: in production it tells a visitor which pages are cached,
+        # which is a map of where to look for a stale-token or stale-content bug.
+        if (Config::get('app.debug') ?? false) Response::header('X-Page-Cache', 'HIT');
 
         while (!feof($handle)) echo fread($handle, 65536);
         fclose($handle);
@@ -154,6 +164,20 @@ class Page
     {
         if ($ttl <= 0 || !self::eligible()) return;
         if (Response::status() !== 200) return;
+
+        # A csrf token is per-session. Storing a page that carries one hands the
+        # same token to everybody who gets the copy, and every form they submit
+        # fails with 406 - a loop, if the page submits on load.
+        #
+        # Caught here rather than left to the developer because the failure is
+        # remote from its cause: the page renders fine, and only the next
+        # visitor's POST breaks. The headers are undone too, or the browser
+        # would keep replaying the stale token from its own cache.
+        if (str_contains($body, "name='_token'") || str_contains($body, 'name="_token"')) {
+            self::noCache();
+            Log::warning('Page not cached: it contains a csrf token.', ['url' => $_SERVER['REQUEST_URI'] ?? '/']);
+            return;
+        }
 
         $dir = self::dir();
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return;
