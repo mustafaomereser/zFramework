@@ -1378,7 +1378,7 @@ Opt-in per route group. **Which routes are limited is where you attach the middl
 hard, in config.**
 
 ```php
-Route::pre('/api')->middleware([API::class, Throttle::class])->noCSRF()->group(...);
+Route::pre('/api')->middleware([Throttle::class, API::class])->noCSRF()->group(...);
 Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...));
 ```
 
@@ -1397,9 +1397,20 @@ Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...)
 ],
 ```
 
-`Throttle` **aborts 429 itself** rather than declining, because a declined middleware with no
-fallback closure ends as a 404 and that is the wrong answer to "you are going too fast". It
-sends `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After`.
+`Throttle` **answers 429 itself** rather than declining, because a declined middleware with no
+fallback closure ends as a 404 and that is the wrong answer to "you are going too fast". The
+body is JSON — there is no `errors/*/429` view, and a 429 is read by retry logic more often
+than by a person:
+
+```json
+{"status": false, "message": "Too many requests.", "try_again_in": 59}
+```
+
+`X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After` go with it.
+
+**Put it first in the list.** The response unwinds out of the middleware loop, so a caller over
+the limit never reaches whatever follows — on the API group that skips the `Auth-Token` lookup
+entirely.
 
 The counter underneath is usable directly:
 

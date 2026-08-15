@@ -222,7 +222,7 @@ and a read of it on every request.
 **Which routes are limited is decided by where you attach the middleware:**
 
 ```php
-Route::pre('/api')->middleware([API::class, Throttle::class])->noCSRF()->group(...);
+Route::pre('/api')->middleware([Throttle::class, API::class])->noCSRF()->group(...);
 Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...));
 ```
 
@@ -241,9 +241,21 @@ Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...)
 ],
 ```
 
-`Throttle` **aborts 429 itself** rather than declining. A declined middleware with no fallback
+`Throttle` **answers 429 itself** rather than declining. A declined middleware with no fallback
 closure ends as a 404 (see `references/routing.md`), and a 404 is the wrong answer to "you are
-going too fast". Sends `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After`.
+going too fast". The body is JSON, because there is no `errors/*/429` view and a 429 is read by
+retry logic more often than by a person:
+
+```json
+{"status": false, "message": "Too many requests.", "try_again_in": 59}
+```
+
+Sends `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After` with it.
+
+**Order it first in the list.** The response is a `ResponseSignal`, which unwinds out of the
+middleware loop, so a caller over the limit never reaches whatever follows. On the API group
+that skips the `Auth-Token` lookup entirely - measured: limit 2, four requests,
+`API::attempt()` ran twice.
 
 Call `RateLimit::clear('login:' . ip())` after a successful login, so a few failed attempts do
 not keep counting against someone who then got it right.

@@ -6,20 +6,25 @@ use zFramework\Core\Facades\Auth;
 use zFramework\Core\Facades\Config;
 use zFramework\Core\Facades\RateLimit;
 use zFramework\Core\Facades\Response;
+use zFramework\Core\ResponseSignal;
 
 /**
  * Rate limit, opt-in per route group:
  *
- *   Route::pre('/api')->middleware([API::class, Throttle::class])->noCSRF()->group(...);
+ *   Route::pre('/api')->middleware([Throttle::class, API::class])->noCSRF()->group(...);
  *   Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...));
  *
  * Limits come from config/framework.php under `throttle`, matched by url prefix
  * with the longest match winning, falling back to the default. Which pages are
  * limited is decided by where you attach the middleware; how hard, by config.
  *
- * It aborts with 429 itself rather than declining. A declined middleware with no
+ * It answers 429 itself rather than declining. A declined middleware with no
  * fallback closure ends as a 404 - see references/routing.md - and a 404 is the
  * wrong answer to "you are going too fast", so this does not leave it to chance.
+ *
+ * Order it first in the list. The response is a signal, which unwinds out of the
+ * middleware loop, so a caller over the limit never reaches whatever follows -
+ * on the API group that saves the token lookup.
  */
 #[\AllowDynamicProperties]
 class Throttle
@@ -38,8 +43,18 @@ class Throttle
 
         if ($hit['allowed']) return true;
 
-        Response::header('Retry-After', (string) $hit['retry_after']);
-        abort(429, 'Too many requests. Try again in ' . $hit['retry_after'] . ' seconds.');
+        # JSON rather than abort(429). There is no errors/*/429 view, so abort
+        # would have emitted the bare message as text - and a 429 is read by
+        # retry logic more often than by a person, which wants the wait as a
+        # number rather than inside a sentence.
+        throw new ResponseSignal(429, [
+            'Content-Type' => 'application/json; charset=utf-8',
+            'Retry-After'  => (string) $hit['retry_after'],
+        ], json_encode([
+            'status'       => false,
+            'message'      => 'Too many requests.',
+            'try_again_in' => $hit['retry_after'],
+        ], JSON_UNESCAPED_UNICODE));
     }
 
     public function error()
