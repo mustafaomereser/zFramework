@@ -45,8 +45,43 @@ key, so naming both PATCH and PUT would have one overwrite the other.
 With `Route::resource('/', …)` the leading dot is trimmed and the names are bare: `index`,
 `store`, `show`, … That is how the framework's own `/` route is registered.
 
-Parameters are `{id}` (required) or `{?id}` (optional) — plain segment matching. **There is no
-`Route::where()`**; you cannot constrain a parameter with a regex.
+## Url parameters
+
+`{id}` is required, `{?id}` optional. A parameter may carry a type, and **omitting it is
+exactly the old behaviour** — `{id}` still matches any segment.
+
+```php
+Route::get('/urun/{id:int}', [ProductController::class, 'show'])->name('product.show');
+Route::get('/urun/{slug}',   [ProductController::class, 'bySlug'])->name('product.slug');
+```
+
+`int` `uint` `float` `alpha` `alnum` `slug` `uuid`. An unrecognised name constrains nothing, so
+a typo weakens a route rather than making it match nothing at all — there is no
+`Route::where()` and no raw regex.
+
+**A type that does not match is not a 404.** The route simply does not apply and the next one
+gets its turn, which is the whole point: the two routes above coexist, `/urun/42` reaching the
+first and `/urun/mavi-tisort` falling through to the second. Measured, along with `/tip/-5`
+being refused by `uint` and landing on an untyped route.
+
+The type is split off the url when the route is registered and kept in its own map, so the
+stored url is a plain `{id}`: `route('product.show', ['id' => 42])` substitutes it unchanged
+and a compiled table stays a table of strings.
+
+**Handler parameters are matched by name**, so `/posts/{id}` needs `$id`, not `$postId`.
+
+### No route model binding
+
+`show(Post $post)` does not work and will not be added. Rows are arrays, so binding would hand
+an array to a parameter typed as `Post` and TypeError before the method body runs — verified,
+not assumed. Take the id and look the row up:
+
+```php
+public function show($id)
+{
+    $post = $this->posts->where('id', $id)->firstOrFail('No such post.');
+}
+```
 
 ## Groups
 

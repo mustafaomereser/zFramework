@@ -60,6 +60,10 @@ Route::noCSRF()
 Route::group(\Closure $callback)
 ```
 
+Url parameters are `{id}` (required) or `{?id}` (optional), and may carry a type:
+`{id:int}` - `int uint float alpha alnum slug uuid`. Omitting it is exactly what it was.
+See `references/routing.md`.
+
 **Groups, prefixes, the middleware contract and the two ways a group leaks are in
 `references/routing.md`.** Signatures here; behaviour there.
 
@@ -202,6 +206,12 @@ JustOneTime::get(string $name): mixed
 ### Response
 ```php
 Response::json(array $data, ?string $flags = null)
+Response::status(?int $code = null): int
+Response::header(string $name, string $value, bool $replace = true): void
+Response::headers(): array
+Response::dropHeader(string $name): void
+Response::cacheTtl(?int $set = null): int      // set by Page::cache(), read by the store
+Response::cacheName(?string $set = null): ?string
 Response::header(string $name, string $value, bool $replace = true)
 Response::status(?int $code = null): int
 Response::addination(string $key, mixed $data)     // attach an extra field to the JSON response
@@ -219,6 +229,42 @@ Redis::available(string $for = 'cache'): bool
 Redis::get/set/delete(string $key, ..., string $for = 'cache')
 Redis::push/pop/size(string $key, ..., string $for = 'queue')
 ```
+
+### Page — full-page and HTTP caching
+```php
+Page::cache(?int $seconds = null, bool $shared = true, ?string $name = null): void
+Page::noCache(): void
+Page::vary(string ...$headers): void          // Vary header; takes the response out of the store
+Page::forget(string $name): int               // every entry tagged $name
+Page::forgetUrl(string $url, string $method = 'GET'): bool
+Page::clear(): int
+```
+Live by default; nothing is stored unless a page declares it. Never stores a non-GET, a
+request with an auth cookie, a non-200, a body with a csrf token, or anything private or
+varying. Detail and the invalidation patterns: **`references/caching.md`**.
+
+### Log
+```php
+Log::debug|info|warning|error(string $message, array $context = []): void
+```
+`storage/logs/Y-m-d.log`. Not the error handler - see `references/infrastructure.md`.
+
+### RateLimit
+```php
+RateLimit::hit(string $key, int $limit, int $window): array   // allowed, count, remaining, retry_after
+RateLimit::clear(string $key): void
+```
+Usually reached through `App\Middlewares\Throttle`, which is opt-in per route group.
+
+### Schedule
+```php
+Schedule::cron(string $expression, \Closure $job, string $name): void
+Schedule::everyMinute|everyMinutes|hourly|daily|weekly|monthly(...)
+Schedule::run(?callable $report = null): int      // used by `php terminal schedule run`
+Schedule::due(string $expression, ?int $at = null): bool
+Schedule::tasks(): array
+```
+Registered in `schedule.php` at the project root, driven by one crontab line.
 
 ### Queue / Defer
 ```php
@@ -383,7 +429,12 @@ php terminal module create {name}
 php terminal route cache | clear | list
 
 # Cache
-php terminal cache clear views|sessions
+php terminal cache clear views|sessions|pages|logs|ratelimit|schedule
+                                       # any directory under storage/
+
+# Scheduled tasks (from schedule.php)
+php terminal schedule run              # everything due this minute
+php terminal schedule list             # what is registered, and when each next runs
 
 # Queue
 php terminal queue work {queue}        php terminal queue size {queue}

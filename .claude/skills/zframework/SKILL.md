@@ -18,7 +18,7 @@ that read as familiar are exactly the ones that differ:
 | `Route::resource(…)->only([…])` | no options at all; and it is `delete`, not `destroy` |
 | `{{ $x }}` escapes | it does, and `{!! $x !!}` is the raw form — but plain `<?= ?>` is the house style |
 | `@for`, `@csrf`, `@method`, `@push` | do not exist; they print into the page |
-| `prefix()` / `where()` on routes | `Route::pre()`; no parameter constraints exist |
+| `prefix()` / `where()` on routes | `Route::pre()`; constraints are types in the url — `{id:int}` |
 | `$request->validated()` returns only valid data | it also aborts the request on failure — and via `Validator` directly it can return a value that failed |
 
 **When you are unsure of a signature, read it — `references/api.md`, or the source under
@@ -67,6 +67,7 @@ resource/       views/  (view('a.b') → resource/views/a/b.php), lang/{tr,en}/
 modules/        self-contained modules (own routes/models/migrations/views)
 public_html/    document root, assets/
 zFramework/     the framework core — touch ONLY to fix a framework bug
+schedule.php    scheduled tasks; read only by `php terminal schedule run`
 terminal        CLI entry point: php terminal <module> <command>
 README.md       73 KB full reference; section numbers below
 ```
@@ -108,6 +109,10 @@ README.md       73 KB full reference; section numbers below
 | Profiling / recording real requests | `modules/Profiling` | §19 |
 | Long-running workers | RoadRunner + `php terminal state check` | §20 |
 | Routes that must not be cached | `route/dynamic/` | §1 |
+| Page caching, HTTP cache headers | `Page::` | §3.1 |
+| Application log | `Log::` | §20.1 |
+| Rate limiting | `RateLimit::` + `Throttle` middleware | §6.1 |
+| Scheduled tasks (cron) | `Schedule::` + `schedule.php` | §14.1 |
 
 Full signatures: **`references/api.md`** — when unsure about a method's parameters, look there
 rather than guessing.
@@ -373,6 +378,53 @@ For an API, put `App\Middlewares\API::class` on the group — it flips Auth into
 logs in from the `Auth-Token` header against `api_token`. Do not hand-roll a token check.
 `noCSRF()` on the same group, or every POST aborts with 406. Detail in `references/auth.md`.
 
+### Page caching
+
+```php
+Page::cache();                     // response.cache-ttl seconds, shared
+Page::cache(600, name: 'post-5');  // tagged, so forget() can find it later
+Page::cache(300, shared: false);   // this browser only
+Page::vary('Cookie');              // per-visitor; takes it out of the shared store
+Page::noCache();                   // back to live
+Page::forget('post-5');            // drop every entry with that tag
+```
+
+**A page nobody declared is live** — `no-store` goes out at bootstrap. Declaring sets the HTTP
+headers always, and stores the rendered output when the response is eligible. Never stored: a
+non-GET, a request with an auth cookie, a non-200, a body with a csrf token, anything private
+or varying. Detail in `references/caching.md`.
+
+### Log
+
+```php
+Log::info('Order paid', ['order' => $id]);
+Log::error('Gateway refused', ['code' => $e->getCode()]);
+```
+
+`storage/logs/Y-m-d.log`. Not the error handler — uncaught throwables still go through
+`errorHandler()`. This is for what was never an exception.
+
+### Rate limiting
+
+```php
+Route::pre('/api')->middleware([API::class, Throttle::class])->noCSRF()->group(...);
+```
+
+Opt-in: which routes are limited is where you attach the middleware, how hard is
+`config/framework.php` → `throttle`. It aborts 429 itself, so it works without a fallback
+closure.
+
+### Scheduled tasks
+
+```php
+// schedule.php, driven by: * * * * * php terminal schedule run
+Schedule::daily('03:00', fn() => ..., 'nightly-backup');
+Schedule::everyMinutes(5, fn() => ..., 'queue-drain');
+```
+
+`php terminal schedule list` shows what is registered and when each next runs. A task still
+running is skipped rather than started twice.
+
 ## Reference files
 
 - **`references/api.md`** — exact signatures for every facade, helper, DB method, job and CLI
@@ -382,6 +434,8 @@ logs in from the `Auth-Token` header against `api_token`. Do not hand-roll a tok
   middleware actually does. Read it before building a protected area.
 - **`references/models.md`** — rows as arrays, the closures every row carries (`update`,
   `delete`, one per relation), `closureMode(false)`, migration column syntax and observers.
+- **`references/caching.md`** — `Page::cache()`, what is never stored and why, per-visitor
+  caching with `Vary`, and invalidation by tag. Read it before caching anything.
 - **`references/validation.md`** — Request classes, every rule and what it really compares,
   and the three different things a validation failure does. Read it before adding a rule.
 - **`references/auth.md`** — `Auth::attempt` and the three ways it surprises people,
@@ -398,7 +452,8 @@ logs in from the `Auth-Token` header against `api_token`. Do not hand-roll a tok
   creating a module, file upload, mail + queue, push notifications, localisation, going to production.
 - **`references/config.md`** — every key in every config file, plus `database/connections.php`
   and what each PDO option costs.
-- **`references/infrastructure.md`** — AutoSSL (ACME), the cPanel classes, the query analyzer,
+- **`references/infrastructure.md`** — the application log, scheduled tasks, rate limiting,
+  AutoSSL (ACME), the cPanel classes, the query analyzer,
   profiling, RoadRunner workers and their state rules, `route/dynamic/`, backups, releases,
   error handling.
 - **`references/conventions.md`** — deliberate design decisions (leave them alone), known traps,

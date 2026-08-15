@@ -37,12 +37,29 @@ commit it, never hand-write it.
     'caching'    => true,    // serve from the cache built by `php terminal route cache`
     'auto-check' => false,   // notice an edited route file (one stat per file per request)
 ],
+'log' => [
+    'enabled' => true,
+    'level'   => 'debug',    // debug | info | warning | error
+    'days'    => 14,         // day files kept; 0 keeps everything
+],
+'throttle' => [
+    'enabled' => true,
+    'limit'   => 60,         // per window, for anything without its own rule
+    'window'  => 60,         // seconds
+    'by'      => 'ip',       // ip | token
+    'rules'   => [           // per url prefix, longest match wins
+        '/api'     => ['limit' => 120],
+        '/sign-in' => ['limit' => 5, 'window' => 300],
+    ],
+],
 'session' => [
     'driver'         => 'file',   // file | redis (redis for multi-server)
     'gc_probability' => 1,        // ignored by the redis driver
 ],
 'response' => [
-    'ajax' => ['include-alerts' => true],   // attach pending alerts to every JSON response
+    'ajax'       => ['include-alerts' => true],   // attach pending alerts to every JSON response
+    'cache-ttl'  => 600,     // what Page::cache() uses when called with no number
+    'page-cache' => true,    // the server-side page store; a kill switch, not an opt-in
 ],
 'cache' => [
     'apcu' => true,          // keep the table schema in shared memory instead of re-reading

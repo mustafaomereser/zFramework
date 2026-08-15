@@ -104,6 +104,8 @@ and invites "is this still true for 3.2?", which is never the right question her
 | Auth, `special_columns`, session modes, the API middleware | `references/auth.md` |
 | A validator rule, or how validation fails and returns | `references/validation.md` |
 | Model behaviour, relations, migration column syntax, observers | `references/models.md` |
+| Page caching, cache headers, invalidation | `references/caching.md` |
+| Log, Schedule, RateLimit, AutoSSL, cPanel, workers | `references/infrastructure.md` |
 | A view directive, or anything about how `resource/views` is laid out | `references/views.md`, and `templates/` if the skeletons change |
 | A new subsystem worth knowing exists at all | the inventory table in `SKILL.md` |
 | A decision that should not be "fixed" later, or a trap worth warning about | this file |

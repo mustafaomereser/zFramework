@@ -131,6 +131,123 @@ Pairs with AutoSSL: `$c = $ssl->issue([...]); SSL::install($domain, $c['cert'], 
 
 ---
 
+## Application log — `Log::`
+
+```php
+Log::debug(string $message, array $context = []): void
+Log::info(...)   Log::warning(...)   Log::error(...)
+```
+
+One file per day at `storage/logs/Y-m-d.log`, appended with `LOCK_EX` so concurrent requests
+do not interleave a line. Context is appended as JSON:
+
+```
+[2026-08-15 07:02:22] WARNING: Page not cached: it contains a csrf token. {"url":"/"}
+```
+
+**This is not the error handler.** Uncaught throwables still go through `errorHandler()` and
+its error page. `Log` is for what you want to read at 03:00 that was never an exception - a
+refused payment, a webhook that arrived twice, a scheduled task that failed.
+
+```php
+// config/framework.php
+'log' => [
+    'enabled' => true,
+    'level'   => 'debug',   // debug | info | warning | error - below it is dropped
+                            // before the message is formatted
+    'days'    => 14,        // pruned on the first write of a process; 0 keeps everything
+],
+```
+
+Costs a request that never logs nothing: the class is referenced from nowhere in the request
+path, so it is never autoloaded. That is also why `Log::$config` and `Log::$dir` are boot
+state rather than request state - putting `Log` in `REQUEST_STATE` would load the file on
+every worker request to clear two values that are identical every time.
+
+## Scheduled tasks — `Schedule::`
+
+One crontab line drives everything:
+
+```
+* * * * * cd /path/to/app && php terminal schedule run >> /dev/null 2>&1
+```
+
+Tasks live in `schedule.php` at the project root:
+
+```php
+use zFramework\Core\Facades\Schedule;
+
+Schedule::everyMinute(fn() => ..., 'name');
+Schedule::everyMinutes(5, fn() => ..., 'name');
+Schedule::hourly(15, fn() => ..., 'name');            // every hour at :15
+Schedule::daily('03:00', fn() => ..., 'name');
+Schedule::weekly(1, '09:00', fn() => ..., 'name');    // Mondays, 0 = Sunday
+Schedule::monthly(1, '00:30', fn() => ..., 'name');   // the 1st
+Schedule::cron('*/5 9-17 * * 1-5', fn() => ..., 'name');
+```
+
+The cron parser takes the five standard fields with `*`, `*/n`, `a,b` and `a-b`; day-of-week
+is 0-6 with 0 as Sunday, and 7 also accepted.
+
+```bash
+php terminal schedule run     # everything due this minute - also how you test a task
+php terminal schedule list    # what is registered, and when each next runs
+```
+
+Two things a raw crontab does not do:
+
+- **A task still running from the previous tick is skipped**, not started again. Two copies of
+  a backup are worse than a late one.
+- **A task will not run twice in the same minute**, however many times `schedule run` is
+  invoked.
+
+A task that throws is caught, logged through `Log::error` and does not stop the others.
+
+Nothing here is reachable from a web request - `schedule.php` is included by the terminal
+command and by nothing else, so a served request pays nothing for it.
+
+## Rate limiting — `RateLimit::` and the `Throttle` middleware
+
+```php
+RateLimit::hit(string $key, int $limit, int $window): array   // allowed, count, remaining, retry_after
+RateLimit::clear(string $key): void
+```
+
+Counters go to redis when it is configured and reachable, where `INCR` makes the count atomic
+across every worker and machine; otherwise to one `flock`'d file per key under
+`storage/ratelimit`, which is what a shared host has. Fixed window, not sliding - a caller can
+send up to twice the limit across a boundary, and buying accuracy past that costs a sorted set
+and a read of it on every request.
+
+**Which routes are limited is decided by where you attach the middleware:**
+
+```php
+Route::pre('/api')->middleware([API::class, Throttle::class])->noCSRF()->group(...);
+Route::middleware([Throttle::class])->group(fn() => Route::post('/sign-in', ...));
+```
+
+**How hard, by config:**
+
+```php
+'throttle' => [
+    'enabled' => true,
+    'limit'   => 60,
+    'window'  => 60,
+    'by'      => 'ip',       // ip | token - `token` counts a logged-in caller by identity
+    'rules'   => [           // per url prefix, longest match wins
+        '/api'     => ['limit' => 120],
+        '/sign-in' => ['limit' => 5, 'window' => 300],
+    ],
+],
+```
+
+`Throttle` **aborts 429 itself** rather than declining. A declined middleware with no fallback
+closure ends as a 404 (see `references/routing.md`), and a 404 is the wrong answer to "you are
+going too fast". Sends `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After`.
+
+Call `RateLimit::clear('login:' . ip())` after a successful login, so a few failed attempts do
+not keep counting against someone who then got it right.
+
 ## Query Analyzer
 
 Runs `EXPLAIN` / `EXPLAIN ANALYZE` on SELECTs and records what they touch: tables scanned,

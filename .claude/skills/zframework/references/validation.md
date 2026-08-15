@@ -125,14 +125,40 @@ Note the callback argument changes the control flow — see "What happens on fai
 
 ## Rules
 
-`required` · `nullable` · `email` · `min:N` · `max:N` · `type:x` · `same:field` ·
-`unique:Model` · `exists:Model`
+| Rule | Means |
+|---|---|
+| `required` | present and non-empty. `0` and `0.0` count as present |
+| `nullable` | may be absent or empty |
+| `email` | a valid address |
+| `url` | a valid **http or https** address |
+| `date` / `date:Y-m-d` | parseable, or that exact format and a real date in it |
+| `min:N` / `max:N` | the value for a number, the length for a string or array |
+| `between:A,B` | the same measure, both ends inclusive |
+| `type:x` | declares the type and asserts the value can be read as it |
+| `in:a,b,c` / `not-in:a,b` | membership, compared as strings |
+| `regex:"^[a-z]+$"` | quoted, without delimiters |
+| `same:other` | equal to another field in the input |
+| `confirmed` / `confirmed:field` | equal to `<field>_confirmation`, or the named field |
+| `unique:Model;key:col;ex:5` | not already in the table, optionally excluding one row |
+| `exists:Model;key:col` | present in the table |
 
-One class per rule under `zFramework/Core/Validator/Rules/`. Adding a rule means adding a
-class there — there is no closure form.
+One class per rule under `zFramework/Core/Validator/Rules/`, registered in `Validator::$ruleMap`.
+Adding a rule means adding a class — there is no closure form. A kebab-case name works
+(`not-in`); the parser accepts `-` in a rule name.
 
 Behaviour that is not obvious:
 
+- **`url` rejects anything but http and https.** `FILTER_VALIDATE_URL` on its own accepts
+  `javascript:` and `data:`, which is how a "website" field becomes an XSS hole.
+- **`date:Y-m-d` re-formats what it parsed and compares.** Without that, `2026-02-31` parses
+  happily and becomes the 3rd of March.
+- **`regex` wants the pattern quoted and without delimiters.** Unquoted, the rule parser stops
+  at the first space or semicolon; the delimiters are added for you, so a `/` in the pattern
+  needs no escaping.
+- **`confirmed` goes on the field itself**, where `same` goes on the second field and names the
+  first. The error then lands on the field the user is looking at.
+- **`between` reads the same measure `min`/`max` do**, so `type:` decides whether it is
+  comparing a number or a length.
 - **`min` / `max` compare a *length* that depends on the type.** For a string it is
   `strlen()`; for a number it is **the value itself**. So `max:100` rejects the string
   `str_repeat('x', 150)` and also rejects the number `150`, and accepts `80`. Declare the type
@@ -143,7 +169,6 @@ Behaviour that is not obvious:
   mean "optional, but a valid address if present".
 - **`required` and `nullable` together throw.** Not a validation failure — an exception. Pick
   one.
-- `required` accepts `0` and `0.0`, which a naive emptiness check would reject.
 - **`unique` and `exists` take a model class and query it**: `unique:App\Models\User`. The
   column defaults to the field name; override with `key`, and exclude a row with `ex`:
   `unique:App\Models\User;key:email;ex:5` — that is the update-form form.
