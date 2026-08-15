@@ -186,10 +186,11 @@ The rest of what exists, for reading other people's templates: `@elseif`, `@else
   `@extends(layoutFor($x))` does not work.
 - Inline section syntax is exact — `@section('title', 'Value')`, comma plus one space.
 - `{{ }}` and `@include` accept **single quotes only**.
-- `{{-- comment --}}` is stripped before anything else parses, so a comment may contain a
-  `{{ }}` echo, an `@include`, or a half-written tag without any of it taking effect. It
-  never reaches the compiled file, so unlike an HTML comment it costs nothing at runtime and
-  does not show up in the page source. Multi-line is fine.
+- Comments come in two spellings, `{{-- comment --}}` and `{{/* comment */}}`, and behave
+  identically. Both are stripped before anything else parses, so a comment may contain a
+  `{{ }}` echo, an `@include`, or a half-written tag without any of it taking effect.
+  Neither reaches the compiled file, so unlike an HTML comment they cost nothing at runtime
+  and do not appear in the page source. Multi-line is fine.
 - `@include` splices the file's text in and compiles it with the parent, max depth 32
   (`View.php:504-557`). Nothing in this repo uses it; partials are called at runtime with
   `<?= view('app.layouts.auth.content') ?>`, which is also fine and keeps the partial's own

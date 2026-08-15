@@ -474,25 +474,30 @@ class View
         );
     }
 
-    /**
-     * Strip {{-- comment --}} blocks.
-     *
-     * Runs before everything else, so a comment can hold anything the compiler
-     * would otherwise act on - a {{ }} echo, an @include, a half-written tag.
-     * Nothing reaches the compiled file, so comments cost nothing at runtime and
-     * never show up in the page source.
-     *
-     * @param string $template
-     * @return string
-     */
+    # Strip comment blocks. Two spellings, same behaviour:
+    #
+    #   {{-- comment --}}
+    #   {{/* comment */}}
+    #
+    # Runs before everything else, so a comment can hold anything the compiler
+    # would otherwise act on - a {{ }} echo, an @include, a half-written tag.
+    # Nothing reaches the compiled file, so comments cost nothing at runtime and
+    # never show up in the page source.
+    #
+    # Hash comments rather than a docblock: the second spelling ends in the same
+    # two characters that would close one.
+    #
+    # @param string $template
+    # @return string
     private static function stripComments(string $template): string
     {
-        return preg_replace('/\{\{--.*?--\}\}/s', '', $template);
+        return preg_replace('/\{\{(?:--.*?--|\/\*.*?\*\/)\}\}/s', '', $template);
     }
 
     /**
-     * Parse {{-- comment --}} out of the template.
+     * Parse comment blocks out of the template.
      * Example: {{-- this line is gone before anything else runs --}}
+     * Example: {{ / * so is this one, without the spaces * / }}
      */
     public static function parseComments(): void
     {
