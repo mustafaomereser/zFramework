@@ -304,11 +304,11 @@ class Run
         ob_start();
 
         # Full-page cache. Off by default, and the config read is what keeps
-        # PageCache.php from being autoloaded while it is - a disabled feature
+        # Page.php from being autoloaded while it is - a disabled feature
         # must not cost a file. A hit ends the request here: no middlewares, no
         # route matching, no session.
         $pageCache = (bool) (\zFramework\Core\Facades\Config::framework('response.page-cache') ?? false);
-        if ($pageCache && \zFramework\Core\PageCache::serve()) return;
+        if ($pageCache && \zFramework\Core\Facades\Page::serve()) return;
 
         try {
             # autoload.php executes the global middlewares rather than declaring
@@ -356,7 +356,7 @@ class Run
         # Store what was rendered, if the page asked to be cached. Before Defer,
         # so deferred work cannot change what gets stored.
         if ($pageCache && ($ttl = \zFramework\Core\Facades\Response::cacheTtl()))
-            \zFramework\Core\PageCache::store((string) ob_get_contents(), $ttl);
+            \zFramework\Core\Facades\Page::store((string) ob_get_contents(), $ttl);
 
         if (class_exists(\zFramework\Core\Facades\Defer::class, false)) \zFramework\Core\Facades\Defer::flush();
     }

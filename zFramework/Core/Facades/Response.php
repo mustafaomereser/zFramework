@@ -28,8 +28,8 @@ class Response
     private static bool $cacheDeclared = false;
 
     /**
-     * Seconds the page asked to be cached for, 0 when it did not ask. Read by
-     * PageCache after the route has run.
+     * Seconds the page asked to be cached for, 0 when it did not ask. Set by
+     * Page::cache(), read by Page after the route has run.
      */
     private static int $cacheTtl = 0;
 
@@ -81,68 +81,31 @@ class Response
     }
 
     /**
-     * Declare this response cacheable.
+     * Forget a collected header. Only meaningful under the CLI SAPI, where
+     * headers are a list rather than something PHP holds; header_remove() is
+     * the equivalent everywhere else.
      *
-     *   Response::cache(600);              // shared caches and the browser, 10 minutes
-     *   Response::cache(600, false);       // this visitor's browser only
-     *
-     * Nothing is cached unless a page says so. A page that says nothing is
-     * assumed to be live and gets no-store, because guessing the other way
-     * serves one visitor's page to the next.
-     *
-     * Only for responses that are the same for everyone. Anything behind a
-     * login, anything containing a csrf token, and anything with alerts on it
-     * must stay live - `public` here means a CDN or a proxy may keep a copy.
-     *
-     * @param int|null $seconds null → response.cache-ttl from config/framework.php.
-     * @param bool     $shared  false → private, browser only.
+     * @param string $name
      * @return void
      */
-    public static function cache(?int $seconds = null, bool $shared = true): void
+    public static function dropHeader(string $name): void
     {
-        $seconds ??= (int) (Config::framework('response.cache-ttl') ?? 600);
-
-        if ($seconds <= 0) {
-            self::noCache();
-            return;
-        }
-
-        # The live default sent at bootstrap carries Pragma: no-cache, which is
-        # HTTP/1.0 and outranks Cache-Control on the intermediaries that still
-        # read it. Declaring a page cacheable has to take it back off.
-        if (PHP_SAPI !== 'cli') {
-            if (!headers_sent()) header_remove('Pragma');
-        } else {
-            self::$headers = array_values(array_filter(self::$headers, fn($header) => strcasecmp($header[0], 'Pragma') !== 0));
-        }
-
-        self::$cacheTtl = $seconds;
-
-        self::header('Cache-Control', ($shared ? 'public' : 'private') . ", max-age=$seconds");
-        self::header('Expires', gmdate('D, d M Y H:i:s', time() + $seconds) . ' GMT');
+        self::$headers = array_values(array_filter(self::$headers, fn($header) => strcasecmp($header[0], $name) !== 0));
     }
-
-    /**
-     * Say explicitly what the default already does. Useful to override a
-     * cache() set further up, e.g. in a group-wide middleware.
-     *
-     * @return void
-     */
-    public static function noCache(): void
-    {
-        self::$cacheTtl = 0;
-
-        self::header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-        self::header('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT');
-    }
-
 
     /**
      * Seconds this response declared, or 0.
+     *
+     * Page::cache() sets it through here rather than keeping its own static:
+     * this class is already cleared between requests, and a ttl left standing
+     * in a worker would cache the next page for the wrong length - or at all.
+     *
+     * @param int|null $set
      * @return int
      */
-    public static function cacheTtl(): int
+    public static function cacheTtl(?int $set = null): int
     {
+        if ($set !== null) self::$cacheTtl = max(0, $set);
         return self::$cacheTtl;
     }
 

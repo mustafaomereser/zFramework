@@ -1,8 +1,6 @@
 <?php
 
-namespace zFramework\Core;
-
-use zFramework\Core\Facades\Response;
+namespace zFramework\Core\Facades;
 
 /**
  * Server-side full-page cache.
@@ -28,7 +26,7 @@ use zFramework\Core\Facades\Response;
  * quietly breaks it - the token is per-session, so a cached one is wrong for
  * everybody who gets it afterwards.
  */
-class PageCache
+class Page
 {
     /**
      * Where the entries live, resolved on first use.
@@ -36,9 +34,63 @@ class PageCache
     private static ?string $dir = null;
 
     /**
-     * The key for this request, computed once.
+     * Declare this page cacheable.
+     *
+     *   Page::cache();          // response.cache-ttl seconds
+     *   Page::cache(600);       // shared caches and the browser
+     *   Page::cache(600, false) // this visitor's browser only
+     *
+     * Sets the HTTP headers, which is all it does while response.page-cache is
+     * off - the browser and any CDN reuse their copy, PHP still renders. With
+     * page-cache on, the rendered output is stored and replayed too.
+     *
+     * Nothing is cached unless a page says so. A page that says nothing is
+     * assumed to be live, because guessing the other way serves one visitor's
+     * page to the next.
+     *
+     * Only for pages that are the same for everyone. A csrf token in the body
+     * is the usual thing that quietly breaks that - it is per-session, so a
+     * stored one is wrong for everybody who gets it afterwards.
+     *
+     * @param int|null $seconds null → response.cache-ttl from config/framework.php.
+     * @param bool     $shared  false → private, browser only.
+     * @return void
      */
-    private static ?string $key = null;
+    public static function cache(?int $seconds = null, bool $shared = true): void
+    {
+        $seconds ??= (int) (Config::framework('response.cache-ttl') ?? 600);
+
+        if ($seconds <= 0) {
+            self::noCache();
+            return;
+        }
+
+        # The live default sent at bootstrap carries Pragma: no-cache, which is
+        # HTTP/1.0 and outranks Cache-Control on the intermediaries that still
+        # read it. Declaring a page cacheable has to take it back off.
+        if (PHP_SAPI !== 'cli') {
+            if (!headers_sent()) header_remove('Pragma');
+        } else {
+            Response::dropHeader('Pragma');
+        }
+
+        Response::cacheTtl($seconds);
+        Response::header('Cache-Control', ($shared ? 'public' : 'private') . ", max-age=$seconds");
+        Response::header('Expires', gmdate('D, d M Y H:i:s', time() + $seconds) . ' GMT');
+    }
+
+    /**
+     * Say explicitly what the default already does. Useful to override a
+     * cache() set further up, e.g. from a group-wide middleware.
+     *
+     * @return void
+     */
+    public static function noCache(): void
+    {
+        Response::cacheTtl(0);
+        Response::header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        Response::header('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT');
+    }
 
     /**
      * Whether this request may take part at all - GET, no auth cookie.
@@ -174,16 +226,6 @@ class PageCache
      */
     private static function path(): string
     {
-        self::$key ??= sha1(($_SERVER['REQUEST_METHOD'] ?? 'GET') . '|' . ($_SERVER['REQUEST_URI'] ?? '/'));
-
-        return self::dir() . '/' . self::$key . '.cache';
-    }
-
-    /**
-     * @return void
-     */
-    public static function flushRequestState(): void
-    {
-        self::$key = null;
+        return self::dir() . '/' . sha1(($_SERVER['REQUEST_METHOD'] ?? 'GET') . '|' . ($_SERVER['REQUEST_URI'] ?? '/')) . '.cache';
     }
 }

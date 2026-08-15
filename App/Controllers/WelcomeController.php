@@ -4,14 +4,14 @@ namespace App\Controllers;
 
 use App\Requests\Welcome\CommandRequest;
 use zFramework\Core\Abstracts\Controller;
-use zFramework\Core\Facades\Response;
+use zFramework\Core\Facades\Page;
 
 class WelcomeController extends Controller
 {
 
     public function __construct($method)
     {
-        Response::cache(5);
+        Page::cache();
     }
 
     /** Index page | GET: /
