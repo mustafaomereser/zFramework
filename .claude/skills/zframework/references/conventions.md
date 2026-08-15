@@ -78,6 +78,7 @@ a new terminal command or flag, a new config key, a new view directive, a new va
 | AutoSSL, cPanel, analyzer, worker runtime | `references/infrastructure.md` |
 | Route registration, group/prefix/middleware behaviour, the middleware contract | `references/routing.md` |
 | Auth, `special_columns`, session modes, the API middleware | `references/auth.md` |
+| A validator rule, or how validation fails and returns | `references/validation.md` |
 | A view directive, or anything about how `resource/views` is laid out | `references/views.md`, and `templates/` if the skeletons change |
 | A new subsystem worth knowing exists at all | the inventory table in `SKILL.md` |
 | A decision that should not be "fixed" later, or a trap worth warning about | this file |

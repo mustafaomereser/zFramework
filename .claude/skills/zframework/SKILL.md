@@ -361,6 +361,8 @@ logs in from the `Auth-Token` header against `api_token`. Do not hand-roll a tok
 - **`references/routing.md`** — groups and prefixes (`Route::pre`, `middleware`, `noCSRF`),
   how they nest, the two ways a group leaks, the middleware contract, and what a declined
   middleware actually does. Read it before building a protected area.
+- **`references/validation.md`** — Request classes, every rule and what it really compares,
+  and the three different things a validation failure does. Read it before adding a rule.
 - **`references/auth.md`** — `Auth::attempt` and the three ways it surprises people,
   `special_columns` on the user model, cookie vs Redis session mode, and the `API` middleware
   that turns a route group into a header-authenticated API. Read it before touching login or
