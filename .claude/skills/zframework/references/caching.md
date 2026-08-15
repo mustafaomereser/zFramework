@@ -125,6 +125,24 @@ The url is still the lookup key — `serve()` runs before the route and has only
 go on — so a name is a second way in, not a replacement. The query string is part of the key:
 `/blog` and `/blog?page=2` are two entries, and one tag covers both.
 
+## The key, and what is not in it
+
+```
+method | url (query string included) | language cookie | Accept-Language[0:2]
+```
+
+The language is in there because `serve()` answers **before the global middlewares run**, so
+the locale has not been resolved yet — without it an English visitor was handed the Turkish
+copy of a page. It is keyed on what *decides* the language rather than the language itself:
+identical inputs resolve identically, so the worst case is a spare entry, never the wrong page.
+Read through `Cookie::get('lang')`, exactly as the `Language` middleware does — cookie names
+are hashed and values encrypted, so `$_COOKIE['lang']` does not exist.
+
+**Anything else that varies per visitor and is not in the url must use `Page::vary()`** — a
+tenant, a currency, a country. `vary()` takes the response out of the shared store entirely
+and leaves it to the browser, which is the only correct answer for a key the store cannot
+express.
+
 ## Configuration
 
 ```php

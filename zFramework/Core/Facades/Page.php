@@ -402,6 +402,32 @@ class Page
      */
     private static function key(string $method, string $uri): string
     {
-        return sha1(strtoupper($method) . '|' . $uri);
+        return sha1(strtoupper($method) . '|' . $uri . '|' . self::localeKey());
+    }
+
+    /**
+     * The language inputs, as part of the key.
+     *
+     * serve() runs before the global middlewares, so the locale has not been
+     * resolved yet - and without this an English visitor was handed the Turkish
+     * copy of a page, which is exactly the bug the store's other rules exist to
+     * prevent. The url is not enough on a translated site.
+     *
+     * Keyed on what decides the language rather than on the language itself:
+     * identical inputs resolve identically, so the worst case is one extra entry
+     * rather than the wrong page. Reads it exactly as the Language middleware
+     * does - through Cookie, whose names are hashed and values encrypted, so
+     * $_COOKIE['lang'] does not exist - and falls back to the first two
+     * characters of Accept-Language the way Lang::locale() does.
+     *
+     * Anything else that varies per visitor and is not in the url - a tenant, a
+     * currency - has to use Page::vary(), which keeps the response out of the
+     * shared store altogether.
+     *
+     * @return string
+     */
+    private static function localeKey(): string
+    {
+        return ((string) (Cookie::get('lang') ?: '')) . '|' . substr($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '', 0, 2);
     }
 }
