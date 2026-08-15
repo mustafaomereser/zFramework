@@ -25,7 +25,7 @@
 | 🔔 Push Notifications — web push, VAPID, per-app keys | 🤖 AI assistant skill — ships in `.claude/` |
 | 🚀 Page cache — HTTP headers + server-side store, tag invalidation | 🚦 Rate limiting — opt-in per route group |
 | ⏰ Scheduler — one crontab line, tasks in `schedule/` | 📝 Application log — daily files, levels, retention |
-| 🗓️ Cron scripts — one file per job, `cron/cron.php` boots it | |
+| 🗓️ Cron scripts — one file per job, `cron/cron.php` boots it | ⬆️ Self-update — core only, config merged not overwritten |
 | 🚫 Throttle blocking — refuse a flood outright for N seconds | |
 
 ---
@@ -103,6 +103,7 @@ replacement for it.
 - [14. Terminal](#14-terminal)
   - [14.1. Scheduled Tasks](#141-scheduled-tasks)
   - [14.2. Cron Scripts](#142-cron-scripts)
+  - [14.3. Updating the Framework](#143-updating-the-framework)
 - [15. API](#15-api)
 - [16. Helper Methods](#16-helper-methods)
 - [17. AutoSSL](#17-autossl)
@@ -1899,6 +1900,17 @@ php terminal module create blog
 # Cache
 php terminal cache clear views
 php terminal cache clear sessions
+php terminal cache clear pages            # any directory under storage/
+
+# Scheduled tasks
+php terminal schedule run                 # everything due this minute
+php terminal schedule list
+
+# Updating the framework
+php terminal update --check               # is there a newer version
+php terminal update                       # update the core; reports config drift
+php terminal update --config              # also write the merged config files
+php terminal update --rollback            # restore the last backup
 
 # Security
 php terminal security key --regen         # regenerate crypt key + salt
@@ -2026,7 +2038,73 @@ something you do not want sharing a tick with anything else.
 
 ---
 
+### 14.3. Updating the Framework
+
+```bash
+php terminal update --check       # is a newer version out
+php terminal update               # update the core, report what config would change
+php terminal update --config      # also write the merged config files
+php terminal update --rollback    # restore the last backup
+php terminal update --force       # update even when the versions match
+```
+
+**What is replaced, and what is not.** The repository archive carries a whole project — `App/`,
+`config/`, `route/`, `resource/`, `public_html/` — and all of that is your application. Only
+the core is touched:
+
+| Replaced | Never touched |
+|---|---|
+| `zFramework/bootstrap.php` | `zFramework/vendor/` — composer's, not in the repository |
+| `zFramework/run.php` | `zFramework/storage/` — sessions, caches, logs, locks |
+| `zFramework/Core/` | `App/`, `config/`, `route/`, `resource/`, `public_html/` |
+| `zFramework/Kernel/` | `modules/`, `cron/`, `schedule/` |
+| `zFramework/modules/` | |
+
+`vendor/` and `storage/` matter especially: neither is in the repository, so replacing
+`zFramework/` wholesale would delete composer's packages and every session and cache with them.
+
+**The steps**, in order, each one able to stop before anything is lost:
+
+1. read the version from one remote file, rather than downloading an archive to find out
+2. download, and check the first two bytes are `PK` — a failed request arrives as an HTML page
+3. extract to `storage/update`, and refuse to continue unless it really contains a framework
+4. back up the five core paths to `storage/update-backup/<version>-<timestamp>`
+5. replace the core
+6. report the config differences, or apply them with `--config`
+7. say so if `composer.json` changed
+8. clear the compiled views and the route cache — both were built against the old core
+
+**Config is merged, never overwritten.** `config/app.php` gains keys between versions, and your
+settings live in the same file. The merge takes the file the new version ships and splices only
+the values you had changed, located with PHP's tokenizer rather than a regex — so comments,
+indentation and `[]` all survive, and `var_export`'s `array (` never appears.
+
+Per section:
+
+| | |
+|---|---|
+| you changed a value | your value is kept |
+| the update added a key | it arrives with its default |
+| you added keys to a section | that whole section is taken from your file |
+| you both added keys to the same section | the update's version is kept and yours is **reported** to re-add by hand |
+
+The last row is the honest one: no merge can resolve it, so it says so rather than guessing.
+Nothing is written without `--config`, and the file it replaces is kept as
+`<name>.php.before-update`.
+
+**What it cannot do** is follow a setting that moved to another file — `config/view.php`
+becoming `framework.php['view']`. Only the change's author knows where it went; the framework
+handles that case with a runtime fallback in `Config::framework()` instead, so the old file
+keeps working.
+
+**After updating**, run `composer install` if it said so, and re-check anything the config
+report flagged. If something is wrong, `php terminal update --rollback` puts the previous core
+back.
+
+---
+
 ## 15. API
+
 
 
 ```php

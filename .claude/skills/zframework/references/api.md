@@ -440,6 +440,9 @@ php terminal cache clear views|sessions|pages|logs|ratelimit|schedule
 php terminal schedule run              # everything due this minute
 php terminal schedule list             # what is registered, and when each next runs
 
+# Framework updates - replaces the core only, never vendor/ or storage/
+php terminal update [--check] [--config] [--force] [--rollback]
+
 # Queue
 php terminal queue work {queue}        php terminal queue size {queue}
 

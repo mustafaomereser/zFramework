@@ -115,6 +115,7 @@ README.md       73 KB full reference; section numbers below
 | Rate limiting | `RateLimit::` + `Throttle` middleware | §6.1 |
 | Scheduled tasks, one crontab line | `Schedule::` + `schedule/` | §14.1 |
 | A cron job in its own process | `cron/` + `cron/cron.php` | §14.2 |
+| Updating the framework core | `php terminal update` | §14.3 |
 
 Full signatures: **`references/api.md`** — when unsure about a method's parameters, look there
 rather than guessing.

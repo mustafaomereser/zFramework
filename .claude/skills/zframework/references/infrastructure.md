@@ -257,6 +257,58 @@ use `cron/` and let the panel own the timing.
 `cron/` also stays right when a job wants its own process: something long, or something that
 should not share a tick with anything else.
 
+## Updating the framework — `php terminal update`
+
+```bash
+php terminal update --check       # is a newer version out
+php terminal update               # update the core, report config drift
+php terminal update --config      # also write the merged config files
+php terminal update --rollback    # restore the last backup
+php terminal update --force       # update even when the versions match
+```
+
+The archive carries a whole project, so most of it is the application. Only the core is
+replaced: `bootstrap.php`, `run.php`, `Core/`, `Kernel/`, `modules/`.
+
+**`zFramework/vendor/` and `zFramework/storage/` are never touched.** Neither is in the
+repository, so replacing `zFramework/` wholesale would delete composer's packages and every
+session, cache, log and lock. Verified across a real run: vendor stayed at 1961 files and
+storage kept everything.
+
+Each step can stop before anything is lost - version read from one remote file, a `PK`
+signature check because a failed request arrives as HTML, a sanity check that the archive
+really contains a framework, then a backup to `storage/update-backup/<version>-<timestamp>`
+before the replace. `--rollback` restores it.
+
+### Config is merged, never overwritten
+
+`Kernel/Helpers/ConfigMerge`. The shipped file is taken verbatim and only the bytes of values
+the application changed are spliced, located with `token_get_all()`. Comments, indentation and
+`[]` survive because nothing is regenerated - `var_export()` is never involved, so its
+`array (` never appears.
+
+| | |
+|---|---|
+| a value was changed | the application's value is kept |
+| the update added a key | it arrives with its default |
+| the application added keys to a section | that whole section is taken from its file |
+| both added keys to the same section | the update's version is kept, the application's extras are **reported** |
+
+The last row cannot be resolved automatically, so it is reported rather than guessed. Nothing
+is written without `--config`; the replaced file is kept as `<name>.php.before-update`.
+
+**What it cannot do** is follow a setting that moved between files - `config/view.php` becoming
+`framework.php['view']`. Only the change's author knows where it went. The framework covers
+that case with a runtime fallback in `Config::framework()`, which is why the old standalone
+config files still work.
+
+### Writing a terminal command that replaces core files
+
+Load everything it needs before touching the filesystem. The replace step deletes `Kernel/`, so
+a class autoloaded after that is looked for in a directory that no longer holds it - which is
+how the first version of this died half way through, with the core already swapped and
+`ConfigMerge` gone.
+
 ## Rate limiting — `RateLimit::` and the `Throttle` middleware
 
 ```php
