@@ -1,12 +1,28 @@
 ---
 name: zframework
-description: Use when working with zFramework (a custom Laravel-like PHP framework, PHP >=8.1). Read this BEFORE writing any application code on top of it - scaffolding a new project, adding routes/models/controllers/migrations/views, or answering "how do I do X here". Purpose - stop re-implementing features the framework already ships, and use the correct API signatures. Triggers - zFramework, zFramework\Core, Route::, Abstracts\Model, php terminal make, resource/views, App/Controllers, modules/, migration, Auth::attempt, view(), Alerts::, AutoSSL, cPanel API, push notification.
+description: Use when working with zFramework, a self-written PHP framework (PHP >=8.1). It borrows Laravel's vocabulary and does NOT behave like Laravel - writing Laravel from memory produces broken code here (rows are arrays not objects, most Blade directives do not exist, Route::resource takes no options, the destroy method is called delete). Read this BEFORE writing any application code on top of it - scaffolding a project, adding routes/models/controllers/migrations/views, or answering "how do I do X here" - and check references/api.md for a signature rather than assuming. Triggers - zFramework, zFramework\Core, Route::, Abstracts\Model, php terminal make, resource/views, App/Controllers, modules/, migration, Auth::attempt, view(), Alerts::, AutoSSL, cPanel API, push notification.
 ---
 
 # zFramework Working Guide
 
-A custom PHP framework written by a solo developer. It looks like Laravel but **is not Laravel** —
-the APIs read similarly and behave differently. The big one: **rows are arrays, not objects.**
+A self-written PHP framework. It borrows Laravel's vocabulary — `Route::resource`, `@extends`,
+`Auth::attempt` — and **behaves differently behind every one of those names.**
+
+Treat the resemblance as a hazard, not a shortcut. Recalling how Laravel does something is not
+evidence about this framework; it is the most common way to write broken code here. The names
+that read as familiar are exactly the ones that differ:
+
+| Looks like Laravel | Here |
+|---|---|
+| `$post->title` | rows are **arrays** — `$post['title']` |
+| `Route::resource(…)->only([…])` | no options at all; and it is `delete`, not `destroy` |
+| `{{ $x }}` escapes | it does **not** — compiles to a bare `<?= ?>` |
+| `@for`, `{!! !!}`, `@csrf`, `@method` | do not exist; they print into the page |
+| `prefix()` / `where()` on routes | `Route::pre()`; no parameter constraints exist |
+| `$request->validated()` returns only valid data | it also aborts the request on failure — and via `Validator` directly it can return a value that failed |
+
+**When you are unsure of a signature, read it — `references/api.md`, or the source under
+`zFramework/Core/`.** Guessing from Laravel is what this skill exists to prevent.
 
 ## The golden rule
 
