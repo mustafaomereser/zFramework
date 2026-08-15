@@ -63,6 +63,13 @@ class Update
         if (version_compare($remote, FRAMEWORK_VERSION, '<=') && !in_array('--force', Terminal::$parameters))
             return Terminal::text('[color=green]Already up to date.[/color]');
 
+        # Everything this command still needs has to be in memory before the
+        # files go. The replace step deletes Kernel/, and a class autoloaded
+        # after that is looked for in a directory that no longer holds it -
+        # which is how the first version of this died half way through, with
+        # ConfigMerge gone and the core already swapped.
+        class_exists(ConfigMerge::class);
+
         global $storage_path;
         $work = "$storage_path/update";
 
