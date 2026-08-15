@@ -1,19 +1,19 @@
 @extends('app.main')
 
-<?php
+{{--
+    Copy to resource/views/<app>/pages/<resource>/edit-or-create.php
 
-/**
- * Copy to resource/views/<app>/pages/<resource>/edit-or-create.php
- *
- * ONE file serves both create and edit — do not split it into create.php + edit.php.
- * The controller passes $post on edit and passes nothing on create, so every field reads
- * through ?? and the form flips its action and method off $editing.
- */
+    ONE file serves both create and edit — do not split it into create.php + edit.php.
+    The controller passes $post on edit and passes nothing on create, so every field reads
+    through ?? and the form flips its action and method off $editing.
 
-$editing = isset($post['id']);
-?>
+    Note where $editing is set: INSIDE the section. In a template that @extends, anything
+    outside a @section is discarded at compile time, so a setup block placed above
+    @section('body') never runs and its variables come out undefined.
+--}}
 
 @section('body')
+<?php $editing = isset($post['id']); ?>
 <div class="my-4">
     <h3><?= $editing ? 'Edit Post' : 'Add Post' ?></h3>
 

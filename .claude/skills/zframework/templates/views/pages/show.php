@@ -7,7 +7,11 @@
     <h3><?= e($post['title']) ?></h3>
 
     <small class="text-muted">
-        <?= $post['author']()['username'] ?? '-' ?> &middot;
+        {{-- A relation is a callable on the row: $post['author']() runs the query.
+             Only after the model declares it — calling one that is not declared is a
+             fatal, so this line stays commented until Post::author() exists. --}}
+        <?php // echo $post['author']()['username'] ?? '-';
+        ?>
         <?= \zFramework\Core\Helpers\Date::format($post['created_at'], "F j, Y, g:i a") ?>
     </small>
 

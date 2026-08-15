@@ -108,9 +108,24 @@ The rest of what exists, for reading other people's templates: `@elseif`, `@else
 
 ### Engine behaviour worth knowing
 
+- **In a template that `@extends`, anything outside a `@section` is discarded.** Sections are
+  lifted into an array and the rest of the child is replaced wholesale by the compiled parent,
+  so a setup block above `@section('body')`:
+
+  ```php
+  @extends('app.main')
+  <?php $editing = isset($post['id']); ?>   {{-- never runs --}}
+  @section('body') … <?= $editing ?> …      {{-- Undefined variable $editing --}}
+  ```
+
+  never executes. Put per-page setup **inside** the section. A layout may have a `<?php ?>`
+  block at the top (`app/main.php` does) because a layout is the parent, not the child; a
+  standalone partial rendered with `view()` may too, because it extends nothing.
 - **`@yield` is resolved at compile time, not at runtime** (`View.php:600-607`). Sections are
   collected before the parent is compiled, which is why the order works — but it also means a
   section cannot be produced by runtime code.
+- **Section names must match the layout's `@yield` names.** `app/main.php` yields `header`,
+  `body` and `footer`; a `@section('content')` is silently dropped and the page renders empty.
 - **`@extends($variable)` works and disables the view cache** for that template
   (`View.php:583-592`). Every request recompiles. Avoid unless the layout genuinely varies.
 - The `@extends` regex is `[^)]+`, so a parenthesised expression breaks it:
