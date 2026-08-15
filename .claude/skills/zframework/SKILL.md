@@ -67,6 +67,7 @@ resource/       views/  (view('a.b') → resource/views/a/b.php), lang/{tr,en}/
 modules/        self-contained modules (own routes/models/migrations/views)
 public_html/    document root, assets/
 zFramework/     the framework core — touch ONLY to fix a framework bug
+cron/           standalone cron scripts; cron.php boots the framework for one job
 schedule/       scheduled tasks; read only by `php terminal schedule run`
 terminal        CLI entry point: php terminal <module> <command>
 README.md       73 KB full reference; section numbers below
@@ -112,7 +113,8 @@ README.md       73 KB full reference; section numbers below
 | Page caching, HTTP cache headers | `Page::` | §3.1 |
 | Application log | `Log::` | §20.1 |
 | Rate limiting | `RateLimit::` + `Throttle` middleware | §6.1 |
-| Scheduled tasks (cron) | `Schedule::` + `schedule/` | §14.1 |
+| Scheduled tasks, one crontab line | `Schedule::` + `schedule/` | §14.1 |
+| A cron job in its own process | `cron/` + `cron/cron.php` | §14.2 |
 
 Full signatures: **`references/api.md`** — when unsure about a method's parameters, look there
 rather than guessing.
@@ -434,6 +436,12 @@ Schedule::everyMinutes(5, fn() => ..., 'queue-drain');
 
 `php terminal schedule list` shows what is registered and when each next runs. A task still
 running is skipped rather than started twice.
+
+**`cron/` is the other route and is not obsolete.** A standalone script per job, booted by
+`include(__DIR__ . '/cron.php')`, with its own crontab entry. Use it when the host will not run
+cron every minute — a 5/15/30-minute minimum is common on shared hosting, and `everyMinute()`
+then never fires on time — or when a job wants its own process. `references/infrastructure.md`
+compares them.
 
 ## Reference files
 

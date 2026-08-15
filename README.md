@@ -25,6 +25,7 @@
 | 🔔 Push Notifications — web push, VAPID, per-app keys | 🤖 AI assistant skill — ships in `.claude/` |
 | 🚀 Page cache — HTTP headers + server-side store, tag invalidation | 🚦 Rate limiting — opt-in per route group |
 | ⏰ Scheduler — one crontab line, tasks in `schedule/` | 📝 Application log — daily files, levels, retention |
+| 🗓️ Cron scripts — one file per job, `cron/cron.php` boots it | |
 | 🚫 Throttle blocking — refuse a flood outright for N seconds | |
 
 ---
@@ -101,6 +102,7 @@ replacement for it.
 - [13. Config](#13-config)
 - [14. Terminal](#14-terminal)
   - [14.1. Scheduled Tasks](#141-scheduled-tasks)
+  - [14.2. Cron Scripts](#142-cron-scripts)
 - [15. API](#15-api)
 - [16. Helper Methods](#16-helper-methods)
 - [17. AutoSSL](#17-autossl)
@@ -1959,7 +1961,78 @@ pays nothing for it.
 
 ---
 
+### 14.2. Cron Scripts
+
+The other way to run something on a schedule, and the older one: a standalone PHP file that
+boots the framework and does one job. `cron/cron.php` is the header that boots it:
+
+```php
+// cron/nightly-report.php
+<?php
+include(__DIR__ . '/cron.php');
+
+use App\Models\Order;
+use zFramework\Core\Facades\Mail;
+
+$rows = (new Order)->where('created_at', '>', date('Y-m-d', strtotime('-1 day')))->get();
+Mail::to('boss@example.com')->send(['subject' => 'Yesterday', 'body' => view('mails.report', compact('rows'))]);
+```
+
+Then one crontab entry per script, in cPanel or wherever the host keeps them:
+
+```
+0 6 * * * /usr/bin/php /home/user/app/cron/nightly-report.php
+```
+
+**What `cron.php` gives you**, verified by running one:
+
+| | |
+|---|---|
+| config | `config('app.title')` works |
+| helpers | `base_path()`, `view()`, `_l()` … |
+| autoloading | `App\Models\User` resolves |
+| database | queries run |
+| facades | `Log`, `Mail`, `Auth`, `Cache` … |
+
+**What it deliberately leaves out:** it sets `$cron_mode`, which makes `bootstrap.php` skip the
+session setup and the `force-https` redirect — neither means anything without a browser. It
+also never loads routes, providers or modules, so the route table is empty.
+
+**One gap to know about:** unlike `terminal`, `cron.php` does not load the error handler. An
+uncaught throwable gets PHP's default handling — a message on stderr, nothing in `error_logs/`.
+For an unattended job that is usually the wrong way round; wrap the work in try/catch and
+`Log::error()` it, or add the handler to your script:
+
+```php
+include(__DIR__ . '/cron.php');
+zFramework\Run::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php');
+```
+
+**Which of the two to use**
+
+| | `cron/` | `schedule/` (§14.1) |
+|---|---|---|
+| crontab entries | one per job | one, total |
+| where the timing lives | the host's panel | in code, versioned |
+| overlap protection | none | a still-running task is skipped |
+| double fire in a minute | not handled | not repeated |
+| a job that throws | kills that script | logged; the others still run |
+| seeing what is scheduled | read the crontab | `php terminal schedule list` |
+| isolation | its own process per job | one process per tick |
+
+`schedule/` is the better default when the host lets you run cron every minute. **Many shared
+hosts do not** — a five, fifteen or thirty minute minimum is common, and then `everyMinute()`
+and `everyMinutes(5)` quietly never fire on time, because they only run when the host's tick
+happens to land on them. On such a host, either set the crontab to what the host allows and
+schedule nothing finer, or use `cron/` and let the panel own the timing.
+
+`cron/` also stays the right answer when a job needs its own process — something long, or
+something you do not want sharing a tick with anything else.
+
+---
+
 ## 15. API
+
 
 ```php
 // route/api.php

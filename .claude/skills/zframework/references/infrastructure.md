@@ -207,6 +207,59 @@ A task that throws is caught, logged through `Log::error` and does not stop the 
 Nothing here is reachable from a web request - `schedule/` is included by the terminal
 command and by nothing else, so a served request pays nothing for it.
 
+## Cron scripts — `cron/`
+
+The older of the two scheduling routes, and still the right one sometimes. A standalone PHP
+file that boots the framework and does one job; `cron/cron.php` is the header:
+
+```php
+// cron/nightly-report.php
+<?php
+include(__DIR__ . '/cron.php');
+
+$rows = (new App\Models\Order)->where('created_at', '>', date('Y-m-d', strtotime('-1 day')))->get();
+```
+
+One crontab entry per script:
+
+```
+0 6 * * * /usr/bin/php /home/user/app/cron/nightly-report.php
+```
+
+Verified by running one: config, global helpers, autoloading of `App\*`, the database and the
+facades all work. `$cron_mode` makes `bootstrap.php` skip session setup and the `force-https`
+redirect - neither means anything without a browser - and routes, providers and modules are
+never loaded, so the route table is empty.
+
+**`cron.php` does not load the error handler**, where `terminal` does. An uncaught throwable
+gets PHP's default handling: stderr, nothing in `error_logs/`. For an unattended job wrap the
+work in try/catch and `Log::error()` it, or add the handler yourself:
+
+```php
+zFramework\Run::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php');
+```
+
+### Choosing between `cron/` and `schedule/`
+
+| | `cron/` | `schedule/` |
+|---|---|---|
+| crontab entries | one per job | one, total |
+| where the timing lives | the host's panel | in code, versioned |
+| overlap protection | none | a still-running task is skipped |
+| double fire in a minute | not handled | not repeated |
+| a job that throws | kills that script | logged; the others still run |
+| seeing what is scheduled | read the crontab | `php terminal schedule list` |
+| isolation | its own process per job | one process per tick |
+
+`schedule/` is the better default **when the host allows a per-minute cron**. Many shared hosts
+do not - a five, fifteen or thirty minute minimum is common - and then `everyMinute()` and
+`everyMinutes(5)` quietly never fire on time, because they only run when the host's tick lands
+on them. There, either match the crontab to what the host allows and schedule nothing finer, or
+use `cron/` and let the panel own the timing.
+
+`cron/` also stays right when a job wants its own process: something long, or something that
+should not share a tick with anything else.
+
 ## Rate limiting — `RateLimit::` and the `Throttle` middleware
 
 ```php
