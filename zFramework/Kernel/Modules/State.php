@@ -54,6 +54,8 @@ class State
         'zFramework\Core\GlobalCache::$apcu'           => 'whether APCu may be used',
         'zFramework\Core\GlobalCache::$redisEnabled'   => 'whether config asks for redis',
         'zFramework\Core\Facades\Lang::$path'          => 'the language directory',
+        'zFramework\Core\Facades\Log::$config'         => 'log settings from config, identical every request',
+        'zFramework\Core\Facades\Log::$dir'            => 'the log directory, and the prune-once flag with it',
         'zFramework\Core\Facades\Mail::$security'      => 'transport constants',
         'zFramework\Core\Helpers\File::$mimeMap'       => 'a lookup table',
         'zFramework\Core\Helpers\Http::$error_view'    => 'reset by flushRequestState()',

@@ -40,6 +40,22 @@ return [
     ],
 
     /**
+     * Application log - Log::info() and friends, written to storage/logs as one
+     * file per day. Nothing is loaded until the first call, so a request that
+     * never logs pays nothing.
+     *
+     * level  debug | info | warning | error. Anything below it is dropped
+     *        before the message is formatted.
+     * days   How long a day file is kept. Pruned on the first write of a
+     *        process; 0 keeps everything.
+     */
+    'log' => [
+        'enabled' => true,
+        'level'   => 'debug',
+        'days'    => 14,
+    ],
+
+    /**
      * Sessions.
      *
      * driver          file | redis. Use redis when more than one machine serves
