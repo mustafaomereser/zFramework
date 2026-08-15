@@ -1419,6 +1419,19 @@ alone, before any route is matched or session touched.
 ],
 ```
 
+**Ordering matters, and it is the one real decision here.**
+
+| `by` | Where Throttle goes | Why |
+|---|---|---|
+| `ip` (default) | **first** | the 429 unwinds out of the middleware loop, so a refused caller never reaches what follows — on the API group that skips the `Auth-Token` lookup entirely |
+| `token` | **after whatever authenticates** | otherwise `Auth` has resolved nobody yet and every caller is counted by ip |
+
+The `token` mis-ordering **degrades silently** — the limit still works, it is just not
+per-account. Measured: Throttle first gives the key `ip:::1|/x`, Throttle after the API
+middleware gives `user:8|/x`. So `by: 'token'` also costs the identity lookup for a caller you
+are about to refuse. Use it when one account must not spread its quota across addresses;
+otherwise `ip` is cheaper and harder to get wrong.
+
 `Throttle` **answers 429 itself** rather than declining, because a declined middleware with no
 fallback closure ends as a 404 and that is the wrong answer to "you are going too fast". The
 body is JSON — there is no `errors/*/429` view, and a 429 is read by retry logic more often
@@ -1430,9 +1443,7 @@ than by a person:
 
 `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After` go with it.
 
-**Put it first in the list.** The response unwinds out of the middleware loop, so a caller over
-the limit never reaches whatever follows — on the API group that skips the `Auth-Token` lookup
-entirely.
+Measured: with the limit at 2 and four requests sent, `API::attempt()` ran exactly twice.
 
 The counter underneath is usable directly:
 

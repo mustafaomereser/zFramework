@@ -27,9 +27,22 @@ use zFramework\Core\ResponseSignal;
  * fallback closure ends as a 404 - see references/routing.md - and a 404 is the
  * wrong answer to "you are going too fast", so this does not leave it to chance.
  *
- * Order it first in the list. The response is a signal, which unwinds out of the
- * middleware loop, so a caller over the limit never reaches whatever follows -
- * on the API group that saves the token lookup.
+ * Ordering, and the one place it is a real decision:
+ *
+ *   by: 'ip'    - put this first. The response is a signal, which unwinds out of
+ *                 the middleware loop, so a caller over the limit never reaches
+ *                 whatever follows. On the API group that skips the token lookup
+ *                 entirely.
+ *
+ *   by: 'token' - it has to come AFTER whatever authenticates, or Auth has not
+ *                 resolved anybody yet and every caller is counted by ip instead.
+ *                 That degrades silently: the limit still works, just not per
+ *                 account. Measured - Throttle first gives `ip:::1|/x`, Throttle
+ *                 after the API middleware gives `user:8|/x`.
+ *
+ * So `by: 'token'` costs the lookup even for a caller you are about to refuse.
+ * Use it when one account must not spread its quota across addresses; otherwise
+ * ip is both cheaper and harder to get wrong.
  */
 #[\AllowDynamicProperties]
 class Throttle

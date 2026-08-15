@@ -267,6 +267,19 @@ Measured with `throttle(3, 10, block: 15)`: requests 1-3 pass, the 4th returns 4
 `try_again_in: 15`, the counter stops moving while blocked, the wait counts 15 → 10 → 5, and
 the request after that is served.
 
+**Ordering matters, and it is the one real decision here.**
+
+| `by` | Where Throttle goes | Why |
+|---|---|---|
+| `ip` (default) | **first** | the 429 unwinds out of the middleware loop, so a refused caller never reaches what follows — on the API group that skips the `Auth-Token` lookup entirely |
+| `token` | **after whatever authenticates** | otherwise `Auth` has resolved nobody yet and every caller is counted by ip |
+
+The `token` mis-ordering **degrades silently** — the limit still works, it is just not
+per-account. Measured: Throttle first gives the key `ip:::1|/x`, Throttle after the API
+middleware gives `user:8|/x`. So `by: 'token'` also costs the identity lookup for a caller you
+are about to refuse. Use it when one account must not spread its quota across addresses;
+otherwise `ip` is cheaper and harder to get wrong.
+
 `Throttle` **answers 429 itself** rather than declining. A declined middleware with no fallback
 closure ends as a 404 (see `references/routing.md`), and a 404 is the wrong answer to "you are
 going too fast". The body is JSON, because there is no `errors/*/429` view and a 429 is read by
@@ -278,10 +291,8 @@ retry logic more often than by a person:
 
 Sends `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `Retry-After` with it.
 
-**Order it first in the list.** The response is a `ResponseSignal`, which unwinds out of the
-middleware loop, so a caller over the limit never reaches whatever follows. On the API group
-that skips the `Auth-Token` lookup entirely - measured: limit 2, four requests,
-`API::attempt()` ran twice.
+Measured on the ordering above: with the limit at 2 and four requests sent, `API::attempt()`
+ran exactly twice - the refused pair never reached it.
 
 Call `RateLimit::clear('login:' . ip())` after a successful login, so a few failed attempts do
 not keep counting against someone who then got it right.
