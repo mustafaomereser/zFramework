@@ -14,7 +14,7 @@ the APIs read similarly and behave differently. The big one: **rows are arrays, 
 everything in the inventory below is shipped and working. Do not write your own helper, your own
 query builder, your own upload routine, your own cache layer.
 
-## Five mistakes people make
+## Mistakes people make
 
 1. `$post->title` — **wrong**. Rows are arrays: `$post['title']`.
 2. Echoing a view instead of returning it — controllers `return view(...)`.
@@ -23,6 +23,22 @@ query builder, your own upload routine, your own cache layer.
 4. Touching `$_SESSION` directly — `Session::set/get` reads once and writes once per request;
    going around it breaks that.
 5. Creating classes by hand — `php terminal make ...` has templates for all of them.
+
+The next four are the ones that keep happening. They are not style preferences; each one
+produces code that fights the framework.
+
+6. **Writing the seven CRUD routes by hand**, or building a `$crud` array and looping it to
+   simulate resource routing. `Route::resource('/posts', PostController::class)` exists and
+   registers all of them, named. Never generate routes from a data structure.
+7. **Inventing a controller hierarchy.** The only base class is `zFramework\Core\Abstracts\Controller`
+   and it is deliberately empty. There is no `AbstractCrudController` to write, no interface to
+   implement, no shared CRUD parent. Every controller extends `Controller` directly.
+8. **Hand-writing the controller** instead of `php terminal make controller X --resource`, which
+   emits exactly the seven methods `Route::resource` dispatches to — including `delete()`, which
+   is not called `destroy()` here.
+9. **Putting views wherever.** `resource/views/` has a contract: one directory per interface
+   layer, `main.php` as that layer's only layout, and every page group a directory with
+   `index.php` in it. See `references/views.md` — it is the most-violated part of this skill.
 
 ## Directory map
 
@@ -93,8 +109,13 @@ php terminal db migrate                           # [--fresh] [--seed] [--module
 
 With `--module=blog` everything lands under `modules/Blog/` instead.
 
-Then register the route and add the view under `resource/views/`. Order:
+Then register the route and add the views. Order:
 migration → model → request → controller → route → view.
+
+Views are the step people improvise; do not. Copy the skeletons in `templates/` —
+`templates/views/main.php`, `templates/views/pages/{index,edit-or-create,show}.php`,
+`templates/ResourceController.php` — into place and edit them. `references/views.md` explains
+the directory contract they follow.
 
 ## Core API — quick recall
 
@@ -116,6 +137,17 @@ route('admin.posts.show', ['id' => 5]);              // always the full name
 
 **Do not write closure routes** — they block the route cache (`php terminal route cache`).
 Use `[Controller::class, 'method']`.
+
+`Route::resource` takes exactly two arguments. There is no `->only()`, `->except()`,
+`->names()`, no `apiResource`, no `Route::where()`, and the prefix helper is `Route::pre()`,
+not `prefix()`. If you need a subset, write those routes individually. The destroy method is
+**`delete`**, and the PUT route is intentionally left unnamed (route names are array keys, so
+naming both PATCH and PUT would overwrite one).
+
+**Do not trust `php terminal route list` as the full picture.** Routes registered
+conditionally — behind a module's `status`, inside `route/dynamic/`, or behind any runtime
+condition — may not appear in it. To know what is actually registered, read `route/web.php`,
+`route/api.php`, `route/dynamic/*` and each enabled module's `route/web.php`.
 
 ### Model
 
@@ -231,18 +263,38 @@ per rule.
 
 ### View — `resource/views/`
 
-`view('app.pages.welcome')` → `resource/views/app/pages/welcome.php`.
+**Read `references/views.md` before writing a template.** It is not Blade; it is a
+regex compiler, and the differences bite. Summary:
+
+`view('app.pages.posts.index')` → `resource/views/app/pages/posts/index.php`.
+
+The directory contract, which is not optional:
 
 ```
-@extends('layouts.app')  @section('content') ... @endsection  @yield('content')
-@if @elseif @else @endif   @foreach @endforeach   @forelse @empty @endforelse
-@isset @endisset  @empty @endempty  @php @endphp  @include('partials.nav')
-@json($x)  @dump($x)  @dd($x)
-{{ $x }}  → escaped        {!! $x !!} → raw
+resource/views/<app>/main.php                    one layout per interface layer
+resource/views/<app>/pages/<resource>/index.php  a page group is a DIRECTORY + index.php
+resource/views/<app>/pages/<resource>/edit-or-create.php   create and edit share one file
+resource/views/errors/<app>/{main,404}.php       every layer ships its own error views
 ```
 
-Custom directive: `View::directive('alert', fn($t, $m) => ...)` in `App/Providers/ViewProvider.php`.
-Auto-injected view data: `View::bind('layouts.app', fn() => ['user' => Auth::user()])`.
+Always use `@extends('app.main')`, `@section('body') … @endsection`, `@yield`, `@include`.
+
+Prefer plain PHP for output and control flow — `<?= $x ?>`, `<?php foreach (…): ?>`,
+`<?php if (…): ?>`. `{{ }}` and `@foreach` work, but `{{ }}` **does not escape** (it compiles
+to a bare `<?= ?>`), so it buys nothing over `<?= ?>` and parses more fragilely. Use
+`<?= e($x) ?>` when you need escaping. If the user asks for `{{ }}`, use it.
+
+These do **not** exist and will be printed literally into the page:
+`@for` `@while` `@switch` `{!! !!}` `{{-- --}}` `@auth` `@guest` `@csrf` `@method` `@push`
+`@stack` `@component` `@each`. Use `<?= csrf() ?>` and `<?= inputMethod('PATCH') ?>`.
+
+What does exist: `@if @elseif @else @endif`, `@foreach @endforeach`,
+`@forelse @empty @endforelse`, `@isset @endisset`, `@empty @endempty`, `@php @endphp`,
+`@json($x)`, `@dump($x)`, `@dd($x)`.
+
+Custom directive: `View::directive('page', fn($x) => ...)` in `App/Middlewares/ViewDirectives.php`.
+Auto-injected view data: `View::bind('app.main', fn() => ['user' => Auth::user()])`.
+Clear compiled views with `php terminal cache clear views`.
 
 ### Auth
 
@@ -264,6 +316,12 @@ Keep it that way (see `references/conventions.md`).
 
 - **`references/api.md`** — exact signatures for every facade, helper, DB method, job and CLI
   helper. Check here when unsure about parameter order.
+- **`references/views.md`** — the `resource/views` directory contract, which directives exist and
+  which only look like they do, and how the compiler actually behaves. Read it before writing
+  a template.
+- **`templates/`** — working skeletons to copy rather than retype: a layer layout
+  (`views/main.php`), the three page files (`views/pages/*.php`), and a filled-in resource
+  controller.
 - **`references/recipes.md`** — end-to-end recipes: CRUD screen, protected area, JSON API,
   creating a module, file upload, mail + queue, push notifications, localisation, going to production.
 - **`references/config.md`** — every key in every config file, plus `database/connections.php`
