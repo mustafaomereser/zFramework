@@ -33,14 +33,6 @@ return [
      *
      * A route defined with a closure cannot be cached, and one of them keeps the
      * whole table out. `route cache` names them.
-     *
-     * Urls are stored as literal strings, so a prefix built from request state -
-     * Route::pre('/' . _l('routes.admin.route'), '/admin') - is frozen as whatever
-     * the CLI resolved when the cache was built. A few of those belong in
-     * route/dynamic/, which is never cached. If most of the routing is dynamic,
-     * turn caching off instead: the cache would then hold a small part of the
-     * table while the rest still runs every request, for the price of a second
-     * place where routes live.
      */
     'route' => [
         'caching'    => true,
