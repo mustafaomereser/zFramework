@@ -57,6 +57,11 @@ class State
         'zFramework\Core\Facades\Log::$config'         => 'log settings from config, identical every request',
         'zFramework\Core\Facades\Page::$dir'          => 'the page cache directory, derived from the storage path',
         'zFramework\Core\Facades\RateLimit::$dir'     => 'the counter directory, derived from the storage path',
+
+        # CLI only: schedule.php is included by `php terminal schedule run` and
+        # by nothing else, so neither of these is ever set during a request.
+        'zFramework\Core\Facades\Schedule::$tasks'    => 'registered by schedule.php, in the terminal process',
+        'zFramework\Core\Facades\Schedule::$dir'      => 'the lock directory, derived from the storage path',
         'zFramework\Core\Facades\Log::$dir'            => 'the log directory, and the prune-once flag with it',
         'zFramework\Core\Facades\Mail::$security'      => 'transport constants',
         'zFramework\Core\Helpers\File::$mimeMap'       => 'a lookup table',
