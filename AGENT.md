@@ -45,6 +45,10 @@ sessions that never load it, because these are the rules that keep getting broke
   re-runs on a cache hit. Bind once on the layout, never per page.
 - **Code outside a `@section` is discarded** in a template that `@extends`. Per-page setup
   goes inside the section, or the variable comes out undefined.
+- **A page and its layout share one variable scope** — they compile to one file with a single
+  `extract()`. A variable set in the layout is visible inside the sections and vice versa, and
+  an assignment in the layout overwrites what the controller passed under the same key. Name
+  view data specifically (`$post`, not `$item`) and prefix anything the layout owns.
 - Clear compiled views with `php terminal cache clear views`.
 
 ## Routes and controllers

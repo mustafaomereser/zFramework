@@ -29,10 +29,11 @@ findings.
 - **`json_encode($row)`** writes relation closures as `{}`. Use `closureMode(false)` or
   `array_filter(..., fn($v) => !$v instanceof Closure)`.
 - **Closure routes** block `php terminal route cache`. Use the controller-array form.
-- **`Route::resource('/', …)` registers `/{id}`, which matches every one-segment url.** Anything
-  static and one-segment defined after it is served by `show($id)` — `abort(404)` in the
-  generated controller. `route/dynamic/` is included last, so its one-segment routes are all
-  dead this way; `/_dynamic-check` in `route/dynamic/example.php` is one.
+- **Root and resource routes are written last, deliberately.** `Route::resource('/', …)`
+  registers `/{id}`, which matches every one-segment url and lets `show()` claim it. That is
+  the intended behaviour, not a bug — so the rule is ordering: every other route is defined
+  **above** the root resource. A one-segment static route placed after it (or in
+  `route/dynamic/`, which is included last) is out-ranked and served by `show($id)`.
 - **`oninsert`/`onupdate` observers must return `$sets`**, otherwise the data is lost.
 - **`Auth::model()` is lazy.** Do not construct the model inside `Auth::init()` — the model
   constructor opens a DB connection and loads the schema, and every visitor pays for it including

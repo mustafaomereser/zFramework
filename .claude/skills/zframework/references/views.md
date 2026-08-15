@@ -121,6 +121,57 @@ Providers are auto-loaded — everything in `App/Providers/*.php` is instantiate
 the constructor is where registration goes. Bind the layout by the name pages extend
 (`app.main`), not by the page name.
 
+### One scope for the whole page — name variables accordingly
+
+A page and its layout compile into **one file**, and `extract($data)` runs once over it. There
+is no per-view scope: the layout, every section, and every partial spliced in with `@include`
+all read and write the same variables. Order is textual — the layout's top, then each section
+where its `@yield` was, then the rest of the layout.
+
+Measured, all in one render:
+
+```php
+{{-- probe/main.php --}}
+<?php $item = 'FROM-LAYOUT'; ?>
+@yield('body')
+after yield: <?= $fromSection ?>   {{-- FROM-SECTION --}}
+             <?= $item ?>          {{-- SECTION-OVERWROTE  --}}
+```
+
+```php
+{{-- the page --}}
+@extends('probe.main')
+@section('body')
+    <?php $fromSection = 'FROM-SECTION'; ?>
+    <?= $item ?>      {{-- FROM-LAYOUT — the layout's assignment is visible here --}}
+    <?php $item = 'SECTION-OVERWROTE'; ?>
+@endsection
+```
+
+Both directions leak. A variable set in the layout reaches the section; a variable set in a
+section reaches the rest of the layout after the yield point, and reaches **later sections**
+too.
+
+The consequence that costs the most time:
+
+> **The controller passed `['item' => 'CONTROLLER-ITEM']`, and the section still printed
+> `FROM-LAYOUT`.** The layout's `<?php $item = … ?>` runs after `extract()`, so it silently
+> overwrote the controller's data.
+
+So:
+
+- **Name view data specifically.** `$item`, `$data`, `$list`, `$user`, `$row`, `$count` are
+  collisions waiting to happen. `$post`, `$postComments`, `$activeUser` are not.
+- **Prefix anything the layout owns** — `$layoutMenu`, `$navUser` — since it is in scope for
+  every page in that layer.
+- This is another reason the layout should not compute (see above): a `View::bind` merges as
+  `bind() + $data`, so **a bound key wins over the same key from the controller**. Keeping
+  layout data bound and specifically named makes the precedence irrelevant, because nothing
+  collides.
+- `@include` splices text into the same scope, so a partial can quietly clobber a caller's
+  variable. Prefer `<?= view('app.layouts.card', ['card' => $post]) ?>` when a partial needs
+  its own data — that is a separate `extract()`.
+
 ## Directives
 
 ### Required — always use these

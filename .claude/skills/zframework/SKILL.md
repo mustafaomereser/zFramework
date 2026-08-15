@@ -137,6 +137,10 @@ Route::pre('/api')->noCSRF()->group(fn() => ...);    // turn CSRF off for the AP
 route('admin.posts.show', ['id' => 5]);              // always the full name
 ```
 
+**Write the root and resource routes last.** `Route::resource('/', …)` registers `/{id}`,
+which owns every one-segment url by design - anything more specific goes above it, and a
+one-segment route in `route/dynamic/` (included last) can never win.
+
 **Do not write closure routes** — they block the route cache (`php terminal route cache`).
 Use `[Controller::class, 'method']`.
 
@@ -316,6 +320,11 @@ View::bind('app.main', fn() => ['lang_list' => Lang::list()]);
 
 The bind fires even when the request rendered a page that `@extends('app.main')`, and it
 re-runs on a cache hit — so bind once, on the layout, never per page.
+
+A page and its layout compile into **one file with a single `extract()`** — one shared scope.
+A variable set in the layout is visible inside the sections and the other way round, and a
+layout assignment overwrites what the controller passed under that key. Name view data
+specifically (`$post`, not `$item`) and prefix what the layout owns.
 
 Custom directive: `View::directive('page', fn($x) => ...)` in `App/Middlewares/ViewDirectives.php`.
 Clear compiled views with `php terminal cache clear views`.
