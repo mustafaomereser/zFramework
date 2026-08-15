@@ -1075,7 +1075,7 @@ class BlogController extends Controller
 | a response that is not 200 | `Page::cache()` in a constructor runs before the method aborts |
 | a body containing a csrf token | per-session; the copy breaks every form that receives it |
 | `shared: false` | "for this visitor" and "one copy for everyone" are opposites |
-| after `Page::vary(...)` | the store is keyed by url alone and cannot hold variants |
+| after `Page::vary(...)` | the store's key is fixed and cannot hold variants |
 
 The csrf case is caught by the framework and, with `app.debug` on, logged with the url — the
 failure is otherwise remote from its cause: the page renders fine and only the *next*
@@ -1100,6 +1100,12 @@ Page::forgetUrl('/blog/hello');    // by url, when it was never tagged
 Page::clear();                     // everything
 php terminal cache clear pages     // the same, from the CLI
 ```
+
+The key is `method | url | language cookie | Accept-Language[0:2]` — the language is in there
+because a hit is served before the middlewares resolve the locale, and without it an English
+visitor would get the Turkish copy. Anything else that varies per visitor and is not in the
+url — a tenant, a currency — has to use `Page::vary()`, which keeps the response out of the
+shared store.
 
 Prefer the tag — rebuilding the url with its query string where a model is saved is the part
 nobody gets right, and one tag can cover several urls. An observer is the tidy place:

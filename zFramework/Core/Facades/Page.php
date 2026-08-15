@@ -140,10 +140,11 @@ class Page
     {
         if (!$headers) return;
 
-        # A stored entry is keyed by url alone, so it cannot represent a response
-        # that varies by anything else - storing one would serve the wrong
-        # variant to everybody. Declaring Vary takes it out of the store and
-        # leaves it to the browser, which does honour the header.
+        # A stored entry has a fixed key - method, url and the language inputs -
+        # so it cannot represent a response that varies by anything else, and
+        # storing one would serve the wrong variant to everybody. Declaring Vary
+        # takes it out of the store and leaves it to the browser, which does
+        # honour the header.
         Response::cacheTtl(0);
 
         Response::header('Vary', implode(', ', $headers));
