@@ -67,6 +67,60 @@ Route::pre('/admin')
 
 `Route::pre()` prefixes the **name** as well, so those routes are `admin.posts.index` and so on.
 
+## Where a template's data comes from
+
+**Templates render. They do not fetch and they do not calculate.**
+
+No `new Post`, no `->where(...)->get()`, no aggregation, no sorting, no business rules inside
+a view file. The controller queries and hands finished data to `view()`; the template loops
+over it and prints it. Formatting is fine — `Date::format()`, `e()`, `number_format()`,
+a ternary picking a CSS class. Deciding *what* the data is, is not.
+
+The reason is not purity. A template that queries cannot be rendered from a second controller
+without repeating the query, it cannot be tested or cached independently, and the query hides
+in the one place nobody greps for one. Model calls scattered across views are also how a page
+ends up issuing forty queries nobody can account for.
+
+A genuinely niche exception exists and should be rare enough to justify in a comment.
+
+### The layout is not an exception — bind it
+
+`main.php` renders on every request, so it is the most tempting place to fetch. Do not.
+Register the data in `App/Providers/ViewProvider.php`:
+
+```php
+use zFramework\Core\Facades\Lang;
+use zFramework\Core\View;
+
+class ViewProvider
+{
+    public function __construct()
+    {
+        View::bind('app.main', fn() => [
+            'lang_list' => Lang::list(),
+        ]);
+    }
+}
+```
+
+```php
+{{-- resource/views/app/main.php --}}
+@foreach($lang_list as $lang) … @endforeach   {{-- just consumes it --}}
+```
+
+Verified behaviour, both of which are what make this work:
+
+- **A bind on the layout fires even when the request rendered a page that `@extends` it.**
+  `parseExtends` compiles the parent through `compile()`, which applies the parent's binds and
+  merges them back into the child's data. You do not bind per page.
+- **Binds re-run on a cache hit.** The manifest records which binds the chain used and
+  `View::view()` re-applies them before including the compiled file, so bound data is never
+  stale even though the template is not recompiled.
+
+Providers are auto-loaded — everything in `App/Providers/*.php` is instantiated at boot, so
+the constructor is where registration goes. Bind the layout by the name pages extend
+(`app.main`), not by the page name.
+
 ## Directives
 
 ### Required — always use these

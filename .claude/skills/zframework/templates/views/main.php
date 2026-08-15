@@ -8,6 +8,14 @@
  *
  * The three @yield names below are the contract every page in this layer relies on.
  * Renaming one means editing every page, so keep header/body/footer.
+ *
+ * This file fetches NOTHING. Anything the layout needs on every render is bound in
+ * App/Providers/ViewProvider.php and arrives as a variable:
+ *
+ *     View::bind('app.main', fn() => ['lang_list' => Lang::list()]);
+ *
+ * The bind fires even when the request rendered a page that @extends this layout, and
+ * it re-runs on a cache hit — so there is never a reason to query from in here.
  */
 
 use zFramework\Core\Facades\Alerts;

@@ -1,8 +1,6 @@
 <?php
 
 use zFramework\Core\Facades\Lang;
-
-$lang_list = Lang::list();
 ?>
 <!DOCTYPE html>
 <html lang="<?= Lang::$locale ?>" data-bs-theme="light">

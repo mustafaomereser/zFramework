@@ -293,8 +293,21 @@ What does exist: `@if @elseif @else @endif`, `@foreach @endforeach`,
 `@json($x)`, `@dump($x)`, `@dd($x)`, and `{{-- comment --}}` (stripped before anything else
 parses, so it may contain directives).
 
+**Templates render; they do not fetch or calculate.** No `new Post`, no `->where()->get()`,
+no aggregation or business rules in a view file. The controller queries and passes finished
+data to `view()`. Formatting (`Date::format`, `e()`, a ternary picking a class) is fine.
+
+The layout is not an exception. What `main.php` needs on every render is registered in
+`App/Providers/ViewProvider.php`:
+
+```php
+View::bind('app.main', fn() => ['lang_list' => Lang::list()]);
+```
+
+The bind fires even when the request rendered a page that `@extends('app.main')`, and it
+re-runs on a cache hit — so bind once, on the layout, never per page.
+
 Custom directive: `View::directive('page', fn($x) => ...)` in `App/Middlewares/ViewDirectives.php`.
-Auto-injected view data: `View::bind('app.main', fn() => ['user' => Auth::user()])`.
 Clear compiled views with `php terminal cache clear views`.
 
 ### Auth

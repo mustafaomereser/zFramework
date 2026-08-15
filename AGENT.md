@@ -29,6 +29,22 @@ sessions that never load it, because these are the rules that keep getting broke
   `@for` `@while` `@switch` `{!! !!}` `@csrf` `@method` `@auth` `@guest` `@push`
   `@stack` `@component` `@each`. Use `<?php for (…): ?>`, `<?= csrf() ?>`,
   `<?= inputMethod('PATCH') ?>`.
+- **Templates render; they do not fetch or calculate.** No `new Post`, no
+  `->where()->get()`, no aggregation or business rules inside a view file — the controller
+  queries and hands finished data to `view()`. Formatting (`Date::format`, `e()`, a ternary
+  picking a CSS class) is fine. A genuinely niche exception should be rare enough to justify
+  in a comment.
+- **The layout is not an exception.** Whatever `main.php` needs on every render is registered
+  in `App/Providers/ViewProvider.php`, not fetched inside the template:
+
+  ```php
+  View::bind('app.main', fn() => ['lang_list' => Lang::list()]);
+  ```
+
+  The bind fires even when the request rendered a page that `@extends('app.main')`, and it
+  re-runs on a cache hit. Bind once on the layout, never per page.
+- **Code outside a `@section` is discarded** in a template that `@extends`. Per-page setup
+  goes inside the section, or the variable comes out undefined.
 - Clear compiled views with `php terminal cache clear views`.
 
 ## Routes and controllers
