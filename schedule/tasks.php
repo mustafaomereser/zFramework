@@ -3,6 +3,9 @@
 /**
  * Scheduled tasks.
  *
+ * Every .php file under schedule/ is loaded, so split this by subject or by
+ * module as it grows - the same arrangement route/ has.
+ *
  * One crontab line drives all of it:
  *
  *   * * * * * cd /path/to/app && php terminal schedule run >> /dev/null 2>&1
@@ -14,7 +17,7 @@
  * A task that is still running from the previous tick is skipped rather than
  * started again, and one that throws is logged and does not stop the others.
  *
- * Only the terminal reads this file, so nothing here costs a served request.
+ * Only the terminal reads these files, so nothing here costs a served request.
  */
 
 use zFramework\Core\Facades\Schedule;

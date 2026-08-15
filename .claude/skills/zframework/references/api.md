@@ -267,7 +267,8 @@ Schedule::run(?callable $report = null): int      // used by `php terminal sched
 Schedule::due(string $expression, ?int $at = null): bool
 Schedule::tasks(): array
 ```
-Registered in `schedule.php` at the project root, driven by one crontab line.
+Registered under `schedule/` at the project root - every `.php` file there is loaded - and
+driven by one crontab line.
 
 ### Queue / Defer
 ```php
@@ -435,7 +436,7 @@ php terminal route cache | clear | list
 php terminal cache clear views|sessions|pages|logs|ratelimit|schedule
                                        # any directory under storage/
 
-# Scheduled tasks (from schedule.php)
+# Scheduled tasks (from schedule/*.php)
 php terminal schedule run              # everything due this minute
 php terminal schedule list             # what is registered, and when each next runs
 

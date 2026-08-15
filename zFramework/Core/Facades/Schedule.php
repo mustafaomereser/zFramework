@@ -7,15 +7,15 @@ namespace zFramework\Core\Facades;
  *
  *   * * * * * cd /path/to/app && php terminal schedule run >> /dev/null 2>&1
  *
- * Everything else lives in schedule.php at the project root, in code you can
+ * Everything else lives under schedule/ at the project root, in code you can
  * read, instead of a crontab nobody remembers editing:
  *
  *   Schedule::daily('03:00', fn() => Backup::run(), 'nightly-backup');
  *   Schedule::everyMinutes(5, fn() => Queue::drain(), 'queue-drain');
  *   Schedule::cron('0 9 * * 1', fn() => Mail::send(...), 'monday-report');
  *
- * Nothing here is reachable from a web request - schedule.php is only included
- * by the terminal command, so the file costs a served request nothing.
+ * Nothing here is reachable from a web request - schedule/ is only included
+ * by the terminal command, so those files cost a served request nothing.
  *
  * Two things it does that a raw crontab does not: it will not start a task that
  * is still running from last time, and it will not run one twice if cron fires

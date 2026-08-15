@@ -3,6 +3,7 @@
 namespace zFramework\Kernel\Modules;
 
 use zFramework\Kernel\Terminal;
+use zFramework\Run;
 use zFramework\Core\Facades\Schedule as ScheduleFacade;
 
 class Schedule
@@ -48,7 +49,7 @@ class Schedule
 
         $tasks = ScheduleFacade::tasks();
 
-        if (!count($tasks)) return Terminal::text('[color=dark-gray]No tasks registered in schedule.php.[/color]');
+        if (!count($tasks)) return Terminal::text('[color=dark-gray]No tasks registered under schedule/.[/color]');
 
         foreach ($tasks as [$expression, , $name]) {
             $next = self::next($expression);
@@ -62,24 +63,28 @@ class Schedule
     }
 
     /**
-     * Include schedule.php, which is where tasks are registered.
+     * Include everything under schedule/, which is where tasks are registered.
      *
-     * Deliberately not loaded anywhere else: a served request must not pay for
-     * a file only the scheduler reads.
+     * A directory rather than one file, for the same reason route/ is one: a
+     * task list grows, and splitting it per subject or per module beats one file
+     * everyone edits.
+     *
+     * Deliberately not loaded anywhere else - a served request must not pay for
+     * files only the scheduler reads.
      *
      * @return bool
      */
     private static function load(): bool
     {
-        $file = BASE_PATH . '/schedule.php';
+        $dir = BASE_PATH . '/schedule';
 
-        if (!is_file($file)) {
-            Terminal::text("[color=red]No schedule.php in the project root.[/color]");
+        if (!is_dir($dir)) {
+            Terminal::text("[color=red]No schedule/ directory in the project root.[/color]");
             Terminal::text("[color=dark-gray]Create one and register tasks with Schedule::daily(), ::everyMinutes(), ::cron().[/color]");
             return false;
         }
 
-        include_once($file);
+        Run::includer($dir);
 
         return true;
     }

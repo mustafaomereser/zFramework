@@ -67,7 +67,7 @@ resource/       views/  (view('a.b') → resource/views/a/b.php), lang/{tr,en}/
 modules/        self-contained modules (own routes/models/migrations/views)
 public_html/    document root, assets/
 zFramework/     the framework core — touch ONLY to fix a framework bug
-schedule.php    scheduled tasks; read only by `php terminal schedule run`
+schedule/       scheduled tasks; read only by `php terminal schedule run`
 terminal        CLI entry point: php terminal <module> <command>
 README.md       73 KB full reference; section numbers below
 ```
@@ -112,7 +112,7 @@ README.md       73 KB full reference; section numbers below
 | Page caching, HTTP cache headers | `Page::` | §3.1 |
 | Application log | `Log::` | §20.1 |
 | Rate limiting | `RateLimit::` + `Throttle` middleware | §6.1 |
-| Scheduled tasks (cron) | `Schedule::` + `schedule.php` | §14.1 |
+| Scheduled tasks (cron) | `Schedule::` + `schedule/` | §14.1 |
 
 Full signatures: **`references/api.md`** — when unsure about a method's parameters, look there
 rather than guessing.
@@ -427,7 +427,7 @@ needed — and put it first in the list, since the response unwinds past whateve
 ### Scheduled tasks
 
 ```php
-// schedule.php, driven by: * * * * * php terminal schedule run
+// schedule/tasks.php, driven by: * * * * * php terminal schedule run
 Schedule::daily('03:00', fn() => ..., 'nightly-backup');
 Schedule::everyMinutes(5, fn() => ..., 'queue-drain');
 ```

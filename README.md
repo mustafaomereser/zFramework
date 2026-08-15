@@ -24,7 +24,7 @@
 | 📮 Queue — Redis-backed jobs + worker command | ⏭️ Defer — run work after the response is sent |
 | 🔔 Push Notifications — web push, VAPID, per-app keys | 🤖 AI assistant skill — ships in `.claude/` |
 | 🚀 Page cache — HTTP headers + server-side store, tag invalidation | 🚦 Rate limiting — opt-in per route group |
-| ⏰ Scheduler — one crontab line, tasks in `schedule.php` | 📝 Application log — daily files, levels, retention |
+| ⏰ Scheduler — one crontab line, tasks in `schedule/` | 📝 Application log — daily files, levels, retention |
 | 🚫 Throttle blocking — refuse a flood outright for N seconds | |
 
 ---
@@ -1926,7 +1926,8 @@ One crontab line drives everything:
 * * * * * cd /path/to/app && php terminal schedule run >> /dev/null 2>&1
 ```
 
-Tasks live in `schedule.php` at the project root, in code you can read:
+Tasks live under `schedule/` at the project root, in code you can read. Every `.php` file
+there is loaded, so split them by subject or by module the way `route/` is split:
 
 ```php
 use zFramework\Core\Facades\Schedule;
@@ -1953,7 +1954,7 @@ rather than started again** — two copies of a backup are worse than a late one
 **will not run twice in the same minute**, however many times `schedule run` is invoked. A task
 that throws is logged through `Log::error` and does not stop the others.
 
-`schedule.php` is included by the terminal command and by nothing else, so a served request
+`schedule/` is included by the terminal command and by nothing else, so a served request
 pays nothing for it.
 
 ---

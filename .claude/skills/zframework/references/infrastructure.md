@@ -172,7 +172,8 @@ One crontab line drives everything:
 * * * * * cd /path/to/app && php terminal schedule run >> /dev/null 2>&1
 ```
 
-Tasks live in `schedule.php` at the project root:
+Tasks live under `schedule/` at the project root. Every `.php` file there is loaded, so split
+them by subject or by module the way `route/` is split:
 
 ```php
 use zFramework\Core\Facades\Schedule;
@@ -203,7 +204,7 @@ Two things a raw crontab does not do:
 
 A task that throws is caught, logged through `Log::error` and does not stop the others.
 
-Nothing here is reachable from a web request - `schedule.php` is included by the terminal
+Nothing here is reachable from a web request - `schedule/` is included by the terminal
 command and by nothing else, so a served request pays nothing for it.
 
 ## Rate limiting — `RateLimit::` and the `Throttle` middleware
