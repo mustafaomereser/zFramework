@@ -13,6 +13,15 @@
  * still works with the cache. Use this directory only when a route genuinely
  * must not exist for some requests: per-tenant flags, licence-gated modules.
  *
+ * The other case is a url that is not a constant. A group like
+ *
+ *     Route::pre('/' . _l('routes.admin.route'), '/admin')
+ *
+ * translates the url per locale while the route name stays admin.*, so no
+ * route() call site changes. The cache stores urls as literal strings, so
+ * built from the CLI it would freeze one language for everyone - a group like
+ * that belongs here.
+ *
  * These files run on every request, so keep the conditions cheap. A query here
  * is paid by requests that never touch these routes.
  */

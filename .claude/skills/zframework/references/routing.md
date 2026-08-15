@@ -134,6 +134,34 @@ Route::pre('/panel', '')->group(fn() => Route::get('/a', …)->name('a'));
 // url /panel/a, name just "a"
 ```
 
+#### Localised urls with a stable name
+
+This is what the second argument is really for — a url that is translated per locale while
+every `route()` call site keeps working:
+
+```php
+Route::pre('/' . _l('routes.admin.route'), '/admin')->group(function () {
+    Route::resource('/posts', AdminPostController::class);   // always admin.posts.index
+});
+```
+
+`locale=tr` gives `/yonetim/posts`, `locale=en` gives `/admin/posts`, and the name is
+`admin.posts.*` either way.
+
+This works because global middlewares are included **before** the route files, on purpose —
+`App/Middlewares/Language.php` has already resolved the visitor's locale from the cookie by
+the time `route/web.php` runs.
+
+**But it is incompatible with the route cache.** `writeCache()` stores the table with
+`var_export()`, so the url is frozen as a literal string — whatever locale the CLI had when
+`php terminal route cache` ran, which is the default, with no cookie in sight. Every visitor
+then gets that one language's urls and 404s on the others.
+
+Put locale-dependent groups in **`route/dynamic/`**, which is excluded from the cache in both
+directions (`Route::sources()` skips it, and `handle()` re-includes it per request on top of
+the booted table). Keep those files cheap — they are re-evaluated on every request, including
+ones that never touch those routes.
+
 `noCSRF` is inherited by nested groups too.
 
 Look routes up with the full name: `route('admin.blog.posts')`, `route('posts.show', ['id' => 5])`.
@@ -258,6 +286,11 @@ php terminal route list
 **`route list` is not the full picture.** Routes registered conditionally — behind a module's
 `status`, inside `route/dynamic/` (never cached, re-read every request), or behind any runtime
 condition — may not appear. To know what is really registered, read the route files themselves.
+
+Before turning caching on, check the route files for a url built from request state — a
+locale (`_l()`), a tenant, a config flag read at include time. The cache stores urls as
+literal strings, so anything like that is frozen at build time. Those groups belong in
+`route/dynamic/`.
 
 `Route::has('/admin')` tests whether a url substring is registered, which is how
 `ViewDirectives` decides it is in the admin layer.
