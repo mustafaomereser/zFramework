@@ -341,8 +341,8 @@ return [
     'name'              => 'shop',
     'description'       => '',
     'author'            => '',
-    'created_at'        => '2026-01-01 00:00:00',
-    'framework_version' => '3.0.0',
+    'created_at'        => '2026-01-01 00:00:00',   // filled in by `module create`
+    'framework_version' => '…',                     // filled in by `module create`
     'module_version'    => '0.0.0',
     'sort'              => 3,
     'callback'          => function () {

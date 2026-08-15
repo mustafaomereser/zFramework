@@ -73,6 +73,10 @@ signature is worse than a missing one, because it gets used without checking.
 commit.** That means: a new or renamed facade/helper/model method, a changed signature or default,
 a new terminal command or flag, a new config key, a new view directive, a new validator rule.
 
+**Do not write framework version numbers into this skill.** It documents the code as it stands
+in the working tree — whatever is checked out is current. A version in the text only goes stale
+and invites "is this still true for 3.2?", which is never the right question here.
+
 | Changed | Update |
 |---|---|
 | A method on a facade, helper, or the DB layer | `references/api.md` |
@@ -82,6 +86,7 @@ a new terminal command or flag, a new config key, a new view directive, a new va
 | Route registration, group/prefix/middleware behaviour, the middleware contract | `references/routing.md` |
 | Auth, `special_columns`, session modes, the API middleware | `references/auth.md` |
 | A validator rule, or how validation fails and returns | `references/validation.md` |
+| Model behaviour, relations, migration column syntax, observers | `references/models.md` |
 | A view directive, or anything about how `resource/views` is laid out | `references/views.md`, and `templates/` if the skeletons change |
 | A new subsystem worth knowing exists at all | the inventory table in `SKILL.md` |
 | A decision that should not be "fixed" later, or a trap worth warning about | this file |

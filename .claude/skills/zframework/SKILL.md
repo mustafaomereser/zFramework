@@ -1,6 +1,6 @@
 ---
 name: zframework
-description: Use when working with zFramework (a custom Laravel-like PHP framework, v3.0.0, PHP >=8.1). Read this BEFORE writing any application code on top of it - scaffolding a new project, adding routes/models/controllers/migrations/views, or answering "how do I do X here". Purpose - stop re-implementing features the framework already ships, and use the correct API signatures. Triggers - zFramework, zFramework\Core, Route::, Abstracts\Model, php terminal make, resource/views, App/Controllers, modules/, migration, Auth::attempt, view(), Alerts::, AutoSSL, cPanel API, push notification.
+description: Use when working with zFramework (a custom Laravel-like PHP framework, PHP >=8.1). Read this BEFORE writing any application code on top of it - scaffolding a new project, adding routes/models/controllers/migrations/views, or answering "how do I do X here". Purpose - stop re-implementing features the framework already ships, and use the correct API signatures. Triggers - zFramework, zFramework\Core, Route::, Abstracts\Model, php terminal make, resource/views, App/Controllers, modules/, migration, Auth::attempt, view(), Alerts::, AutoSSL, cPanel API, push notification.
 ---
 
 # zFramework Working Guide
@@ -361,6 +361,8 @@ logs in from the `Auth-Token` header against `api_token`. Do not hand-roll a tok
 - **`references/routing.md`** — groups and prefixes (`Route::pre`, `middleware`, `noCSRF`),
   how they nest, the two ways a group leaks, the middleware contract, and what a declined
   middleware actually does. Read it before building a protected area.
+- **`references/models.md`** — rows as arrays, the closures every row carries (`update`,
+  `delete`, one per relation), `closureMode(false)`, migration column syntax and observers.
 - **`references/validation.md`** — Request classes, every rule and what it really compares,
   and the three different things a validation failure does. Read it before adding a rule.
 - **`references/auth.md`** — `Auth::attempt` and the three ways it surprises people,
