@@ -1,7 +1,11 @@
 # zFramework — Agent Rules
 
-It looks like Laravel and it is not Laravel. The biggest difference: **rows are arrays,
-not objects** — `$post['title']`, never `$post->title`.
+It borrows Laravel's vocabulary and **behaves differently behind every one of those
+names**. Recalling how Laravel does something is not evidence about this framework — it
+is the most common way to write broken code here. The biggest single difference:
+**rows are arrays, not objects** — `$post['title']`, never `$post->title`.
+
+Work from the code that is checked out, not from a version number.
 
 Before writing application code, load the `zframework` skill
 (`.claude/skills/zframework/`) — the API inventory, the correct signatures and the
