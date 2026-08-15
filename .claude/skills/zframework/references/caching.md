@@ -66,8 +66,8 @@ measured:
    result was a reload loop.
 5. **`shared: false`.** "For this visitor only" and "keep one copy for everyone" are
    opposites.
-6. **`Page::vary(...)` was called.** The store is keyed by url alone, so it cannot represent a
-   response that varies by anything else.
+6. **`Page::vary(...)` was called.** The store's key is fixed (see below), so it cannot
+   represent a response that varies by anything the key does not carry.
 
 Rules 5 and 6 are not restrictions to work around — they are how per-visitor caching works.
 

@@ -11,7 +11,7 @@ use zFramework\Core\Route;
 # It runs before API::class: the 429 unwinds out of the middleware loop, so a
 # caller over the limit never costs the Auth-Token lookup. The group needs no
 # fallback closure either - Throttle answers 429 itself.
-Route::pre('/api')->throttle(120)->middleware([API::class])->noCSRF()->group(function () {
+Route::pre('/api')->throttle(1)->middleware([API::class])->noCSRF()->group(function () {
     Route::pre('/v1')->group(function () {
         Route::get('/', fn() => Response::json([
             'status'    => rand(0, 999),
