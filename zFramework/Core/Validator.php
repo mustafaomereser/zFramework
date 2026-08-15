@@ -77,7 +77,8 @@ class Validator
         if (count($errors)) {
             if (!$callback) {
                 if (Http::isAjax()) abort(400, Response::json($errors));
-                foreach ($errors as $error_list) foreach ($error_list as $error) Alerts::danger($error);
+                # The alert was already raised where the rule failed, for every path.
+                # Raising it again here showed the visitor each message twice.
                 back();
             } else $callback($errors, $statics);
         }
