@@ -162,6 +162,21 @@ directions (`Route::sources()` skips it, and `handle()` re-includes it per reque
 the booted table). Keep those files cheap — they are re-evaluated on every request, including
 ones that never touch those routes.
 
+**If most of the routing is dynamic, stop splitting it and turn the cache off:**
+
+```php
+// config/framework.php
+'route' => ['caching' => false, 'auto-check' => false],
+```
+
+`route/dynamic/` earns its keep when a few definitions are request-dependent and the bulk is
+static. Once the bulk is dynamic, the cache holds a small fraction of the table while the
+translated or tenant-scoped groups still run every request — you pay the include cost anyway
+and get a second place where routes live, plus a cache that has to be rebuilt on deploy and
+silently freezes anything that slipped back into `route/web.php`. One file, caching off, is
+both cheaper to reason about and closer to what actually happens. `php terminal bench run`
+reports what the cache is worth on this project before you decide.
+
 `noCSRF` is inherited by nested groups too.
 
 Look routes up with the full name: `route('admin.blog.posts')`, `route('posts.show', ['id' => 5])`.
@@ -290,7 +305,8 @@ condition — may not appear. To know what is really registered, read the route 
 Before turning caching on, check the route files for a url built from request state — a
 locale (`_l()`), a tenant, a config flag read at include time. The cache stores urls as
 literal strings, so anything like that is frozen at build time. Those groups belong in
-`route/dynamic/`.
+`route/dynamic/` — or, if there are many of them, leave `route.caching` off entirely rather
+than maintaining the split. See "Localised urls with a stable name" above.
 
 `Route::has('/admin')` tests whether a url substring is registered, which is how
 `ViewDirectives` decides it is in the admin layer.
