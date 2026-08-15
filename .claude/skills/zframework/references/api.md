@@ -168,6 +168,10 @@ toggleAttach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue
 ## Facades
 
 ### Auth
+
+**`Auth::attempt` semantics, `special_columns`, the two session modes and the API
+middleware are in `references/auth.md`.** Signatures here; behaviour there.
+
 ```php
 Auth::attempt(array $fields = [], bool $staymein = false): bool
 Auth::login(array $user): bool          Auth::token_login(string $token): bool

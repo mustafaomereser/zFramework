@@ -336,6 +336,15 @@ public $special_columns = ['email' => 'email', 'password' => 'password', 'passwo
 `Auth::model()` is lazy — a request that never asks for an identity opens no DB connection.
 Keep it that way (see `references/conventions.md`).
 
+Three things about `attempt()` that catch people out: it returns **false if someone is already
+logged in**; every key other than the password becomes a `where()`; and **with no password key
+it logs the user in without checking one** — `Auth::attempt(['id' => 7])` succeeds. Name the
+fields explicitly, never pass `request()` into it.
+
+For an API, put `App\Middlewares\API::class` on the group — it flips Auth into api mode and
+logs in from the `Auth-Token` header against `api_token`. Do not hand-roll a token check.
+`noCSRF()` on the same group, or every POST aborts with 406. Detail in `references/auth.md`.
+
 ## Reference files
 
 - **`references/api.md`** — exact signatures for every facade, helper, DB method, job and CLI
@@ -343,6 +352,10 @@ Keep it that way (see `references/conventions.md`).
 - **`references/routing.md`** — groups and prefixes (`Route::pre`, `middleware`, `noCSRF`),
   how they nest, the two ways a group leaks, the middleware contract, and what a declined
   middleware actually does. Read it before building a protected area.
+- **`references/auth.md`** — `Auth::attempt` and the three ways it surprises people,
+  `special_columns` on the user model, cookie vs Redis session mode, and the `API` middleware
+  that turns a route group into a header-authenticated API. Read it before touching login or
+  writing an endpoint.
 - **`references/views.md`** — the `resource/views` directory contract, which directives exist and
   which only look like they do, and how the compiler actually behaves. Read it before writing
   a template.

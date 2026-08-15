@@ -278,6 +278,41 @@ Static routes are resolved through a hash; parameterised ones are scanned in def
 `Route::resource` registers `/create` before `/{id}` — reverse them and `/create` would be
 swallowed as an id.
 
+### A resource mounted at `/` swallows every one-segment url
+
+`Route::resource('/', WelcomeController::class)` registers `/{id}`, and `/{id}` matches
+**any** single-segment path. Every static one-segment route defined *after* it is therefore
+unreachable: the request is served by `show($id)` instead, which in the generated controller
+is `abort(404)`.
+
+This is not theoretical — it is why `route/dynamic/example.php`'s own `/_dynamic-check` route
+returns 404 with `app.debug` on. `route/dynamic/` is included last, after `route/web.php`, so
+everything in it sits after `/{id}`:
+
+```php
+// route/web.php, last line
+Route::resource('/', WelcomeController::class);      // registers /{id}
+
+// route/dynamic/anything.php — included afterwards
+Route::get('/status', …)->name('status');            // never reached: /{id} wins, show() aborts 404
+Route::get('/status/live', …)->name('status.live');  // fine — two segments
+```
+
+Registered and indexed correctly; simply out-ranked. Confirmed by dumping the table from
+inside a request: the route is present, its segments match, and `/{id}` still wins on position.
+
+If you mount a resource at `/`, either define one-segment static routes **before** it, or
+mount the root with explicit routes instead:
+
+```php
+Route::get('/', [WelcomeController::class, 'index'])->name('index');
+Route::post('/', [WelcomeController::class, 'store'])->name('store');
+```
+
+The same trap applies to any `Route::resource('/x', …)` versus a later `/x/something` static
+route — but the root case is the one that bites, because it covers the whole one-segment
+namespace.
+
 CSRF is checked in `match()`, before middleware, and a failure aborts with 406. `noCSRF()`
 skips it — use it for API groups.
 

@@ -29,6 +29,10 @@ findings.
 - **`json_encode($row)`** writes relation closures as `{}`. Use `closureMode(false)` or
   `array_filter(..., fn($v) => !$v instanceof Closure)`.
 - **Closure routes** block `php terminal route cache`. Use the controller-array form.
+- **`Route::resource('/', …)` registers `/{id}`, which matches every one-segment url.** Anything
+  static and one-segment defined after it is served by `show($id)` — `abort(404)` in the
+  generated controller. `route/dynamic/` is included last, so its one-segment routes are all
+  dead this way; `/_dynamic-check` in `route/dynamic/example.php` is one.
 - **`oninsert`/`onupdate` observers must return `$sets`**, otherwise the data is lost.
 - **`Auth::model()` is lazy.** Do not construct the model inside `Auth::init()` — the model
   constructor opens a DB connection and loads the schema, and every visitor pays for it including
@@ -72,6 +76,7 @@ a new terminal command or flag, a new config key, a new view directive, a new va
 | A config key, or a `connections.php` option | `references/config.md` |
 | AutoSSL, cPanel, analyzer, worker runtime | `references/infrastructure.md` |
 | Route registration, group/prefix/middleware behaviour, the middleware contract | `references/routing.md` |
+| Auth, `special_columns`, session modes, the API middleware | `references/auth.md` |
 | A view directive, or anything about how `resource/views` is laid out | `references/views.md`, and `templates/` if the skeletons change |
 | A new subsystem worth knowing exists at all | the inventory table in `SKILL.md` |
 | A decision that should not be "fixed" later, or a trap worth warning about | this file |
