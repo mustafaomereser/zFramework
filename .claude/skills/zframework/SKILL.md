@@ -407,12 +407,22 @@ Log::error('Gateway refused', ['code' => $e->getCode()]);
 ### Rate limiting
 
 ```php
-Route::pre('/api')->middleware([API::class, Throttle::class])->noCSRF()->group(...);
+Route::throttle(int $limit, int $window = 60, string $by = 'ip', int $block = 0)
 ```
 
-Opt-in: which routes are limited is where you attach the middleware, how hard is
-`config/framework.php` → `throttle`. It aborts 429 itself, so it works without a fallback
-closure.
+```php
+Route::pre('/api')->throttle(120)->middleware([API::class])->noCSRF()->group(...);
+Route::throttle(5, 300)->group(fn() => Route::post('/sign-in', ...));
+Route::pre('/search')->throttle(100, 10, block: 600)->group(...);
+```
+
+A group setting, like `pre()` and `noCSRF()` — it attaches the middleware itself, so the limit
+sits with the routes it governs. Config carries only the fallback; there is no url-prefix
+table, because that is a second copy of the routing that stops matching when a url changes.
+
+`block` refuses a flood outright for that long instead of letting the next window in, answered
+on one read with no route matched. Answers 429 as JSON itself, so no fallback closure is
+needed — and put it first in the list, since the response unwinds past whatever follows.
 
 ### Scheduled tasks
 

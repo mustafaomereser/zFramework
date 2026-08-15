@@ -42,15 +42,12 @@ commit it, never hand-write it.
     'level'   => 'debug',    // debug | info | warning | error
     'days'    => 14,         // day files kept; 0 keeps everything
 ],
-'throttle' => [
-    'enabled' => true,
-    'limit'   => 60,         // per window, for anything without its own rule
-    'window'  => 60,         // seconds
-    'by'      => 'ip',       // ip | token
-    'rules'   => [           // per url prefix, longest match wins
-        '/api'     => ['limit' => 120],
-        '/sign-in' => ['limit' => 5, 'window' => 300],
-    ],
+'throttle' => [          // only the fallback - the limit belongs on the route group,
+    'enabled' => true,   // Route::pre('/api')->throttle(120)->group(...)
+    'limit'   => 60,     // false here turns every limit off, wherever declared
+    'window'  => 60,     // seconds
+    'by'      => 'ip',   // ip | token
+    'block'   => 0,      // seconds to refuse outright once the limit is passed
 ],
 'session' => [
     'driver'         => 'file',   // file | redis (redis for multi-server)

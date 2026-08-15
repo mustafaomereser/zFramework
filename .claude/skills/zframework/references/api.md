@@ -294,7 +294,7 @@ Mail::sendNow(array $data): bool                 // always immediate
 ```php
 Str::limit($text, 50, '...')      Str::wordLimit($text, 3, '...')
 Str::rand(int $length = 5, bool $unique = false)
-Str::slug($text, '-')             Str::base64UrlEncode/Decode()
+Str::slug($text, '-')             Str::base64UrlEncode($binary)   Str::base64UrlDecode($text)
 
 Date::now('d.m.Y H:i')            Date::format(?string $date, 'd.m.Y')
 Date::timestamp('-0 days')        Date::timeago($date)      Date::timediff($t1, $t2)
