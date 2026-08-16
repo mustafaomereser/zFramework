@@ -45,6 +45,25 @@ findings.
   non-ASCII slug has to be `rawurldecode()`d before it is compared with a database value.
 - **`json_encode($row)`** writes relation closures as `{}`. Use `closureMode(false)` or
   `array_filter(..., fn($v) => !$v instanceof Closure)`.
+- **`route($name, $data)` drops keys that are not URL placeholders.** `Route::find` only
+  runs `str_replace('{key}', …)` over the route's url; leftover keys are silently
+  discarded and **no query string is appended**. So
+  `route('admin.seferler.create', ['tur' => 5])` returns `/admin/seferler/create` and the
+  parameter never arrives — measured, ten links in one panel were quietly broken this
+  way. Append the query yourself or wrap `route()` in a helper that does.
+- **A model subclass cannot declare a static `$cache`.** `DB` already has a non-static
+  `$cache` and the model inherits it, so `private static array $cache = []` inside a
+  model dies at parse time: *"Cannot redeclare non static DB::$cache as static"*. Name
+  per-request caches on models something else.
+- **`?>` inside a `#` or `//` comment closes PHP mode.** A comment such as
+  `# example: <?php foreach … ?>` ends the script right there; everything after it is
+  emitted as HTML and the parse errors point at unrelated lines. Never write a closing
+  tag inside a comment, not even as an example.
+- **Soft-deleted rows are reachable by unsetting the flag.** The `deleted_at IS NULL`
+  condition is added whenever `isset($model->softDelete)`
+  (`DB/Drivers/mysql.php::getWhereOrHaving`). `unset($model->softDelete)` on an instance
+  makes queries — `update()` included — see deleted rows; that is how a trash screen and
+  a restore action are built without touching the framework. There is no `forceDelete`.
 - **Closure routes** block `php terminal route cache`. Use the controller-array form.
 - **Root and resource routes are written last, deliberately.** `Route::resource('/', …)`
   registers `/{id}`, which matches every one-segment url and lets `show()` claim it. That is
