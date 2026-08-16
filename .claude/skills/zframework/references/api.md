@@ -458,4 +458,7 @@ php terminal run roadrunner serve|reset|workers|stop
 php terminal bench run                  # request cost measurement
 php terminal state check                # reports statics that would leak in a worker
 php terminal help
+php terminal start                      # the banner; what runs with no command
+php terminal clear                      # clear the terminal screen
+php terminal test                       # print the colours Terminal::text accepts
 ```
