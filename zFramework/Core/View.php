@@ -316,10 +316,29 @@ class View
      * These are stylesheet syntax, not view directives.
      */
     private const CSS_AT_RULES = [
-        'charset', 'color-profile', 'container', 'counter-style', 'document', 'font-face',
-        'font-feature-values', 'font-palette-values', 'import', 'keyframes', 'layer',
-        'media', 'namespace', 'page', 'property', 'scope', 'starting-style', 'supports',
-        'viewport', '-webkit-keyframes', '-moz-keyframes', '-ms-keyframes', '-o-keyframes',
+        'charset',
+        'color-profile',
+        'container',
+        'counter-style',
+        'document',
+        'font-face',
+        'font-feature-values',
+        'font-palette-values',
+        'import',
+        'keyframes',
+        'layer',
+        'media',
+        'namespace',
+        'page',
+        'property',
+        'scope',
+        'starting-style',
+        'supports',
+        'viewport',
+        '-webkit-keyframes',
+        '-moz-keyframes',
+        '-ms-keyframes',
+        '-o-keyframes',
     ];
 
     /**
@@ -644,12 +663,16 @@ class View
     /**
      * Parse @yield('name') and replace with stored section content.
      * Example: @yield('content')
+     * With fallback: @yield('title', 'Default title')
      */
     public static function parseYields(): void
     {
         self::$view = preg_replace_callback(
-            '/@yield\(\'(.*?)\'\)/',
-            fn($yieldName) => self::$sections[$yieldName[1]] ?? '',
+            '/@yield\(\s*\'([^\']*)\'\s*(?:,\s*\'((?:[^\'\\\\]|\\\\.)*)\'\s*)?\)/s',
+            function ($yield) {
+                if (isset(self::$sections[$yield[1]])) return self::$sections[$yield[1]];
+                return isset($yield[2]) ? str_replace(["\\'", '\\\\'], ["'", '\\'], $yield[2]) : '';
+            },
             self::$view
         );
     }

@@ -25,6 +25,14 @@ findings.
 
 - **Never echo what `errorHandler()` returns.** `handle.php` already prints it, so
   `die(errorHandler($e))` renders the page twice. Correct form: `errorHandler($err); die;`
+- **Alerts survive a redirect, and that is load-bearing.** `Run::handle()` clears
+  `Alerts` and `JustOneTime` after a `ResponseSignal`, but skips the clear when the
+  signal carries a `Location` or `Refresh` header. Without that skip the whole
+  flash-then-redirect pattern is dead: `Alerts::danger(…); return back();` writes the
+  alert, the 302 goes out, and the alert is deleted before the browser has fetched the
+  page that would have shown it — every validation message, every "saved", silently
+  gone, on every screen. A response with a body (an `abort()` page, a download) is
+  cleared as before, because it did get its chance to render them.
 - **Rows are arrays.** `$row->col` does not work — it yields `null` plus a warning.
 - **`@include` is inlined, so `return` in a partial kills the rest of the page.** The compiler
   merges every partial into one compiled file, so a guard clause like
