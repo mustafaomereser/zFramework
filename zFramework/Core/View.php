@@ -685,10 +685,14 @@ class View
      */
     public static function parseSections(): void
     {
-        self::$view = preg_replace_callback('/@section\(\'(.*?)\', \'(.*?)\'\)/', function ($sectionDetail) {
-            self::$sections[$sectionDetail[1]] = $sectionDetail[2];
-            return '';
-        }, self::$view);
+        self::$view = preg_replace_callback(
+            '/@section\(\s*\'([^\']*)\'\s*,\s*\'((?:[^\'\\\\]|\\\\.)*)\'\s*\)/',
+            function ($sectionDetail) {
+                self::$sections[$sectionDetail[1]] = str_replace(["\\'", '\\\\'], ["'", '\\'], $sectionDetail[2]);
+                return '';
+            },
+            self::$view
+        );
 
         self::$view = preg_replace_callback('/@section\(\'(.*?)\'\)(.*?)@endsection/s', function ($sectionName) {
             self::$sections[$sectionName[1]] = $sectionName[2];
