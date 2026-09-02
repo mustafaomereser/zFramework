@@ -102,7 +102,16 @@ class Redis
             # Do not take the request down because a cache is unreachable; callers
             # degrade on their own. Sessions are the exception and say so loudly.
             self::$failed = true;
-            if (function_exists('errorHandler') && ($config['log_failures'] ?? true)) errorHandler($e);
+
+            # errorHandler() logs and then aborts, and the abort throws - which is
+            # exactly what the line above refuses to do. The log is written before the
+            # signal arrives, so dropping it costs nothing.
+            if (function_exists('errorHandler') && ($config['log_failures'] ?? true)) {
+                try {
+                    errorHandler($e);
+                } catch (\zFramework\Core\ResponseSignal) {
+                }
+            }
             return null;
         }
     }
