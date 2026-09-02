@@ -158,6 +158,44 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
       `method_exists()` kullandığı için `Mail`, `cURL`, `PushNotification`, `Redis`, `Defer`,
       `Profiler` kullanılmasa bile yükleniyor.
 
+## 12. Hata sayfasında view satır numarası *(en son — büyük iş)*
+
+- [ ] **Hata sayfası derlenmiş view'i gösteriyor, kaynağı değil**
+      Trace `View.php(NNN) : eval()'d code` ya da `storage/views/x.compiled.php` diyor.
+      "Open in IDE" cache dosyasını açıyor. Hangi view'in hangi satırında patladığı
+      bilinmiyor.
+
+      **Plan — satır haritası (Twig'in yaptığının basitleştirilmişi):**
+
+      Derleme sırasında dosya sınırlarına işaret koy:
+      `<?php /*#zf:resource/views/app/main.php:1*/ ?>` — PHP yorumu, çıktıya bir şey basmıyor,
+      yalnızca `@include` / `@extends` sınırlarında (satır başına değil).
+
+      Hata anında derlenmiş dosyada geriye doğru en yakın işaret bulunur:
+      `kaynak satır = işaretin kaynak satırı + (derlenmiş satır − işaretin derlenmiş satırı)`
+
+      Bu tutar, çünkü aradaki geçişler satır sayısını koruyor: `{{ }}` → `<?= e() ?>`,
+      `@if(...)` → `<?php if(...): ?>`, `@php...@endphp` — hepsi aynı satırda kalıyor.
+
+      **Bozan üç şey ve çözümleri:**
+      1. `stripComments` — çok satırlı `{{-- --}}` silinince satır sayısı düşüyor.
+         Yorumu silerken içindeki satır sonlarını koru (`str_repeat("
+", $n)`).
+      2. `parseIncludes` / `parseExtends` — partial'ı gömüyor, section'ları taşıyor.
+         Gömerken başına ve sonuna işaret koy; böylece partial'daki hata partial'ı gösterir.
+      3. `minifyTemplate` — her şeyi tek satıra indiriyor, harita anlamsızlaşıyor.
+         `app.debug` açıkken minify'ı atla.
+
+      **Dokunulan yerler:** `View::stripComments`, `View::parseIncludes`, `View::parseExtends`,
+      `View::render` (eval/include öncesi kaynak yolunu yayınla), `handle.php` (harita okuyucu
+      + `goIDE` hedefi).
+
+      **Maliyet:** derleme zamanı birkaç işaret satırı; çalışma zamanı dosya başına 1-2 boş
+      `<?php ?>` bloğu; cache birkaç yüz bayt. Hepsi ihmal edilebilir.
+
+      **Not:** bugüne kadarki en büyük değişiklik. Mevcut view'ların derlenmiş çıktısının
+      bozulmadığı ve haritanın doğru satırı verdiği kanıtlanmadan bırakılmamalı.
+
 ## 11. Dokümanlar
 
 - [ ] **`resource/lang/tr/validator.php` — 7 yeni kural Türkçe karaktersiz**
