@@ -229,7 +229,8 @@ Cache::cache(string $name, $callback, int $timeout = 5)       // session-scoped 
 Cache::remove(string $name): bool      Cache::clear(): bool
 
 GlobalCache::cache(string $name, \Closure $cb, ?int $timeout = null)   // APCu, all requests
-GlobalCache::apcu(): bool              GlobalCache::remove()/clear()
+GlobalCache::apcu(): bool              GlobalCache::remove(string $name): bool
+GlobalCache::clear(): bool             // this install's entries only, L1 and L2 both
 
 Redis::available(string $for = 'cache'): bool
 Redis::get/set/delete(string $key, ..., string $for = 'cache')
@@ -244,6 +245,11 @@ Page::vary(string ...$headers): void          // Vary header; takes the response
 Page::forget(string $name): int               // every entry tagged $name
 Page::forgetUrl(string $url, string $method = 'GET'): bool
 Page::clear(): int
+
+// A served entry replays the headers it was stored with, plus an Age telling the
+// browser and any proxy how much of the max-age window is already spent.
+// store() refuses a body carrying a csrf token in any shape it can see -
+// name="_token", name='_token', or a `csrf-token` meta tag.
 ```
 Live by default; nothing is stored unless a page declares it. Never stores a non-GET, a
 request with an auth cookie, a non-200, a body with a csrf token, or anything private or
@@ -333,6 +339,8 @@ Http::isAjax(): bool             Http::abort(int $code = 418, $message = null)
 ```php
 File::upload(string $path, array $file, array $options = []): string|array|false
     // options: ['accept' => ['jpg','png'], 'size' => bytes]
+    // shape follows the input, not the outcome: $_FILES['x'] from a single input
+    // returns a string or false; from a `multiple` input, always a list.
 File::save(string $path, string $file): string           // downloads a remote URL
 File::download(string $file): never
 File::resizeImage(string $file, array $sizes = [], ?string $new_name = null)

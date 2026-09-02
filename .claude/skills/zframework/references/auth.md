@@ -136,9 +136,15 @@ class API
 }
 ```
 
-It sets `Auth::$api_mode`, which switches Auth's storage from `Cookie` to `Session`, discards
-any inherited login, and then logs in from the **`Auth-Token`** header matched against the
-user's `api_token` column. It always returns true — it authenticates, it does not authorise.
+It sets `Auth::$api_mode`, which moves Auth's storage out of the cookie into an array that
+lives as long as the request, discards any inherited login, and then logs in from the
+**`Auth-Token`** header matched against the user's `api_token` column. It always returns
+true — it authenticates, it does not authorise.
+
+Nothing is persisted for an API caller, and nothing needs to be: within the one request
+`token_login()` writes what `check()` reads, and a client authenticating by header sends no
+session cookie back, so it could never be handed the same session twice. This used to route
+through `Session`, which meant a file on disk per API call that nothing ever read.
 
 **Use it on every API group.** Do not write a bearer-token check by hand:
 
@@ -165,10 +171,11 @@ Responses go through `Response::json($data, $flags)`; set a status with `Respons
 before returning it. Inside an API group `Auth::check()` / `Auth::user()` work exactly as they
 do on the web side.
 
-**`$api_mode` is request state.** `Auth::flushRequestState()` resets it, and that matters under
-a long-running worker: left standing, one `/api` call would make every later request on that
-worker authenticate through Session instead of Cookie. Do not set `Auth::$api_mode` yourself
-outside a middleware.
+**`$api_mode` is request state,** and so is the array behind it. `Auth::flushRequestState()`
+clears both, which matters under a long-running worker: left standing, `$api_mode` would make
+every later request on that worker read its auth out of the array instead of the cookie, and
+the array itself holds one caller's identity. Do not set `Auth::$api_mode` yourself outside a
+middleware.
 
 ## Guarding pages
 

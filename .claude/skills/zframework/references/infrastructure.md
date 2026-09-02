@@ -559,7 +559,15 @@ php terminal bench run                              # boot + request cost on thi
   `errorHandler($err); die;`
 - `config/app.php` → `error.logging` writes HTML files under `error_logs/`; `error.stream`
   (`false` | `'error_log'` | `'stderr'` | `'syslog'`) also emits a one-line summary, which is what
-  you want as soon as more than one machine serves the site.
+  you want as soon as more than one machine serves the site. `error.keep_days` (14) sweeps old
+  reports - only on a request that already failed, and at most once an hour; 0 keeps everything.
+- **A fatal is reported too, by a shutdown handler, not by `errorHandler()`.** Running out of
+  memory, passing `max_execution_time` or a parse error in a runtime include never reaches
+  `set_exception_handler`, and there is no `set_error_handler` here at all - so those used to
+  produce nothing anywhere. The shutdown handler writes one plain-text line to
+  `error_logs/*.fatal.txt` and to `error.stream`, and sets a 500 if nothing has been sent. It
+  deliberately does not load the renderer: a process that just died for want of memory cannot
+  build 68 KB of markup.
 - `error.callback` receives `($log_path, $log)`. The shipped one dies on CLI **unless `ZF_WORKER`
   is defined** — dying in a long-running process would kill it rather than end one unit of work.
   `worker.php` and `php terminal queue work` both define it. If you write your own callback and

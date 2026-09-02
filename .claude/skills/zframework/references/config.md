@@ -13,7 +13,8 @@ commit it, never hand-write it.
 ```php
 'debug'        => true,      // false in production; also gates the query analyzer
 'error' => [
-    'logging'  => true,      // HTML reports under error_logs/
+    'logging'   => true,     // HTML reports under error_logs/
+    'keep_days' => 14,       // how long one is kept; 0 keeps everything
     'stream'   => false,     // false | 'error_log' | 'stderr' | 'syslog' — one-line summary
     'callback' => fn($log_path, $log) => ...,   // dies on CLI unless ZF_WORKER is defined
                                                 //   (worker.php and `queue work` both define it)
