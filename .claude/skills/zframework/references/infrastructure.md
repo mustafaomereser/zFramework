@@ -241,7 +241,7 @@ redirect - neither means anything without a browser - and routes, providers and 
 never loaded, so the route table is empty.
 
 `cron.php` installs the same error handler `terminal` does, so a cron script obeys
-`config/app.php` `error.logging` and an uncaught throwable lands in `error_logs/`. It did not
+`framework.error.logging` and an uncaught throwable lands in `error_logs/`. It did not
 until recently: the throwable went to stderr, and a crontab line ending in `>> /dev/null 2>&1`
 threw that away as well, so an unattended job could fail nightly and leave nothing behind.
 

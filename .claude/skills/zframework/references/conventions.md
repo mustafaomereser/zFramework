@@ -115,8 +115,8 @@ findings.
   opcache off.
 - `class_exists(..., false)` guards keep `Profiler` and `Defer` from loading on requests that do
   not use them. Do not remove those guards.
-- `error_handlers/loader.php` is a thin shell; the 68 KB `handle.php` loads only when an error
-  actually happens.
+- `error_handlers/loader.php` is a thin shell; `handle.php`, `Report.php`, `Highlighter.php` and
+  `render/*` load only when an error actually happens.
 - The Redis autoload short-circuit (`GlobalCache`, `Auth`): the `Redis::available()` check keeps
   `Facades/Redis.php` from loading at all. When adding new statics, update the allowlist in
   `State.php`.
