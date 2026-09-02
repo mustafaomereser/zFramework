@@ -36,9 +36,16 @@ class Date
         # The parameter used to be ?string, so is_string() could never be false and
         # the int branch beside it was unreachable - a unix timestamp went through
         # strtotime(), which does not read one, and every int column printed as
-        # 01.01.1970. Numeric strings count as timestamps too: PDO hands an int
-        # column back as a string.
-        $time = is_numeric($date) ? (int) $date : strtotime($date);
+        # 01.01.1970.
+        #
+        # A string is still tried as a date first, because a compact `20240115` is
+        # numeric too and strtotime() reads it correctly; only what strtotime() cannot
+        # read is taken as a timestamp - which is what PDO hands back for an int column.
+        if (is_int($date)) $time = $date;
+        else {
+            $time = strtotime($date);
+            if ($time === false && is_numeric($date)) $time = (int) $date;
+        }
 
         return $time ? date($format, $time) : '-';
     }

@@ -171,8 +171,8 @@ class Page
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') return false;
 
-        # A header-authenticated API caller carries no cookie at all - Auth uses the
-        # session in api mode - and its response is as private as a logged-in page.
+        # A header-authenticated API caller carries no cookie at all - Auth keeps its
+        # state in memory in api mode - and its response is as private as a logged-in page.
         if (isset($_SERVER['HTTP_AUTH_TOKEN'])) return false;
 
         static $names = null;
