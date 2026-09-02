@@ -8,6 +8,11 @@ class Exists extends Rule
 {
     public function handle(array $data): bool
     {
+        # Nothing to look up. Without this the rule defeated nullable on every
+        # optional foreign key: the blank went to the database as `col = ''`, matched
+        # no row, and the field could not be left empty however it was declared.
+        if ($data['value'] === null || $data['value'] === '') return true;
+
         $exists = (new $data['equivalent'])->whereRaw(($data['parameters']['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
         if ($ex = @$data['parameters']['ex']) $exists->where('id', '!=', $ex);
         if ($exists->count()) return true;
