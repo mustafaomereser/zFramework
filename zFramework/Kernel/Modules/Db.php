@@ -493,6 +493,78 @@ class Db
      * Usage: php kernel db restore [--db=default]
      * @param --db={key}  (optional) db connection key, defaults to first
      */
+    /**
+     * Split a dump into statements the way the server would read it.
+     *
+     * explode(';') cut every INSERT whose text held a semicolon, and the halves came
+     * back as two syntax errors while the command still reported success. It also had
+     * no idea about DELIMITER, which the dump wraps trigger and routine bodies in
+     * precisely because those bodies are full of semicolons.
+     *
+     * @param string $sql
+     * @return array
+     */
+    private static function splitStatements(string $sql): array
+    {
+        $statements = [];
+        $current    = '';
+        $quote      = null;
+        $delimiter  = ';';
+        $length     = strlen($sql);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $sql[$i];
+
+            if ($quote !== null) {
+                $current .= $char;
+
+                # A backslash escapes whatever follows, the closing quote included.
+                if ($char === '\\' && $i + 1 < $length) {
+                    $current .= $sql[++$i];
+                    continue;
+                }
+
+                # A doubled quote inside a string is one literal quote, not the end of it.
+                if ($char === $quote) {
+                    if ($i + 1 < $length && $sql[$i + 1] === $quote) {
+                        $current .= $sql[++$i];
+                        continue;
+                    }
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            # DELIMITER is a client directive rather than SQL, so it is consumed here and
+            # never handed to the server. \G anchors the match at the current offset.
+            if (($i === 0 || $sql[$i - 1] === "\n") && preg_match('/\G[ \t]*DELIMITER[ \t]+(\S+)[^\n]*(\n|$)/i', $sql, $match, 0, $i)) {
+                $delimiter = $match[1];
+                $i += strlen($match[0]) - 1;
+                continue;
+            }
+
+            if ($char === "'" || $char === '"' || $char === '`') {
+                $quote    = $char;
+                $current .= $char;
+                continue;
+            }
+
+            if (substr($sql, $i, strlen($delimiter)) === $delimiter) {
+                $statements[] = $current;
+                $current      = '';
+                $i           += strlen($delimiter) - 1;
+                continue;
+            }
+
+            $current .= $char;
+        }
+
+        $statements[] = $current;
+
+        return array_values(array_filter(array_map('trim', $statements), fn($statement) => $statement !== ''));
+    }
+
     public static function restore()
     {
         $backups = glob(base_path('database/backups/' . self::$dbname . '/*'));
@@ -528,7 +600,7 @@ class Db
             if (str_ends_with($file, '.sql.gz')) $data = gzdecode($data);
             // self::$db->connection()->exec($data);
             // Terminal::text("[color=green]" . basename($file) . " backup restored... (" . substr_count($data, ';') . " queries executed)[/color]", true);
-            $queries   = explode(";", $data);
+            $queries   = self::splitStatements($data);
             $totalRows = 0;
             foreach ($queries as $sql) {
                 if (trim($sql) === '') continue;
