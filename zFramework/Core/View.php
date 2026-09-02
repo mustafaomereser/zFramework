@@ -27,6 +27,29 @@ class View
     static $usedBinds         = [];
 
     /**
+     * Where the file being compiled lives on disk - what the source markers name.
+     */
+    private static ?string $view_path = null;
+
+    /**
+     * Source file and line of each captured @section, keyed like $sections.
+     * A yield copies the content elsewhere; this says where it came from.
+     */
+    private static array $sectionSources = [];
+
+    /**
+     * Compiled templates currently inside eval(), innermost last.
+     *
+     * An error thrown from a template reports its file as `View.php(N) :
+     * eval()'d code`, and nothing else identifies which template. The text that
+     * was handed to eval() is the only way back to a source file and line - see
+     * sourceOf() - so it is kept here for as long as it is running. A nested
+     * view() pushes its own; an error leaves the whole stack standing for the
+     * error page to read, in the same order as its eval frames.
+     */
+    public static array $evaluating = [];
+
+    /**
      * Prepare config.
      *
      * Config keys:
@@ -57,7 +80,8 @@ class View
 
         # Balanced by view() itself; zeroed here in case a render was abandoned
         # mid-way and left the count standing.
-        self::$depth = 0;
+        self::$depth      = 0;
+        self::$evaluating = [];
     }
 
     /**
@@ -72,6 +96,8 @@ class View
         self::$compiledFiles      = [];
         self::$hasDynamicExtends  = false;
         self::$usedBinds          = [];
+        self::$view_path          = null;
+        self::$sectionSources     = [];
     }
 
     /**
@@ -99,6 +125,7 @@ class View
     {
         $prevView     = self::$view;
         $prevViewName = self::$view_name;
+        $prevViewPath = self::$view_path;
         $prevData     = self::$data;
         $prevSections = self::$sections;
 
@@ -109,7 +136,8 @@ class View
         $view_path = self::resolveViewPath($view_name);
 
         self::$compiledFiles[] = $view_path;
-        self::$view            = file_get_contents($view_path);
+        self::$view_path       = $view_path;
+        self::$view            = self::marker($view_path, 1) . file_get_contents($view_path);
         self::$data            = $data;
 
         if ($isExtend) self::$sections = $prevSections;
@@ -123,6 +151,7 @@ class View
 
         self::$view      = $prevView;
         self::$view_name = $prevViewName;
+        self::$view_path = $prevViewPath;
         self::$data      = $prevData;
 
         return ['compiled' => $result, 'data' => $mergedData];
@@ -281,8 +310,16 @@ class View
             $compiled = $result['compiled'];
             $data     = $result['data'];
 
-            if (self::$config['minify'] ?? false) $compiled = self::minifyTemplate($compiled);
+            # Not while debugging: minify folds a template into a line or two, and
+            # an error in it can then say nothing more precise than "line 2". With
+            # the line breaks kept the markers compile() leaves point at the exact
+            # template line - see sourceOf(). Production minifies as before.
+            if ((self::$config['minify'] ?? false) && !config('app.debug')) $compiled = self::minifyTemplate($compiled);
             if ($caching && !self::$hasDynamicExtends) $cache = self::saveCache($view_name, $compiled);
+
+            # Pushed before and popped only after a clean return: a throw leaves it
+            # standing for the error page to read, and the request state clears it.
+            self::$evaluating[] = $compiled;
 
             $output = (function () use ($data, $compiled) {
                 ob_start();
@@ -290,6 +327,8 @@ class View
                 echo eval('?>' . $compiled);
                 return ob_get_clean();
             })();
+
+            array_pop(self::$evaluating);
         }
 
         self::reset();
@@ -555,7 +594,9 @@ class View
     # @return string
     private static function stripComments(string $template): string
     {
-        return preg_replace('/\{\{(?:--.*?--|\/\*.*?\*\/)\}\}/s', '', $template);
+        # A comment spanning lines leaves its line breaks behind, so everything
+        # below it stays on the line the developer sees in the editor.
+        return preg_replace_callback('/\{\{(?:--.*?--|\/\*.*?\*\/)\}\}/s', fn($m) => str_repeat("\n", substr_count($m[0], "\n")), $template);
     }
 
     /**
@@ -626,6 +667,111 @@ class View
      * never invalidated the cache.
      */
     /**
+     * A note in the compiled text saying "from here, file F line L".
+     *
+     * A PHP comment, so it prints nothing and survives minify - and sits exactly
+     * where one file's text gives way to another's: the start of a compiled file,
+     * either side of an @include, either side of a yielded section. sourceOf()
+     * walks back to the nearest one to turn a line of compiled code into a line
+     * of the template the developer wrote.
+     *
+     * @param string $path Absolute; stored relative to BASE_PATH.
+     * @param int    $line
+     * @return string
+     */
+    private static function marker(string $path, int $line): string
+    {
+        $base = str_replace('\\', '/', BASE_PATH) . '/';
+        $path = str_replace('\\', '/', $path);
+        if (str_starts_with($path, $base)) $path = substr($path, strlen($base));
+
+        return '<?php /*#zf:' . $path . ':' . $line . '*/ ?>';
+    }
+
+    /**
+     * The line a byte offset in the text being compiled falls on.
+     *
+     * @param int $offset
+     * @return int
+     */
+    private static function lineAt(int $offset): int
+    {
+        return substr_count(self::$view, "\n", 0, $offset) + 1;
+    }
+
+    /**
+     * Which template file and line a byte offset in the text being compiled is.
+     *
+     * Resolved through the markers already in the text rather than assumed to be
+     * the file being compiled: by the time a nested @include or a @section inside
+     * a partial is seen, the offset sits in text that another file contributed.
+     *
+     * @param int $offset
+     * @return array{0: string, 1: int}
+     */
+    private static function positionOf(int $offset): array
+    {
+        $line  = self::lineAt($offset);
+        $found = self::sourceOf(substr(self::$view, 0, $offset), $line);
+
+        return $found ? [$found['file'], $found['line']] : [self::$view_path, $line];
+    }
+
+    /**
+     * A marker handing the text back to whatever file an offset belongs to.
+     *
+     * @param int $offset
+     * @return string
+     */
+    private static function markerAt(int $offset): string
+    {
+        [$file, $line] = self::positionOf($offset);
+
+        return self::marker($file, $line);
+    }
+
+    /**
+     * Which template file and line a line of compiled code came from.
+     *
+     * The nearest marker at or above the line names the file and the line its
+     * own text started on; the lines between are counted on. Only exact while the
+     * compiled text keeps the template's line breaks - which is why a debug
+     * compile skips minify.
+     *
+     * @param string $compiled The text handed to eval(), or a cache file's contents.
+     * @param int    $line     1-based line within it.
+     * @return array{file: string, line: int}|null
+     */
+    public static function sourceOf(string $compiled, int $line): ?array
+    {
+        if (!preg_match_all('#<\?php /\*\#zf:(.+?):(\d+)\*/ \?>#', $compiled, $markers, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) return null;
+
+        $found = null;
+
+        foreach ($markers as $marker) {
+            $offset = $marker[0][1];
+            $at     = substr_count($compiled, "\n", 0, $offset) + 1;
+            if ($at > $line) break;
+
+            # A marker on the asked-for line only counts when nothing but other
+            # markers precede it there: text before it belongs to the previous file,
+            # and a line number cannot say which side of the marker the error was.
+            if ($at === $line) {
+                $lineStart = (int) strrpos(substr($compiled, 0, $offset), "\n") + 1;
+                $before    = preg_replace('#<\?php /\*\#zf:.+?\*/ \?>#', '', substr($compiled, $lineStart, $offset - $lineStart));
+                if (trim($before) !== '') continue;
+            }
+
+            $found = ['file' => $marker[1][0], 'line' => (int) $marker[2][0] + ($line - $at)];
+        }
+
+        if ($found && !str_starts_with($found['file'], '/') && !preg_match('#^[A-Za-z]:/#', $found['file']))
+            $found['file'] = str_replace('\\', '/', BASE_PATH) . '/' . $found['file'];
+
+        return $found;
+    }
+
+    /**
      * Where a view name lives on disk.
      *
      * Three candidates, in order: the configured view directory, a module, then
@@ -653,15 +799,17 @@ class View
             self::$view = preg_replace_callback('/@include\(\'(.*?)\'\)/', function ($viewName) {
                 # Same resolution as any other view, so @include('partials.header')
                 # finds the file wherever view('partials.header') would.
-                $path                  = self::resolveViewPath($viewName[1]);
+                $path                  = self::resolveViewPath($viewName[1][0]);
                 self::$compiledFiles[] = $path;
 
-                if (!is_file($path)) throw new \RuntimeException('View: @include(\'' . $viewName[1] . '\') in `' . self::$view_name . '` - no such view (' . $path . ').');
+                if (!is_file($path)) throw new \RuntimeException('View: @include(\'' . $viewName[1][0] . '\') in `' . self::$view_name . '` - no such view (' . $path . ').');
 
                 # Strip the partial's own comments as it comes in: parse() already
                 # ran parseComments over the parent, and this text arrives after.
-                return self::stripComments(file_get_contents($path));
-            }, self::$view);
+                # Bracketed by markers: the partial's text starts at its line 1, and
+                # what follows is the parent again, on the line the directive sat on.
+                return self::marker($path, 1) . self::stripComments(file_get_contents($path)) . self::markerAt($viewName[0][1]);
+            }, self::$view, -1, $count, PREG_OFFSET_CAPTURE);
 
             if (self::$view === $before) return;
         }
@@ -684,12 +832,16 @@ class View
     public static function parseExtends(): void
     {
         self::$view = preg_replace_callback('/@extends\(([^)]+)\)/', function ($match) {
-            $expression = trim($match[1]);
+            $expression = trim($match[1][0]);
+
+            # The layout arrives with its own markers; this one hands the text back
+            # to the child for whatever follows the directive.
+            $resume = self::markerAt($match[0][1]);
 
             if (preg_match("/^'([^']+)'$/", $expression, $literal)) {
                 $result     = self::compile($literal[1], self::$data, true);
                 self::$data = $result['data'];
-                return $result['compiled'];
+                return $result['compiled'] . $resume;
             }
 
             self::$hasDynamicExtends = true;
@@ -701,8 +853,8 @@ class View
 
             $result     = self::compile($resolvedName, self::$data, true);
             self::$data = $result['data'];
-            return $result['compiled'];
-        }, self::$view);
+            return $result['compiled'] . $resume;
+        }, self::$view, -1, $count, PREG_OFFSET_CAPTURE);
     }
 
     /**
@@ -715,10 +867,23 @@ class View
         self::$view = preg_replace_callback(
             '/@yield\(\s*\'([^\']*)\'\s*(?:,\s*\'((?:[^\'\\\\]|\\\\.)*)\'\s*)?\)/s',
             function ($yield) {
-                if (isset(self::$sections[$yield[1]])) return self::$sections[$yield[1]];
-                return isset($yield[2]) ? str_replace(["\\'", '\\\\'], ["'", '\\'], $yield[2]) : '';
+                $name = $yield[1][0];
+
+                if (isset(self::$sections[$name])) {
+                    # The section's text came from another file; say so on the way in,
+                    # and hand the text back to this file on the way out.
+                    $from   = self::$sectionSources[$name] ?? null;
+                    $resume = self::markerAt($yield[0][1]);
+
+                    return ($from ? self::marker($from[0], $from[1]) : '') . self::$sections[$name] . $resume;
+                }
+
+                return isset($yield[2]) ? str_replace(["\\'", '\\\\'], ["'", '\\'], $yield[2][0]) : '';
             },
-            self::$view
+            self::$view,
+            -1,
+            $count,
+            PREG_OFFSET_CAPTURE
         );
     }
 
@@ -739,17 +904,28 @@ class View
         self::$view = preg_replace_callback(
             '/@section\(\s*\'([^\']*)\'\s*,\s*\'((?:[^\'\\\\]|\\\\.)*)\'\s*\)/',
             function ($sectionDetail) use ($keep) {
-                if (!$keep($sectionDetail[1]))
-                    self::$sections[$sectionDetail[1]] = str_replace(["\\'", '\\\\'], ["'", '\\'], $sectionDetail[2]);
+                if (!$keep($sectionDetail[1][0])) {
+                    self::$sections[$sectionDetail[1][0]]       = str_replace(["\\'", '\\\\'], ["'", '\\'], $sectionDetail[2][0]);
+                    self::$sectionSources[$sectionDetail[1][0]] = self::positionOf($sectionDetail[0][1]);
+                }
                 return '';
             },
-            self::$view
+            self::$view,
+            -1,
+            $count,
+            PREG_OFFSET_CAPTURE
         );
 
         self::$view = preg_replace_callback('/@section\(\'(.*?)\'\)(.*?)@endsection/s', function ($sectionName) use ($keep) {
-            if (!$keep($sectionName[1])) self::$sections[$sectionName[1]] = $sectionName[2];
-            return '';
-        }, self::$view);
+            if (!$keep($sectionName[1][0])) {
+                self::$sections[$sectionName[1][0]]       = $sectionName[2][0];
+                self::$sectionSources[$sectionName[1][0]] = self::positionOf($sectionName[0][1]);
+            }
+
+            # The block is lifted out, so the lines after it move up; a marker puts the
+            # rest of the file back on the line @endsection sat on.
+            return self::markerAt($sectionName[0][1] + strlen($sectionName[0][0]) - 1);
+        }, self::$view, -1, $count, PREG_OFFSET_CAPTURE);
     }
 
     /**
