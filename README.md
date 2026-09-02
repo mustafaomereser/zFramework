@@ -211,7 +211,7 @@ Route::redirect('/old-url', '/new-url');   // issues a 302
 Route::resource('/posts', PostController::class);
 ```
 
-Registers 7 routes automatically:
+Registers 8 routes automatically — 7 named, plus the unnamed PUT:
 
 | URL | HTTP Method | Controller Method | Route Name |
 |---|---|---|---|
@@ -341,13 +341,19 @@ class Post extends Model
 
     public $table      = 'posts';
     public $db         = 'local';        // connection name from database/connections.php; defaults to first
-    public $guard      = ['secret'];     // columns excluded from get() / first() results
+    public $guard      = ['secret'];     // columns left out when the query names none itself
     public $primary    = 'id';           // auto-detected from schema if omitted
     public $created_at = 'created_at';   // set to null to disable auto-timestamping
     public $updated_at = 'updated_at';
     public $deleted_at = 'deleted_at';   // used by softDelete trait
 }
 ```
+
+**`$guard` only applies while the query names no columns of its own.** It works by
+expanding `SELECT *` into the column list minus the guarded ones, so an explicit
+`select('*')` - or `select('id, password')` - is sent as written and the guarded
+column comes back. Guard is a default, not an access rule: for anything that must never
+leave the table, leave it out of the select.
 
 ### CRUD
 
@@ -987,8 +993,10 @@ goes **inside** the section.
 {{/* comment */}}        — the same thing, other spelling
 ```
 
-`{{ }}` escapes, so it is the one to reach for without thinking. Anything that emits markup —
-`csrf()`, `inputMethod()`, a rendered partial — has to say so with `{!! !!}`.
+`{{ }}` escapes, so it is the one to reach for without thinking. Anything that **returns**
+markup — `inputMethod()`, `$posts['links']()`, a rendered partial — has to say so with
+`{!! !!}`. `csrf()` is not one of them: it echoes its input tag and returns void, so both
+spellings emit the same thing and `<?= csrf() ?>` is what the shipped views write.
 
 > **Changed in 3.1.2.** `{{ }}` used to be a bare `<?= ?>` that escaped nothing, and `{!! !!}`
 > did not exist. Upgrading an older project: every `{{ }}` that prints markup needs to become
@@ -1602,18 +1610,18 @@ Redis is what lets more than one application server share state. It is off by
 default — everything works without it, on one machine.
 
 ```php
-// config/redis.php
+// config/framework.php, under the 'redis' key
 'enabled'  => true,
 'host'     => '127.0.0.1',
 'database' => ['cache' => 0, 'session' => 1, 'queue' => 2],
 ```
 
-Requires the `redis` (phpredis) extension. Enabling it changes three things:
+Requires the `redis` (phpredis) extension. Enabling it changes four things:
 
 | | Without Redis | With Redis |
 |---|---|---|
 | `GlobalCache` | APCu, per server | APCu (L1) + Redis (L2) |
-| Sessions | files on local disk | shared, via `config/session.php` |
+| Sessions | files on local disk | shared, when `session.driver` is `redis` |
 | `Auth` | id + password hash in the cookie | opaque token, revocable server-side |
 | `Queue::push()` | runs the job inline | queued for a worker |
 
@@ -1746,7 +1754,7 @@ Alerts::info('Your session expires in 5 minutes.');
 CSRF tokens are automatically verified on every non-GET route (unless `noCSRF()` is used).
 
 ```php
-csrf()                   // renders: <input type="hidden" name="_token" value="...">
+csrf()                   // echoes: <input type="hidden" name="_token" value="..."> (returns void)
 Csrf::get()              // returns current token string
 Csrf::set()              // generates and stores a new token
 Csrf::unset()            // destroys all tokens
@@ -1758,24 +1766,31 @@ Csrf::remainTimeOut()    // seconds remaining until token rotation
 ## 11. Language
 
 ```
-lang/
+resource/lang/
   en/
-    lang.php      // ['greeting' => 'Hello, :name!']
+    lang.php      // ['greeting' => 'Hello, {name}!']
     auth.php
   tr/
-    lang.php      // ['greeting' => 'Merhaba, :name!']
+    lang.php      // ['greeting' => 'Merhaba, {name}!']
     auth.php
 ```
+
+The placeholder is `{name}` in braces — `Lang::get()` does a plain `str_replace` on
+`"{" . $key . "}"`. A `:name` is left in the string exactly as written.
 
 ```php
 Lang::locale('tr');                              // set active locale
 Lang::get('lang.greeting', ['name' => 'Ali']);   // "Merhaba, Ali!"
 _l('lang.greeting', ['name' => 'Ali']);          // shortcut
-Lang::list();                                    // returns all keys for active locale
+Lang::list();                                    // the locales themselves: ['en', 'tr']
 
 // Default locale set in config/app.php:
 'lang' => 'en'
 ```
+
+`Lang::list()` reads the directory names under `resource/lang`, so it answers which
+locales exist — it is what a language switcher iterates over. A missing file makes
+`Lang::get()` return null rather than raising anything.
 
 ---
 
@@ -1791,11 +1806,16 @@ $encodedArr = Crypter::encodeArray(['a', 'b', 'c']);
 $decodedArr = Crypter::decodeArray($encodedArr);
 ```
 
-Configure key and salt in `config/app.php`:
+Key and salt live in their own file, `config/crypt.php`, which `security key --regen`
+rewrites in place:
 
 ```php
-'crypt' => ['key' => 'your-key', 'salt' => 'your-salt'],
+// config/crypt.php
+return ['key' => 'your-key', 'salt' => 'your-salt'],
 ```
+
+Changing either invalidates every value already encoded with the old one — cookies
+included, since `Cookie::set()` encrypts the name as well as the value.
 
 Regenerate:
 
@@ -1904,7 +1924,9 @@ php terminal module create blog
 # Cache
 php terminal cache clear views
 php terminal cache clear sessions
-php terminal cache clear pages            # any directory under storage/
+php terminal cache clear pages            # any directory that already exists under
+                                          # zFramework/storage/ — on a clean install
+                                          # `pages` does not, and the command says so
 
 # Scheduled tasks
 php terminal schedule run                 # everything due this minute
@@ -1991,7 +2013,7 @@ use App\Models\Order;
 use zFramework\Core\Facades\Mail;
 
 $rows = (new Order)->where('created_at', '>', date('Y-m-d', strtotime('-1 day')))->get();
-Mail::to('boss@example.com')->send(['subject' => 'Yesterday', 'body' => view('mails.report', compact('rows'))]);
+Mail::to('boss@example.com')->send(['subject' => 'Yesterday', 'message' => view('mails.report', compact('rows'))]);
 ```
 
 Then one crontab entry per script, in cPanel or wherever the host keeps them:
@@ -2096,7 +2118,7 @@ The last row is the honest one: no merge can resolve it, so it says so rather th
 Nothing is written without `--config`, and the file it replaces is kept as
 `<name>.php.before-update`.
 
-**What it cannot do** is follow a setting that moved to another file — `config/view.php`
+**What it cannot do** is follow a setting that moved to another file — a `view` key
 becoming `framework.php['view']`. Only the change's author knows where it went; the framework
 handles that case with a runtime fallback in `Config::framework()` instead, so the old file
 keeps working.
@@ -2404,12 +2426,18 @@ page, it turns off two things that are expensive or unsafe on production:
   attached to exceptions — a failed login would write the plain password into
   the error log next to the trace.
 
-### config/view.php
+### config/framework.php — the `view` key
 
 ```php
-'caching' => true,   // compile templates once
-'minify'  => true,
+'view' => [
+    'caching' => true,   // compile templates once
+    'minify'  => true,
+],
 ```
+
+View, session, redis, route caching and profiling all live in this one file. There is no
+`config/view.php`, `config/session.php` or `config/redis.php` — a `Config::get('view.…')`
+returns null rather than failing, which is the quiet way to lose a setting.
 
 Compiled views live in `zFramework/storage/views`. The manifest tracks every
 file a template depends on — layouts and nested includes as well — so a changed
