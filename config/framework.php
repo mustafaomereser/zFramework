@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Framework behaviour: caching, sessions, redis, profiling.
+ * Framework behaviour: caching, sessions, redis, profiling, errors, proxies.
  *
  * Application settings live in app.php. This file is about how the framework
  * itself works, not about what your application is.
