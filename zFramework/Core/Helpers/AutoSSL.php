@@ -448,13 +448,30 @@ class AutoSSL
             $domain = basename($path);
 
             // wildcard domains use dns-01, which needs manual TXT publishing — cannot auto-renew.
-            if (strpos($domain, '*') !== false) {
-                echo "Skipping $domain (wildcard, dns-01 manual renewal)\n";
+            // The folder is what is being read, and prepareDomain() names it after the
+            // domain with the `*.` rewritten to `wildcard.` — an asterisk is not a legal
+            // directory name on Windows and awkward everywhere else. So looking for one
+            // here never matched, and every wildcard fell through to be renewed under
+            // the literal name `wildcard.example.com`, which is not a domain at all.
+            if (strpos($domain, '*') !== false || str_starts_with($domain, 'wildcard.')) {
+                echo "Skipping " . preg_replace('/^wildcard\./', '*.', $domain) . " (wildcard, dns-01 manual renewal)\n";
                 continue;
             }
 
+            // Reading the expiry can throw on its own: an empty or truncated
+            // certificate.crt, or a domain that no longer answers on 443 for checkSSL()
+            // to ask. Outside the try below, one such folder ended the whole round — and
+            // renewAll() is what cron calls, so every domain after it in the listing
+            // silently stopped being renewed until someone read the cron mail.
             $leaf = "$path/certificate.crt";
-            $days = file_exists($leaf) ? $this->getDaysLeftFromBundle($leaf) : $this->checkSSL($domain)['days_left'];
+
+            try {
+                $days = file_exists($leaf) ? $this->getDaysLeftFromBundle($leaf) : $this->checkSSL($domain)['days_left'];
+            } catch (\Exception $e) {
+                echo "Cannot read expiry for $domain: " . $e->getMessage() . "\n";
+                continue;
+            }
+
             if ($days < 20) {
                 echo "Renewing: $domain ($days days left)\n";
                 try {
