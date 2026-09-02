@@ -378,7 +378,9 @@ zFramework\Kernel\Helpers\Ask::do(string $question, object $callback)   // inter
 zFramework\Kernel\Helpers\Module::getModules()
 zFramework\Kernel\Helpers\Module::classMethods($class, $flags = ReflectionMethod::IS_PUBLIC)
 zFramework\Kernel\Helpers\MySQLBackup::__construct($db, $config = []) ->backup()
-zFramework\Kernel\Terminal::begin(array $commands)     // run a command from PHP; --web for html output
+zFramework\Kernel\Terminal::begin(array|string $args)  // run a command from PHP; --web for html output
+    // an array is $argv (script name first); a string is one line, split like a shell would:
+    // Terminal::begin('db migrate --module=blog --web')
 ```
 
 ### Seeder — `database/seeders/`
