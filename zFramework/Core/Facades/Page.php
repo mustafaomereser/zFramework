@@ -262,8 +262,12 @@ class Page
         $dir = self::dir();
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return;
 
+        # What this entry answers, recorded so forgetUrl() can find it: the file name
+        # is a hash that folds in the visitor's language, and no caller can rebuild it.
         $meta = json_encode([
             'expires' => time() + $ttl,
+            'method'  => strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'),
+            'url'     => $_SERVER['REQUEST_URI'] ?? '/',
             'headers' => self::storableHeaders(),
         ], JSON_UNESCAPED_SLASHES);
 
@@ -332,9 +336,30 @@ class Page
      */
     public static function forgetUrl(string $url, string $method = 'GET'): bool
     {
-        $file = self::dir() . '/' . self::key($method, $url) . '.cache';
+        $method  = strtoupper($method);
+        $deleted = false;
 
-        return is_file($file) && @unlink($file);
+        # The key folds in the visitor's language, so rebuilding it from a url alone
+        # was never possible: from the terminal there is no cookie and no
+        # Accept-Language to fold in, so nothing matched at all, and from a browser it
+        # reached the caller's own variant and left every other language cached. The
+        # entries say what they answer, so they are read rather than guessed at - one
+        # directory scan, on an invalidation nobody runs per request.
+        foreach ((array) glob(self::dir() . '/*.cache') as $file) {
+            $handle = @fopen($file, 'rb');
+            if (!$handle) continue;
+
+            $meta = json_decode((string) fgets($handle), true);
+            fclose($handle);
+
+            if (!is_array($meta)) continue;
+            if (($meta['url'] ?? null) !== $url) continue;
+            if (strtoupper((string) ($meta['method'] ?? 'GET')) !== $method) continue;
+
+            if (@unlink($file)) $deleted = true;
+        }
+
+        return $deleted;
     }
 
     /**
