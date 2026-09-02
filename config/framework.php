@@ -86,13 +86,22 @@ return [
     /**
      * Addresses allowed to speak for someone else.
      *
-     * ip() reads REMOTE_ADDR and nothing else until the request arrives from one
-     * of these. A forwarded header is set by whoever sent the request, so on a
-     * directly served site trusting it hands every caller a fresh rate-limit
-     * bucket per request - or somebody else's address to spend until it is blocked.
+     * ip() answers with REMOTE_ADDR - the address the connection actually came
+     * from, which cannot be forged. Only when that address is listed here does it
+     * go on to read, in order, CF-Connecting-IP, Client-IP, and the first entry of
+     * X-Forwarded-For (the chain is `client, proxy, proxy`). Each candidate is
+     * validated as an address; anything else falls back to REMOTE_ADDR.
      *
-     * Put the load balancer, nginx or Cloudflare edge address here. Empty trusts
-     * nothing, which is right whenever the site is reached directly.
+     * The gate is the point. A forwarded header is written by whoever sent the
+     * request, so on a directly served site reading it lets any caller pick a fresh
+     * rate-limit bucket with one curl flag - or spend somebody else's address until
+     * that address is blocked for everyone behind it.
+     *
+     * Empty is right when the site is reached directly. Behind Cloudflare, nginx or
+     * a load balancer, put its address here: leave it empty there and every visitor
+     * counts as the proxy, so the whole site shares one bucket.
+     *
+     *   'trusted-proxies' => ['10.0.0.5'],
      */
     'trusted-proxies' => [],
 
