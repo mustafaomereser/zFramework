@@ -762,7 +762,9 @@ class View
                 if (trim($before) !== '') continue;
             }
 
-            $found = ['file' => $marker[1][0], 'line' => (int) $marker[2][0] + ($line - $at)];
+            # `at` is the compiled line the governing marker sits on - where this file's
+            # text began - so a caller can ask what came just before it.
+            $found = ['file' => $marker[1][0], 'line' => (int) $marker[2][0] + ($line - $at), 'at' => $at];
         }
 
         if ($found && !str_starts_with($found['file'], '/') && !preg_match('#^[A-Za-z]:/#', $found['file']))
