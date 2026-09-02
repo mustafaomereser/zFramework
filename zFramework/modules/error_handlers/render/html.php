@@ -224,7 +224,7 @@ return (function (array $report): string {
             # the part of the system it belongs to, so "what did the database see" or
             # "what did the controller get" is one glance rather than a walk of the stack.
             $areas = [];
-            foreach ($report['chain'] as $ci => $ex) foreach ($ex['frames'] as $f) if ($f['function']) $areas[$f['area'] ?? 'Other'][] = [$ci, $f];
+            foreach ($report['chain'] as $ci => $ex) foreach ($ex['frames'] as $f) if ($f['function'] && $f['args']) $areas[$f['area'] ?? 'Other'][] = [$ci, $f];
             $order = ['Application', 'View', 'Database', 'Validation', 'Auth & Session', 'Mail & Queue', 'Routing', 'Framework', 'Vendor', 'PHP'];
             uksort($areas, function ($a, $b) use ($order) {
                 $ia = array_search($a, $order, true); $ib = array_search($b, $order, true);
@@ -242,13 +242,11 @@ return (function (array $report): string {
                                 <span class="call-fn"><?= $h($f['function']) ?>()</span>
                                 <span class="call-at"><?= $h($rel($f['file'])) ?>:<?= $f['line'] ?><?= $ci ? ' · caused by #' . $ci : '' ?></span>
                             </div>
-                            <?php if ($f['args']): ?>
-                                <table class="kv">
-                                    <?php foreach ($f['args'] as $name => $arg): ?>
-                                        <tr><th><?= $h($name) ?></th><td class="type"><?= $h($arg['type']) ?></td><td><?= $value($arg['value'], 0) ?></td></tr>
-                                    <?php endforeach ?>
-                                </table>
-                            <?php else: ?><div class="empty">no arguments</div><?php endif ?>
+                            <table class="kv">
+                                <?php foreach ($f['args'] as $name => $arg): ?>
+                                    <tr><th><?= $h($name) ?></th><td class="type"><?= $h($arg['type']) ?></td><td><?= $value($arg['value'], 0) ?></td></tr>
+                                <?php endforeach ?>
+                            </table>
                         </div>
                     <?php endforeach ?>
                 </section>
