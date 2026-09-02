@@ -868,6 +868,18 @@ class DB
             $value    = $data[2];
         }
 
+        # A fourth element is the connector, and the only way to write an OR between
+        # two conditions of the same group: the method name sets the group's own
+        # connector, not the one inside it. It was read nowhere, so the documented
+        # [['status','published'], ['views','>',50,'OR']] quietly came out as AND and
+        # dropped every row the OR was there to include. Three elements cannot carry
+        # one - that form is already [column, operator, value].
+        if (isset($data[3])) {
+            $prev = strtoupper(trim((string) $data[3]));
+            if (!in_array($prev, ['AND', 'OR'], true))
+                throw new \InvalidArgumentException("DB: `$key` was given `{$data[3]}` as a connector; it can only be AND or OR.");
+        }
+
         # A null value is only meaningful next to a null-aware operator. Everywhere else
         # the builder skips both the bind and the placeholder, emitting "WHERE key = LIMIT 1"
         # (SQLSTATE 42000 / 1064) far away from the code that leaked the null.
