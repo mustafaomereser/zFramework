@@ -24,16 +24,28 @@ class Folder
         $path = base_path($path);
         if (!is_dir($path)) return false;
 
-        $items = scan_dir($path);
-        foreach ($items as $item) {
-            $dir_path = $path . DIRECTORY_SEPARATOR . $item;
-            if (is_dir($dir_path)) self::delete($dir_path);
-            else unlink($dir_path);
+        return self::remove($path);
+    }
+
+    /**
+     * Delete a directory that has already been resolved.
+     *
+     * Separate from delete() because the recursion used to call it with an absolute
+     * path, which base_path() then prefixed a second time: is_dir() said no, the
+     * subdirectory was left where it was, and rmdir() failed quietly on a directory
+     * that was not empty - while true went back to the caller.
+     *
+     * @param string $path
+     * @return bool
+     */
+    private static function remove(string $path): bool
+    {
+        foreach (scan_dir($path) as $item) {
+            $child = $path . DIRECTORY_SEPARATOR . $item;
+            is_dir($child) ? self::remove($child) : @unlink($child);
         }
 
-        @rmdir($path);
-
-        return true;
+        return @rmdir($path);
     }
 
     /**
