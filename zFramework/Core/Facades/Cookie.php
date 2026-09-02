@@ -27,10 +27,15 @@ class Cookie
 
     /**
      * Crypt and parse for cookie key.
+     *
+     * Public because the name a cookie is stored under is not the name it was set
+     * with, and Page::eligible() has to look for the stored one - it reads $_COOKIE
+     * directly rather than calling get(), which would decrypt a value it never uses.
+     *
      * @param string $key
      * @return string
      */
-    private static function keyparse($key): string
+    public static function keyparse($key): string
     {
         return str_replace(["=", ",", ";", " ", "\t", "\r", "\n", "\013", "\014", "+", "%"], '', Crypter::encode($key));
     }

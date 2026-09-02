@@ -157,14 +157,29 @@ class Page
      * would open a database connection on every request just to decide not to
      * cache. A visitor with a stale cookie only loses the cache, not the page.
      *
+     * The names have to go through Cookie::keyparse() first. A cookie is stored
+     * under a Crypter-derived name, never the key it was set with, so looking for
+     * 'auth-token' in $_COOKIE never matched and every logged-in page was eligible
+     * - stored, and handed to the next visitor.
+     *
+     * Derived once per process: the key and salt come from config and do not
+     * change while it runs.
+     *
      * @return bool
      */
     public static function eligible(): bool
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') return false;
 
-        foreach (['auth-token', 'auth-session', 'auth-stay-in'] as $cookie)
-            if (isset($_COOKIE[$cookie])) return false;
+        # A header-authenticated API caller carries no cookie at all - Auth uses the
+        # session in api mode - and its response is as private as a logged-in page.
+        if (isset($_SERVER['HTTP_AUTH_TOKEN'])) return false;
+
+        static $names = null;
+        $names ??= array_map([Cookie::class, 'keyparse'], ['auth-token', 'auth-session', 'auth-stay-in']);
+
+        foreach ($names as $name)
+            if (isset($_COOKIE[$name])) return false;
 
         return true;
     }
