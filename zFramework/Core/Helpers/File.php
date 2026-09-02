@@ -98,7 +98,13 @@ class File
     {
         $files = [];
 
-        if (gettype($file['name']) === 'string') foreach ($file as $key => $val) $file[$key] = [$val];
+        # Remembered, because the return shape follows what was asked for and not
+        # what survived. A `<input multiple>` where two of three files were rejected
+        # used to answer with the one path as a bare string, and the foreach on the
+        # other side walked its characters.
+        $single = gettype($file['name']) === 'string';
+
+        if ($single) foreach ($file as $key => $val) $file[$key] = [$val];
 
         $path = self::path($path);
         foreach ($file['name'] as $key => $name) {
@@ -138,7 +144,7 @@ class File
         }
 
         if (!count($files)) return false;
-        return count($files) > 1 ? $files : end($files);
+        return $single ? end($files) : array_values($files);
     }
 
     /**
