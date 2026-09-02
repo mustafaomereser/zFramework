@@ -48,6 +48,18 @@ class DB
     public static array $schemeChecked = [];
 
     /**
+     * Every query this request ran, with its bindings and how long it took.
+     *
+     * Kept only while app.debug is on - it is what the error page shows under
+     * "Queries", and what a request that did not fail never needs. Production
+     * pays one boolean read per query for it. Capped, because a loop that runs
+     * ten thousand queries is exactly the kind of request that fails.
+     */
+    public static array $queryLog = [];
+
+    private const QUERY_LOG_LIMIT = 500;
+
+    /**
      * Clear what belongs to a single request. Called between requests by a
      * long-running worker; under FPM the process ends instead.
      *
@@ -63,6 +75,7 @@ class DB
     public static function flushRequestState(): void
     {
         self::$schemeChecked = [];
+        self::$queryLog      = [];
 
         foreach ($GLOBALS['databases']['connections'] ?? [] as $connection) {
             if (!($connection instanceof \PDO)) continue;
@@ -167,6 +180,25 @@ class DB
     }
 
     /**
+     * Record a query for the error page. Debug only; see $queryLog.
+     *
+     * @param string      $sql
+     * @param array       $data
+     * @param float       $started microtime(true) when it began, or the elapsed seconds.
+     * @param string|null $error   The driver's message when it failed.
+     * @return void
+     */
+    private function logQuery(string $sql, array $data, float $started, ?string $error = null): void
+    {
+        if (!config('app.debug') || count(self::$queryLog) >= self::QUERY_LOG_LIMIT) return;
+
+        # A failure arrives with the start time, a success with the elapsed time.
+        $seconds = $error !== null ? microtime(true) - $started : $started;
+
+        self::$queryLog[] = ['sql' => $sql, 'bindings' => $data, 'ms' => round($seconds * 1000, 3), 'db' => $this->db, 'error' => $error];
+    }
+
+    /**
      * Execute sql query.
      * @param string $sql
      * @param array $data
@@ -186,7 +218,11 @@ class DB
             # for hours, and MySQL closes it after wait_timeout - so the first query
             # after an idle spell fails with "server has gone away". Reconnect and
             # run it once more; anything else is a real error and is re-thrown.
-            if (!$this->connectionLost($exception)) throw $exception;
+            if (!$this->connectionLost($exception)) {
+                # The query that failed is the one the error page most needs to show.
+                $this->logQuery($sql, $data, $queryTime, $exception->getMessage());
+                throw $exception;
+            }
 
             $this->reconnect();
             $e = $this->connection()->prepare($sql);
@@ -194,6 +230,9 @@ class DB
         }
 
         $queryTime = microtime(true) - $queryTime;
+
+        $this->logQuery($sql, $data, $queryTime);
+
         # SELECT only - EXPLAIN on a write costs a round-trip and suggests
         # nothing - and never without app.debug, since analysing a query means
         # running it twice. framework.profiling.queryAnalyze is true, false, or a
@@ -1354,7 +1393,7 @@ class DB
             echo "\nAnalyze query: ";
             try {
                 var_dump($this->connection()->query("EXPLAIN ANALYZE $debug_sql")->fetchAll(\PDO::FETCH_ASSOC));
-            } catch (\Throwable $e) {
+            } catch (\Throwable) {
                 echo "*UNSUPPORTED EXPLAIN ANALYZE*";
             }
 

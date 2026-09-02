@@ -17,6 +17,9 @@
         "SimpleXML", "snmp", "soap", "sockets", "sodium", "SPL", "sqlite3", "standard",
         "superglobals", "sysvmsg", "sysvsem", "sysvshm", "tidy", "tokenizer", "xml",
         "xmlreader", "xmlrpc", "xmlwriter", "xsl", "zip", "zlib",
-        "redis", "apcu"
+        "redis", "apcu",
+        // mt_rand(), mt_getrandmax(), random_int() and friends live in ext-random
+        // since PHP 8.2; without its stub every one of them is "undefined".
+        "random"
     ]
 }
