@@ -205,7 +205,9 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(modules)` dizin adı tek yazıma indirildi, Linux'ta çözülüyor — `51beac1`
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
-- [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — a03c372
+- [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `fix(View)` minify geri geldi: src-only atlanıyor, string literaller korunuyor — `c0449c7`
+      *Bilinen ve bırakılan:* `//` içeren JS regex literali hâlâ yorum sanılıyor.
 
 ## Kapatılanlar (bulgu değil)
 
