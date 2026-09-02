@@ -368,6 +368,8 @@ without naming a number:
     'limit'   => 60,
     'window'  => 60,
     'by'      => 'ip',   // ip | token - `token` counts a logged-in caller by identity
+                         //   `ip` is REMOTE_ADDR unless framework.trusted-proxies
+                         //   names the address the request came from
     'block'   => 0,
 ],
 ```
@@ -398,6 +400,14 @@ per-account. Measured: Throttle first gives the key `ip:::1|/x`, Throttle after 
 middleware gives `user:8|/x`. So `by: 'token'` also costs the identity lookup for a caller you
 are about to refuse. Use it when one account must not spread its quota across addresses;
 otherwise `ip` is cheaper and harder to get wrong.
+
+**Behind a proxy, list it in `framework.trusted-proxies`.** `ip()` reads `REMOTE_ADDR` and nothing
+else until the request arrives from an address on that list; only then does it read
+`CF-Connecting-IP`, `Client-IP` or the first entry of `X-Forwarded-For`. The headers are set by
+whoever sent the request, so trusting them unconditionally - which is what it used to do - let a
+caller take a fresh bucket on every request by changing one header, or spend somebody else's
+address until it was blocked. The cost of leaving the list empty on a proxied site is the
+opposite mistake: every visitor counts as the proxy, so they share one bucket.
 
 `Throttle` **answers 429 itself** rather than declining. A declined middleware with no fallback
 closure ends as a 404 (see `references/routing.md`), and a 404 is the wrong answer to "you are

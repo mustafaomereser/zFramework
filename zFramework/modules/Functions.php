@@ -163,7 +163,24 @@ function _l()
 // Get Client IP address
 function ip()
 {
-    return ($_SERVER['HTTP_CLIENT_IP'] ?? ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']));
+    $remote = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+    # A forwarded header is set by whoever sent the request, so it is read only when
+    # the request actually arrived from an address named as a proxy. Trusting it
+    # unconditionally let a caller take a fresh rate-limit bucket on every request,
+    # or spend somebody else's address until that one was blocked.
+    $trusted = (array) (\zFramework\Core\Facades\Config::framework('trusted-proxies') ?? []);
+    if (!in_array($remote, $trusted, true)) return $remote;
+
+    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR'] as $header) {
+        if (empty($_SERVER[$header])) continue;
+
+        # X-Forwarded-For is a chain - client, proxy, proxy - and the client is first.
+        $candidate = trim(explode(',', $_SERVER[$header])[0]);
+        if (filter_var($candidate, FILTER_VALIDATE_IP)) return $candidate;
+    }
+
+    return $remote;
 }
 
 // Http::abort shorcut

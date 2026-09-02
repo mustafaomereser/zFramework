@@ -1418,6 +1418,8 @@ alone, before any route is matched or session touched.
     'limit'   => 60,
     'window'  => 60,         // seconds
     'by'      => 'ip',       // ip | token - `token` counts a logged-in caller by identity,
+                             // `ip` is REMOTE_ADDR unless framework.trusted-proxies names
+                             // the address the request arrived from,
                              // so one account cannot spread its quota across addresses
     'block'   => 0,
 ],
@@ -1835,6 +1837,7 @@ return [
     'route'    => ['caching' => true, 'auto-check' => false],
     'log'      => ['enabled' => true, 'level' => 'debug', 'days' => 14],
     'throttle' => ['enabled' => true, 'limit' => 60, 'window' => 60, 'by' => 'ip', 'block' => 0],
+    'trusted-proxies' => [],   // addresses ip() may read a forwarded header from
     'session'  => ['driver' => 'file', 'gc_probability' => 1],
     'response' => ['ajax' => ['include-alerts' => true], 'cache-ttl' => 600, 'page-cache' => true],
     'cache'    => ['apcu' => true],

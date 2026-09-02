@@ -84,6 +84,19 @@ return [
     ],
 
     /**
+     * Addresses allowed to speak for someone else.
+     *
+     * ip() reads REMOTE_ADDR and nothing else until the request arrives from one
+     * of these. A forwarded header is set by whoever sent the request, so on a
+     * directly served site trusting it hands every caller a fresh rate-limit
+     * bucket per request - or somebody else's address to spend until it is blocked.
+     *
+     * Put the load balancer, nginx or Cloudflare edge address here. Empty trusts
+     * nothing, which is right whenever the site is reached directly.
+     */
+    'trusted-proxies' => [],
+
+    /**
      * Sessions.
      *
      * driver          file | redis. Use redis when more than one machine serves

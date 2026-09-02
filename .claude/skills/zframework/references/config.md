@@ -50,6 +50,8 @@ commit it, never hand-write it.
     'by'      => 'ip',   // ip | token
     'block'   => 0,      // seconds to refuse outright once the limit is passed
 ],
+'trusted-proxies' => [],       // addresses ip() will read a forwarded header from.
+                               // Empty trusts none: REMOTE_ADDR and nothing else.
 'session' => [
     'driver'         => 'file',   // file | redis (redis for multi-server)
     'gc_probability' => 1,        // ignored by the redis driver
