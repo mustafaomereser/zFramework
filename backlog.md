@@ -48,7 +48,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [ ] **`Drivers/sqlsrv.php:46,49` — `getLimit()` private olduğu için hiç çağrılmıyor**
       SQL Server'a MySQL `LIMIT` sözdizimi gidiyor. Erişilebilir yapılınca offset'i düşürdüğü
       ortaya çıkıyor (paginate 2. sayfadan itibaren hep 1. sayfa). İki hata birbirini gizliyor.
-- [ ] **`DB.php:1299` — `debugSQL()` yanlış SQL basıyor**
+- [x] **`DB.php:1299` — `debugSQL()` yanlış SQL basıyor**
       Yer tutucu önek çakışması + falsy değerleri `null` basması. `name = 'veli'1` gibi.
 
 ## 3. Terminal / CLI
@@ -244,6 +244,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
 - [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `fix(DB)` debugSQL yanlis SQL basiyordu — `fef28b4`
 - [x] `fix(RelationShips)` with() batchlenemeyen iliskiyi iki kez calistiriyordu — `8b9b99a`
 - [x] `fix(DB)` grup where 4. elemanı (bağlaç) okunmuyordu — `48988e3`
 - [x] `fix(DB)` tek koşullu where grubu çift bağlaç üretiyordu — `d1b9ae7`
