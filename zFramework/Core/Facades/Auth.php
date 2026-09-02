@@ -28,9 +28,56 @@ class Auth
      */
     static private ?array $columns = null;
 
-    private static function getMode()
+    /**
+     * Where auth state lives while an API request is being served.
+     *
+     * API mode used to route through Session, and a session is a file on disk. A
+     * client that authenticates by header sends no session cookie back, so it never
+     * gets the same file twice: one write per request, kept until php's gc happens to
+     * sweep it. Nothing was ever read from those files - within the one request
+     * token_login() writes what check() reads, and after it nobody can ask again.
+     */
+    private static array $request = [];
+
+    /**
+     * Write a value where this request keeps it.
+     *
+     * @param string   $key
+     * @param string   $value
+     * @param int|null $expires Cookie lifetime in seconds; meaningless in API mode.
+     * @return void
+     */
+    private static function store(string $key, string $value, ?int $expires = null): void
     {
-        return self::$api_mode ? Session::class : Cookie::class;
+        if (self::$api_mode) {
+            self::$request[$key] = $value;
+            return;
+        }
+
+        Cookie::set($key, $value, $expires);
+    }
+
+    /**
+     * Read one back.
+     *
+     * @param string $key
+     * @return mixed
+     */
+    private static function stored(string $key): mixed
+    {
+        return self::$api_mode ? (self::$request[$key] ?? null) : Cookie::get($key);
+    }
+
+    /**
+     * Drop one.
+     *
+     * @param string $key
+     * @return void
+     */
+    private static function forget(string $key): void
+    {
+        if (self::$api_mode) unset(self::$request[$key]);
+        else Cookie::delete($key);
     }
 
     /**
@@ -40,10 +87,13 @@ class Auth
      * into the next request means one visitor is served as another.
      *
      * $api_mode belongs to the request too, and was missed here at first. The API
-     * middleware sets it, getMode() reads it, and left standing it makes every
-     * later request on that worker authenticate through Session instead of
-     * Cookie - so one /api call was enough to stop "remember me" working for
+     * middleware sets it, store() and stored() read it, and left standing it makes
+     * every later request on that worker read its auth state out of $request instead
+     * of the cookie - so one /api call was enough to stop "remember me" working for
      * every web visitor the worker served afterwards.
+     *
+     * $request goes with it: it holds one API client's identity, and it is exactly
+     * the thing that must not still be there when the next request arrives.
      *
      * $model, $columns and $database_exists are boot state and stay.
      *
@@ -53,6 +103,7 @@ class Auth
     {
         self::$user     = null;
         self::$api_mode = false;
+        self::$request  = [];
     }
 
     public static function init()
@@ -68,7 +119,7 @@ class Auth
 
         self::$database_exists = isset($GLOBALS['databases']['connections'][$database]);
 
-        if (self::$database_exists && !self::check() && $stayIn = (self::getMode())::get('auth-stay-in')) self::restore((string) $stayIn);
+        if (self::$database_exists && !self::check() && $stayIn = self::stored('auth-stay-in')) self::restore((string) $stayIn);
     }
 
     /**
@@ -203,12 +254,12 @@ class Auth
                 'pwd' => $user[self::columns()['password']] ?? '',
             ], self::TOKEN_TTL, 'session');
 
-            (self::getMode())::set('auth-session', $token);
+            self::store('auth-session', $token);
             return true;
         }
 
-        (self::getMode())::set('auth-password', $user[self::columns()['password']]);
-        (self::getMode())::set('auth-token', $user['id']);
+        self::store('auth-password', $user[self::columns()['password']]);
+        self::store('auth-token', (string) $user['id']);
         return true;
     }
 
@@ -230,13 +281,13 @@ class Auth
     {
         # Killing the token server-side is what makes the session actually end -
         # in cookie mode the browser simply stops presenting its cookie.
-        if ($token = (self::getMode())::get('auth-session')) Redis::delete("auth:$token", 'session');
+        if ($token = self::stored('auth-session')) Redis::delete("auth:$token", 'session');
 
         self::$user = null;
-        (self::getMode())::delete('auth-stay-in');
-        (self::getMode())::delete('auth-session');
-        (self::getMode())::delete('auth-token');
-        (self::getMode())::delete('auth-password');
+        self::forget('auth-stay-in');
+        self::forget('auth-session');
+        self::forget('auth-token');
+        self::forget('auth-password');
         return true;
     }
 
@@ -258,9 +309,9 @@ class Auth
     {
         if (self::tokenMode()) return self::userFromToken();
 
-        if (!$user_id = (self::getMode())::get('auth-token')) return false;
+        if (!$user_id = self::stored('auth-token')) return false;
         if (self::$user == null) self::$user = self::model()->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
-        if (!@self::$user['id'] || !hash_equals((string) self::$user[self::columns()['password']], (string) (self::getMode())::get('auth-password'))) return self::logout();
+        if (!@self::$user['id'] || !hash_equals((string) self::$user[self::columns()['password']], (string) self::stored('auth-password'))) return self::logout();
         return self::$user;
     }
 
@@ -275,7 +326,7 @@ class Auth
     private static function userFromToken()
     {
         if (self::$user !== null) return self::$user;
-        if (!$token = (self::getMode())::get('auth-session')) return false;
+        if (!$token = self::stored('auth-session')) return false;
 
         $session = Redis::get("auth:$token", 'session');
         if (empty($session['uid'])) return false;
@@ -351,7 +402,7 @@ class Auth
 
         if (@$user['id']) {
             self::login($user);
-            if ($staymein) (self::getMode())::set('auth-stay-in', $user['api_token'] . '|' . self::passwordTrace($user[self::columns()['password']] ?? ''), time() * 2);
+            if ($staymein) self::store('auth-stay-in', $user['api_token'] . '|' . self::passwordTrace($user[self::columns()['password']] ?? ''), time() * 2);
             return true;
         }
 
