@@ -11,12 +11,12 @@ return [
         'unique'    => 'zaten kullanımda.',
         'exists'    => 'böyle bir veri yok.',
         'in'        => 'listede yok. kabul edilenler: {allowed}.',
-        'not-in'    => 'kullanilamaz.',
-        'regex'     => 'istenen bicimde degil.',
-        'url'       => 'gecerli bir adres olmalidir (http veya https).',
-        'date'      => 'gecerli bir tarih degil.',
-        'between'   => 'girdiginiz {now-val}, {min-val} ile {max-val} arasinda olmalidir.',
-        'confirmed' => '{other} ile ayni degil.',
+        'not-in'    => 'kullanılamaz. yasaklı olanlar: {blocked}.',
+        'regex'     => 'istenen biçimde değil.',
+        'url'       => 'geçerli bir adres olmalıdır (http veya https).',
+        'date'      => 'geçerli bir tarih değil.',
+        'between'   => 'girdiğiniz {now-val}, {min-val} ile {max-val} arasında olmalıdır.',
+        'confirmed' => '{other} ile aynı değil.',
     ],
 
     'attributes' => [

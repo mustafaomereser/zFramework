@@ -11,7 +11,7 @@ return [
         'unique'    => 'already using.',
         'exists'    => 'that\'s not exists.',
         'in'        => 'is not in the list. accepted: {allowed}.',
-        'not-in'    => 'cannot be used.',
+        'not-in'    => 'cannot be used. blocked: {blocked}.',
         'regex'     => 'is not in the expected format.',
         'url'       => 'must be a valid http or https address.',
         'date'      => 'is not a valid date.',
