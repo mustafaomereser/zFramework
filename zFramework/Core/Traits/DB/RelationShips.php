@@ -493,8 +493,10 @@ trait RelationShips
             foreach ($results as $index => $row) {
                 $this->eagerProbe = [];
                 try {
-                    $this->{$relation}($row);
-                    $fallback[$index] = true;               // never probed: not batchable
+                    # Kept, not discarded. A relation that cannot be batched does not throw,
+                    # which means its query has already run here - throwing the result away
+                    # and calling it again at the bottom ran every one of them twice.
+                    $fallback[$index] = $this->{$relation}($row);
                 } catch (EagerProbe) {
                     $intents[$index] = $this->eagerProbe;
                 } finally {
@@ -525,8 +527,9 @@ trait RelationShips
                 }
             }
 
-            # Relations that could not be probed keep their per-row behaviour.
-            foreach (array_keys($fallback) as $index) $results[$index][$relation] = $this->{$relation}($results[$index]);
+            # Relations that could not be probed keep their per-row behaviour - the
+            # value is the one pass 1 already fetched.
+            foreach ($fallback as $index => $value) $results[$index][$relation] = $value;
         }
     }
 
