@@ -40,7 +40,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] **`Drivers/mysql.php:166` — tek koşullu where grubu `AND (AND …)` üretip 1064 veriyor**
       Dinamik filtre kalıbı: `$c = []; if ($q) $c[] = [...]; ->where('publish',1)->where($c)`.
       Grup tek elemanlıysa ve öncesinde başka where varsa bozuk SQL. Boş grup → `()` + warning.
-- [ ] **`DB.php:853` — grup where'inde 4. eleman (bağlaç) hiç okunmuyor**
+- [x] **`DB.php:853` — grup where'inde 4. eleman (bağlaç) hiç okunmuyor**
       `prepareWhere()` `$data[3]`'ü görmüyor; bağlaç çağrılan metottan geliyor.
       README'nin `[['views','>',50,'OR']]` örneği sessizce AND üretiyor.
 - [ ] **`RelationShips.php:496` — `with()` batch'lenemeyen ilişkileri iki kez çalıştırıyor**
@@ -244,6 +244,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
 - [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `fix(DB)` grup where 4. elemanı (bağlaç) okunmuyordu — `48988e3`
 - [x] `fix(DB)` tek koşullu where grubu çift bağlaç üretiyordu — `d1b9ae7`
 - [x] `fix(View)` minify geri geldi: src-only atlanıyor, string literaller korunuyor — `c0449c7`
       *Bilinen ve bırakılan:* `//` içeren JS regex literali hâlâ yorum sanılıyor.
