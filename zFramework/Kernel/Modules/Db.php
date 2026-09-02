@@ -90,9 +90,21 @@ class Db
         else {
             if (isset(Terminal::$parameters['--module'])) {
                 # select one module migrations
-                $module = Terminal::$parameters['--module'];
-                if (!in_array($module, self::$all_modules)) return Terminal::text("[color=red]You haven't a module like this.[/color]");
-                $scans = ["$module/$migrations_path"];
+                #
+                # Matched without regard to case and then used as the directory is
+                # actually spelled: the container is lowercase and the module is not,
+                # so `--module=blog` is what gets typed and `modules/Blog` is what is
+                # there. BASE_PATH was missing from the scan path too, while both
+                # sibling branches have it, so this looked for `blog/migrations` beside
+                # the working directory and reported the module had no migrations.
+                $module   = Terminal::$parameters['--module'];
+                $resolved = null;
+                foreach (self::$all_modules as $known) if (strcasecmp($known, (string) $module) === 0) $resolved = $known;
+
+                if (!$resolved) return Terminal::text("[color=red]You haven't a module like this.[/color]");
+
+                $module = $resolved;
+                $scans  = [BASE_PATH . "/modules/$module/$migrations_path"];
                 Terminal::text("[color=blue]You have selected a module: `$module`.[/color]");
                 #
             } else if (in_array('--module', Terminal::$parameters)) {
