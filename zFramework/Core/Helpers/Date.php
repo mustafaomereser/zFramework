@@ -29,9 +29,18 @@ class Date
      * @param string $format
      * @return string 
      */
-    public static function format(?string $date = null, string $format = 'd.m.Y'): string
+    public static function format(string|int|null $date = null, string $format = 'd.m.Y'): string
     {
-        return $date ? date($format, (is_string($date) ? strtotime($date) : $date)) : '-';
+        if (!$date) return '-';
+
+        # The parameter used to be ?string, so is_string() could never be false and
+        # the int branch beside it was unreachable - a unix timestamp went through
+        # strtotime(), which does not read one, and every int column printed as
+        # 01.01.1970. Numeric strings count as timestamps too: PDO hands an int
+        # column back as a string.
+        $time = is_numeric($date) ? (int) $date : strtotime($date);
+
+        return $time ? date($format, $time) : '-';
     }
 
     /**
