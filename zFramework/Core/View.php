@@ -440,18 +440,27 @@ class View
                     continue;
                 }
 
-                # String literals come out first and go back last. Without that the
-                # comment stripper read '//example.com' as a comment, and the whitespace
-                # passes reached inside join(', ') and shipped join(','). NUL marks them
-                # because no template holds one and none of the passes below match it.
+                # Strings and comments in one left-to-right pass: a string is kept behind
+                # a NUL marker and a comment is dropped, and whichever opens first owns
+                # what follows. Two passes could not do that - stripping comments first
+                # read '//example.com' as a comment, and masking strings first let the
+                # apostrophe in `// don't` open a "string" that swallowed the code below
+                # it. A quoted string stops at a newline, as it does in JS, so an unpaired
+                # quote can only ever take its own line. NUL marks a string because no
+                # template holds one and none of the passes below match it.
                 $strings = [];
                 $script  = preg_replace_callback(
-                    '/(\'(?:[^\'\\\\]|\\\\.)*\'|"(?:[^"\\\\]|\\\\.)*"|`(?:[^`\\\\]|\\\\.)*`)/s',
-                    function ($m) use (&$strings) { $strings[] = $m[1]; return "\x00" . (count($strings) - 1) . "\x00"; },
+                    '/\'(?:[^\'\\\\\n]|\\\\.)*\'|"(?:[^"\\\\\n]|\\\\.)*"|`(?:[^`\\\\]|\\\\.)*`|(?<!:)\/\/[^\n]*|\/\*(?!!)[\s\S]*?\*\//',
+                    function ($m) use (&$strings) {
+                        # By the opening character: an empty literal '' is a string too,
+                        # and has to come back.
+                        if (!str_contains("'\"`", $m[0][0])) return '';
+                        $strings[] = $m[0];
+                        return "\x00" . (count($strings) - 1) . "\x00";
+                    },
                     $parts[$i]
                 );
 
-                $script = preg_replace('/(?<!:)\/\/.*|\/\*(?!!)[\s\S]*?\*\//', '', $script);
                 $script = preg_replace('/\s+/', ' ', $script);
                 $script = preg_replace('/\s*([{}:;,])\s*/', '$1', $script);
                 $script = preg_replace('/\s*(\(|\)|\[|\])\s*/', '$1', $script);
