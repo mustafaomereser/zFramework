@@ -114,7 +114,7 @@ class View
 
         if ($isExtend) self::$sections = $prevSections;
 
-        self::parse();
+        self::parse($isExtend);
 
         $result = self::$view;
 
@@ -254,6 +254,15 @@ class View
         $cache   = null;
         $result  = null;
 
+        # Per render, not per process. A view() called from inside an already compiled
+        # template inherited whatever the outer one had collected, so its manifest
+        # listed files it never uses - any edit invalidated it - and carried the outer
+        # view's binds, which a cache hit then replayed: the first caller's values
+        # baked into every request after it. The recursion inside compile(), which is
+        # where @extends and @include belong, still accumulates as it should.
+        self::$compiledFiles = [];
+        self::$usedBinds     = [];
+
         if ($caching) $result = self::tryCache($view_name);
 
         if ($result) {
@@ -379,7 +388,7 @@ class View
     /**
      * Run all parse passes on the current view.
      */
-    private static function parse(): void
+    private static function parse(bool $isExtend = false): void
     {
         self::parseComments();
         self::parseIncludes();
@@ -387,7 +396,7 @@ class View
         self::parsePHP();
         self::parseVariables();
         self::parseForEach();
-        self::parseSections();
+        self::parseSections($isExtend);
         self::parseExtends();
         self::parseYields();
         self::customDirectives();
@@ -398,7 +407,14 @@ class View
         self::parseJSON();
         self::parseDump();
         self::parseDd();
-        self::unmaskCssAtRules();
+
+        # Only the outermost compilation unmasks. A layout used to lift its own mask
+        # at the end of its pass, and the text was then embedded in the child and
+        # walked again by the child's directives - so a plain `@page { margin: 1cm }`
+        # in the layout's <style> met the `page` directive ViewDirectives registers,
+        # became an `if` with no `endif`, and the eval threw a ParseError. The child's
+        # own <style> was never affected, only the layout's.
+        if (!$isExtend) self::unmaskCssAtRules();
     }
 
     /**
@@ -703,19 +719,26 @@ class View
      * Inline:  @section('title', 'My Page Title')
      * Block:   @section('content') ... @endsection
      */
-    public static function parseSections(): void
+    public static function parseSections(bool $isExtend = false): void
     {
+        # A layout declares defaults; the page that extends it decides. Both were
+        # written into the same array in order, and the layout is compiled second, so
+        # `@section('title', 'Site')` in the layout overwrote the page's own title -
+        # the wrong way round, and silently.
+        $keep = fn(string $name) => $isExtend && isset(self::$sections[$name]);
+
         self::$view = preg_replace_callback(
             '/@section\(\s*\'([^\']*)\'\s*,\s*\'((?:[^\'\\\\]|\\\\.)*)\'\s*\)/',
-            function ($sectionDetail) {
-                self::$sections[$sectionDetail[1]] = str_replace(["\\'", '\\\\'], ["'", '\\'], $sectionDetail[2]);
+            function ($sectionDetail) use ($keep) {
+                if (!$keep($sectionDetail[1]))
+                    self::$sections[$sectionDetail[1]] = str_replace(["\\'", '\\\\'], ["'", '\\'], $sectionDetail[2]);
                 return '';
             },
             self::$view
         );
 
-        self::$view = preg_replace_callback('/@section\(\'(.*?)\'\)(.*?)@endsection/s', function ($sectionName) {
-            self::$sections[$sectionName[1]] = $sectionName[2];
+        self::$view = preg_replace_callback('/@section\(\'(.*?)\'\)(.*?)@endsection/s', function ($sectionName) use ($keep) {
+            if (!$keep($sectionName[1])) self::$sections[$sectionName[1]] = $sectionName[2];
             return '';
         }, self::$view);
     }
