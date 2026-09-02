@@ -75,10 +75,15 @@ class Validator
 
             [$type, $length, $detectedType] = self::resolveTypeAndLength($value, $declaredType);
 
-            $equivalent = null;
-            $parameters = [];
-
             foreach ($validateList as $ruleString) {
+                # Per rule, not per field. Left outside the loop these carried the
+                # previous rule's value into any rule written without one, so
+                # ['min:8', 'confirmed'] handed Confirmed the string '8' as the field
+                # to match and rejected a correctly filled form - while
+                # ['confirmed', 'min:8'] worked. Same for the ;key: parameters.
+                $equivalent = null;
+                $parameters = [];
+
                 if (str_contains($ruleString, ':')) {
                     # The name charclass has to allow '-', or `not-in:a,b` is read
                     # as `in:a,b` - the rule name is silently swapped for another
