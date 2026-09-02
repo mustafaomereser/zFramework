@@ -544,6 +544,23 @@ class Db
                 continue;
             }
 
+            # Comments are skipped whole, so a quote or a delimiter inside one is never
+            # read: `-- Database: it's` opened a string that ran to the next apostrophe
+            # in the data, and a `;` in a trailing comment cut the statement it followed.
+            # `/*!` is kept - that is a versioned statement the server does execute.
+            if ($char === '#' || ($char === '-' && preg_match('/\G--(?:[ \t]|\r?\n|$)/', $sql, $m, 0, $i))) {
+                $end      = strpos($sql, "\n", $i);
+                $i        = $end === false ? $length : $end;
+                $current .= "\n";
+                continue;
+            }
+
+            if ($char === '/' && substr($sql, $i, 2) === '/*' && substr($sql, $i, 3) !== '/*!') {
+                $end = strpos($sql, '*/', $i);
+                $i   = $end === false ? $length : $end + 1;
+                continue;
+            }
+
             if ($char === "'" || $char === '"' || $char === '`') {
                 $quote    = $char;
                 $current .= $char;
