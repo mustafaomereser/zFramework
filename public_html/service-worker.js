@@ -77,19 +77,24 @@ self.addEventListener('pushsubscriptionchange', event => {
             .then(config => self.registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: config.public_key
-            }))
-            .then(subscription => {
+            }).then(subscription => {
                 const json = subscription.toJSON();
                 const body = new URLSearchParams({
                     endpoint: subscription.endpoint,
                     p256dh: json.keys.p256dh,
-                    auth: json.keys.auth
+                    auth: json.keys.auth,
+                    // /config carries the token, because there is no page here to
+                    // read one from. Without it the post answered 406 and the device
+                    // went quiet until someone opened the site again.
+                    _token: config._token
                 });
 
-                // No csrf token here - there is no page to read one from.
-                // Either allow this route without one ('no-csrf'), or accept
-                // that it re-registers next time the user opens the site.
+                // The endpoint the push service replaced. The application and the
+                // topics are on that row and the worker never saw them, so the
+                // server is told where to read them from.
+                if (event.oldSubscription) body.append('old_endpoint', event.oldSubscription.endpoint);
+
                 return fetch('/push-notification/subscribe', { method: 'POST', body: body, credentials: 'include' });
-            })
+            }))
     );
 });
