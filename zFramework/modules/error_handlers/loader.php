@@ -30,14 +30,18 @@ function errorHandler($data)
  * exception handler is itself a fatal error. That fatal is an artefact of the
  * reporting, not a second failure, and logging it would bury the real one.
  *
- * @param bool $set
+ * Request state, so Run::resetState() clears it: in a worker the flag would
+ * otherwise stand for the life of the process, and one handled exception would be
+ * enough to silence the fatal reporter for every request after it.
+ *
+ * @param bool|null $set true to mark, false to clear, null to only ask.
  * @return bool
  */
-function errorHandlerReported(bool $set = false): bool
+function errorHandlerReported(?bool $set = null): bool
 {
     static $reported = false;
 
-    if ($set) $reported = true;
+    if ($set !== null) $reported = $set;
     return $reported;
 }
 

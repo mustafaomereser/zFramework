@@ -110,6 +110,12 @@ class Run
         foreach (self::REQUEST_STATE as $class)
             if (class_exists($class, false) && method_exists($class, 'flushRequestState')) $class::flushRequestState();
 
+        # Not a class static, so `state check` cannot see it and the loop above cannot
+        # reach it: the flag that stops the shutdown handler reporting an error
+        # errorHandler() already reported. Left standing, one handled exception would
+        # silence the fatal reporter for the rest of the worker's life.
+        if (function_exists('errorHandlerReported')) errorHandlerReported(false);
+
         # Back to what boot collected; see $bootIncluded.
         if (self::$bootIncluded !== null && count(self::$included) > self::$bootIncluded)
             self::$included = array_slice(self::$included, 0, self::$bootIncluded);
