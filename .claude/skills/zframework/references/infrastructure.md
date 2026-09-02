@@ -138,7 +138,7 @@ Log::debug(string $message, array $context = []): void
 Log::info(...)   Log::warning(...)   Log::error(...)
 ```
 
-One file per day at `storage/logs/Y-m-d.log`, appended with `LOCK_EX` so concurrent requests
+One file per day at `zFramework/storage/logs/Y-m-d.log`, appended with `LOCK_EX` so concurrent requests
 do not interleave a line. Context is appended as JSON:
 
 ```
@@ -293,7 +293,7 @@ storage kept everything.
 
 Each step can stop before anything is lost - version read from one remote file, a `PK`
 signature check because a failed request arrives as HTML, a sanity check that the archive
-really contains a framework, then a backup to `storage/update-backup/<version>-<timestamp>`
+really contains a framework, then a backup to `zFramework/storage/update-backup/<version>-<timestamp>`
 before the replace. `--rollback` restores it.
 
 ### Config is merged, never overwritten
@@ -335,7 +335,7 @@ RateLimit::clear(string $key): void
 
 Counters go to redis when it is configured and reachable, where `INCR` makes the count atomic
 across every worker and machine; otherwise to one `flock`'d file per key under
-`storage/ratelimit`, which is what a shared host has. Fixed window, not sliding - a caller can
+`zFramework/storage/ratelimit`, which is what a shared host has. Fixed window, not sliding - a caller can
 send up to twice the limit across a boundary, and buying accuracy past that costs a sorted set
 and a read of it on every request.
 
@@ -504,8 +504,11 @@ instead of `fastcgi_pass`.
 - **`header()` and `setcookie()` do nothing under CLI**, which is what a worker runs as. Use
   `Response::header()` and `Cookie::set()` — the worker attaches them to the response. A direct
   `header()` call works under FPM and silently disappears here.
-- **Routes are registered at boot.** `route/dynamic/` is re-evaluated per request under FPM but
-  runs once at worker startup, so per-request conditions belong in middleware.
+- **Routes are registered at boot** — `route/web.php`, `route/api.php` and the modules',
+  once. `route/dynamic/` is the exception and is re-read on every request in a worker too:
+  `handle()` restores the booted table and includes it on top (`run.php:342-346`), so those
+  definitions see request state and never accumulate. That is the whole reason the directory
+  exists, and why nothing in it can be cached.
 
 ```bash
 php terminal state check    # statics that would leak between requests

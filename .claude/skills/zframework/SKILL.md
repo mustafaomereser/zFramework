@@ -78,7 +78,7 @@ zFramework/     the framework core — touch ONLY to fix a framework bug
 cron/           standalone cron scripts; cron.php boots the framework for one job
 schedule/       scheduled tasks; read only by `php terminal schedule run`
 terminal        CLI entry point: php terminal <module> <command>
-README.md       73 KB full reference; section numbers below
+README.md       107 KB full reference; section numbers below
 ```
 
 ## Inventory — "this already exists, don't write it"
@@ -119,7 +119,7 @@ README.md       73 KB full reference; section numbers below
 | Long-running workers | RoadRunner + `php terminal state check` | §20 |
 | Routes that must not be cached | `route/dynamic/` | §1 |
 | Page caching, HTTP cache headers | `Page::` | §3.1 |
-| Application log | `Log::` | §20.1 |
+| Application log | `Log::` | §8.3 |
 | Rate limiting | `RateLimit::` + `Throttle` middleware | §6.1 |
 | Scheduled tasks, one crontab line | `Schedule::` + `schedule/` | §14.1 |
 | A cron job in its own process | `cron/` + `cron/cron.php` | §14.2 |
@@ -174,7 +174,10 @@ which owns every one-segment url by design - anything more specific goes above i
 one-segment route in `route/dynamic/` (included last) can never win.
 
 **Do not write closure routes** — they block the route cache (`php terminal route cache`).
-Use `[Controller::class, 'method']`.
+Use `[Controller::class, 'method']`. A closure in a **middleware fallback** blocks it just
+the same (`Route.php:298-299` reports the two separately), so `middleware([Auth::class],
+fn($d) => abort(403))` costs the cache for the whole table - name a controller method, or
+accept the 404 the routing path gives by default.
 
 `Route::resource` takes exactly two arguments. There is no `->only()`, `->except()`,
 `->names()`, no `apiResource`, no `Route::where()`, and the prefix helper is `Route::pre()`,
@@ -190,7 +193,8 @@ condition — may not appear in it. To know what is actually registered, read `r
 Groups inherit inward as you would expect — a nested group gets the outer prefix, name prefix
 and middleware list, and the outer settings are restored afterwards. Two traps, both verified:
 a `pre()`/`middleware()` left **without any `->group()`** stays pending and is picked up by the
-*next* group, and two `middleware()` calls chained at the same level keep only the second.
+*next* group. Two `middleware()` calls at the same level **accumulate** - as does
+`->throttle()->middleware([...])`, which used to drop what throttle() had just added.
 And a declined middleware with **no fallback closure gives a 404** — the middleware's own
 `error()` never runs on the routing path. Pass `fn($declines) => abort(403)` if you want
 anything else. Full detail in `references/routing.md`.
@@ -330,8 +334,11 @@ Prefer plain PHP for output and control flow — `<?= $x ?>`, `<?php foreach (�
 work too; if the user asks for them, use them.
 
 `{{ $x }}` **escapes** (compiles to `<?= e($x) ?>`) and `{!! $x !!}` is the raw form. Anything
-emitting markup must use the raw one or it renders as visible text: `{!! csrf() !!}`,
+that **returns** markup must use the raw one or it renders as visible text:
 `{!! inputMethod('PATCH') !!}`, `{!! $posts['links']() !!}`.
+
+`csrf()` is the exception: it echoes the input itself and returns void, so both spellings
+emit the same tag. `<?= csrf() ?>` is what the shipped views write.
 
 These do **not** exist and will be printed literally into the page:
 `@for` `@while` `@switch` `@auth` `@guest` `@csrf` `@method` `@push`
@@ -412,7 +419,7 @@ Log::info('Order paid', ['order' => $id]);
 Log::error('Gateway refused', ['code' => $e->getCode()]);
 ```
 
-`storage/logs/Y-m-d.log`. Not the error handler — uncaught throwables still go through
+`zFramework/storage/logs/Y-m-d.log`. Not the error handler — uncaught throwables still go through
 `errorHandler()`. This is for what was never an exception.
 
 ### Rate limiting
@@ -486,12 +493,13 @@ compares them.
 - **`references/conventions.md`** — deliberate design decisions (leave them alone), known traps,
   performance notes.
 
-Still no answer: `README.md` (73 KB, numbered sections) and the source under `zFramework/Core/`.
+Still no answer: `README.md` (107 KB, numbered sections) and the source under `zFramework/Core/`.
 
 ## What this framework does not do
 
 - **No PHPUnit suite, and none is planned.** If a test is needed, write an ad-hoc script.
-- **Adding Composer packages is not the default** — the core runs without dependencies.
+- **Adding Composer packages is not the default** — the core requires two, phpmailer and
+  tedivm/jshrink, and everything else in `composer.json` is a `suggest`.
 - Do not modify `zFramework/` to serve an application need; application code goes in `App/` and
   `modules/`.
 - The `@` operators and `$GLOBALS` usage in the source are deliberate — do not "clean them up".

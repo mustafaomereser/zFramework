@@ -235,13 +235,13 @@ The rest of what exists, for reading other people's templates: `@elseif`, `@else
   never executes. Put per-page setup **inside** the section. A layout may have a `<?php ?>`
   block at the top (`app/main.php` does) because a layout is the parent, not the child; a
   standalone partial rendered with `view()` may too, because it extends nothing.
-- **`@yield` is resolved at compile time, not at runtime** (`View.php:600-607`). Sections are
+- **`@yield` is resolved at compile time, not at runtime** (`View.php:704-714`). Sections are
   collected before the parent is compiled, which is why the order works — but it also means a
   section cannot be produced by runtime code.
 - **Section names must match the layout's `@yield` names.** `app/main.php` yields `header`,
   `body` and `footer`; a `@section('content')` is silently dropped and the page renders empty.
 - **`@extends($variable)` works and disables the view cache** for that template
-  (`View.php:583-592`). Every request recompiles. Avoid unless the layout genuinely varies.
+  (`View.php:677-696`, cached at `285`). Every request recompiles. Avoid unless the layout genuinely varies.
 - The `@extends` regex is `[^)]+`, so a parenthesised expression breaks it:
   `@extends(layoutFor($x))` does not work.
 - Inline section syntax is exact — `@section('title', 'Value')`, comma plus one space.
@@ -252,7 +252,7 @@ The rest of what exists, for reading other people's templates: `@elseif`, `@else
   Neither reaches the compiled file, so unlike an HTML comment they cost nothing at runtime
   and do not appear in the page source. Multi-line is fine.
 - `@include` splices the file's text in and compiles it with the parent, max depth 32
-  (`View.php:504-557`). Nothing in this repo uses it; partials are called at runtime with
+  (`View.php:639-661`, the limit at `607`). Nothing in this repo uses it; partials are called at runtime with
   `<?= view('app.layouts.auth.content') ?>`, which is also fine and keeps the partial's own
   scope.
 - Custom directives are registered in `App/Middlewares/ViewDirectives.php` (a middleware, not
@@ -260,21 +260,22 @@ The rest of what exists, for reading other people's templates: `@elseif`, `@else
   Opening and closing tags are two separate registrations. The match is prefix-based, so a
   new directive named `pag` would also swallow `@page`.
 - `<style>` blocks are masked before parsing so CSS `@media`/`@keyframes` survive
-  (`View.php:318-358`).
+  (`View.php:369-393`).
 - Compiled output goes to `zFramework/storage/views/*.compiled.php` with an mtime manifest.
-  Clear it with **`php terminal cache clear views`** — the `php terminal view clear` written
-  in `config/framework.php:16` is not a real command.
+  Clear it with **`php terminal cache clear views`**. The option has to name a directory that
+  already exists under `zFramework/storage/` (`Cache.php:26`), so on a clean install
+  `cache clear pages` reports a wrong option rather than doing nothing.
 - Caching and minify are both on by default (`config/framework.php:19-22`); turn caching off
   while writing templates.
 
 ## `view()` resolution
 
 ```php
-view(string $name, array $data = [])   // = View::view(), zFramework/modules/Functions.php:136
+view(string $name, array $data = [])   // = View::view(), zFramework/modules/Functions.php:148
 ```
 
 Dot notation, plain `.php` extension (no `.blade.php`, no suffix configured). Three candidates
-are tried in order (`View.php:529-536`):
+are tried in order (`View.php:630-637`):
 
 1. `resource/views/<path>.php`
 2. `modules/<path>.php`
@@ -292,7 +293,7 @@ threading it through every controller:
 View::bind('app.main', fn() => ['user' => Auth::user()]);   // App/Providers/ViewProvider.php
 ```
 
-Binds re-run on every request even when the compiled cache hits (`View.php:261`).
+Binds re-run on every request even when the compiled cache hits (`View.php:78-88`, and the reasoning at `226`).
 
 ## Pagination
 

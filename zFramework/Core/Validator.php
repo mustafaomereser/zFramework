@@ -88,6 +88,11 @@ class Validator
                     # The name charclass has to allow '-', or `not-in:a,b` is read
                     # as `in:a,b` - the rule name is silently swapped for another
                     # one that exists, and the check runs inverted.
+                    #
+                    # An unquoted value ends at the first space or semicolon, which is what
+                    # lets several rules share one string: `exists:User;key:email` is two.
+                    # A value that needs a space says so with quotes - `regex:"^a b$"` -
+                    # and the quoted branch below is matched first for that reason.
                     preg_match_all('/([\w$.()-]+):(?:"([^"]*)"|([^\s;]+))/', $ruleString, $m, PREG_SET_ORDER);
                     $out = [];
                     foreach ($m as $match) $out[$match[1]] = isset($match[2]) && $match[2] !== '' ? $match[2] : $match[3];

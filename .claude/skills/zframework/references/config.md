@@ -63,7 +63,7 @@ commit it, never hand-write it.
 ],
 'cache' => [
     'apcu' => true,          // keep the table schema in shared memory instead of re-reading
-                             // storage/db/<db>/scheme.json per connection
+                             // zFramework/storage/db/<db>/scheme.json per connection
 ],
 'redis' => [
     'enabled'  => false,     // nothing else here is read while false

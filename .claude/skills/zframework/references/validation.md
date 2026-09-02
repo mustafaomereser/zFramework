@@ -202,3 +202,19 @@ $r = Validator::validate(['age' => '150'], ['age' => ['required', 'max:100']], [
 
 Measured, not inferred. In the normal (no-callback) flow this never surfaces, because the
 request has already redirected or aborted.
+
+## Where a rule value ends
+
+An unquoted value runs to the first space or semicolon. The semicolon is what lets one
+string carry several rules — `exists:User;key:email` is `exists` plus a `key` parameter —
+and the space is what lets a list stay readable.
+
+So a value that contains a space has to be quoted:
+
+```php
+'regex:"^[a-z ]+$"'      // quoted: the whole pattern
+'regex:^[a-z ]+$'        // unquoted: cut at the space, `^[a-z` is the pattern
+```
+
+By design, not a bug (`Validator.php:91`) — the quoted branch is matched first for exactly
+this reason. It only ever bites `regex`, `in` and `not-in` with spaced values.

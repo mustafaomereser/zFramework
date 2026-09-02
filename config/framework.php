@@ -13,7 +13,7 @@ return [
      *
      * caching  Compile templates once and reuse them. Turn off while writing
      *          templates so edits show up without clearing anything; on in
-     *          production. Clear with `php terminal view clear`.
+     *          production. Clear with `php terminal cache clear views`.
      * minify   Strip whitespace from the compiled output.
      */
     'view' => [

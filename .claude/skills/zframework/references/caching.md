@@ -5,7 +5,7 @@
 | Layer | What it is | Who honours it |
 |---|---|---|
 | HTTP headers | `Cache-Control`, `Expires`, `Vary` | the browser, and any CDN or proxy |
-| Server-side store | the rendered output on disk under `storage/pages` | this application, before the route runs |
+| Server-side store | the rendered output on disk under `zFramework/storage/pages` | this application, before the route runs |
 
 `Page::cache()` sets the headers always. It also stores, when the response is
 eligible — which is most of what this file is about.
@@ -106,6 +106,10 @@ Page::clear();                           // everything - a deploy, or a change t
 php terminal cache clear pages           // the same, from the CLI
 ```
 
+Do it at the call site, not in an observer: `onupdated`, `ondelete` and `ondeleted` are
+invoked with no arguments at all (`DB.php:1266,1277,1285`), so a hook that reads `$row['id']`
+reads an empty array. Only `oninsert`, `oninserted` and `onupdate` receive data.
+
 **Prefer the tag.** Rebuilding the url — query string and all — at the point where a model is
 saved is the part nobody gets right, and one tag can cover several urls:
 
@@ -113,14 +117,11 @@ saved is the part nobody gets right, and one tag can cover several urls:
 // where the page renders
 Page::cache(600, name: 'post-' . $post['id']);
 
-// where the post is saved - an observer is the tidy place
-public function onupdated(array $row)
-{
-    Page::forget('post-' . $row['id']);
-}
+// where the post is saved
+Page::forget('post-' . $post['id']);
 ```
 
-A tag writes one marker file per entry under `storage/pages/tags/`, so `forget()` reads a
+A tag writes one marker file per entry under `zFramework/storage/pages/tags/`, so `forget()` reads a
 directory instead of opening every cached page looking for a tag it probably does not carry.
 
 The url is still the lookup key — `serve()` runs before the route and has only the request to
@@ -159,7 +160,7 @@ express.
 `Page::cache()`. Turning it off leaves the headers working and takes the store out of the
 request path.
 
-Cost when nothing is cached: `Run::handle()` checks `is_dir(storage/pages)` before touching
+Cost when nothing is cached: `Run::handle()` checks `is_dir(zFramework/storage/pages)` before touching
 the class, and that directory does not exist until something has actually been stored. An
 application that never declares a cacheable page pays one stat per request and never loads
 `Page.php`. Boot measured at 0.87–0.95 ms with all of this in, against 0.90 ms before.

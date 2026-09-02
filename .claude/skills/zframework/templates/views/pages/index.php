@@ -56,16 +56,14 @@
 <script>
     // DELETE is not a link. Post the spoofed method with a csrf token.
     function deletePost(id) {
-        $.ask.do({
-            onAccept: () => {
-                $.post(`<?= route('posts.delete') ?>`.replace('{id}', id), {
-                    _method: 'DELETE',
-                    _token: csrf
-                }, e => {
-                    $.showAlerts(e.alerts);
-                    location.reload();
-                });
-            }
+        if (!confirm('Delete this post?')) return;
+
+        $.post(`<?= route('posts.delete') ?>`.replace('{id}', id), {
+            _method: 'DELETE',
+            _token: '<?= \zFramework\Core\Csrf::get() ?>'
+        }, e => {
+            $.showAlerts(e.alerts);
+            location.reload();
         });
     }
 </script>

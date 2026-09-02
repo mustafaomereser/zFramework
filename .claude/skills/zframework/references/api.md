@@ -172,6 +172,11 @@ toggleAttach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue
 
 ## Facades
 
+Most of what follows is `zFramework\Core\Facades\<Name>`. Six are not, and the
+autoloader turns the namespace straight into a path, so the wrong one is a fatal:
+`Csrf`, `Crypter` and `GlobalCache` sit in `zFramework\Core\`, while `File`, `Folder`,
+`Assets`, `_Array`, `Http`, `Date` and `AutoSSL` are `zFramework\Core\Helpers\`.
+
 ### Auth
 
 **`Auth::attempt` semantics, `special_columns`, the two session modes and the API
@@ -248,7 +253,7 @@ varying. Detail and the invalidation patterns: **`references/caching.md`**.
 ```php
 Log::debug|info|warning|error(string $message, array $context = []): void
 ```
-`storage/logs/Y-m-d.log`. Not the error handler - see `references/infrastructure.md`.
+`zFramework/storage/logs/Y-m-d.log`. Not the error handler - see `references/infrastructure.md`.
 
 ### RateLimit
 ```php
@@ -350,7 +355,9 @@ _Array::compare(array $a1, array $a2, \Closure $callback): array
 // A queue job is a class with handle(array $payload): void
 zFramework\Core\Jobs\SendMail::handle(array $payload)
 zFramework\Core\Jobs\SendPushNotifications::handle(array $payload)
-// enqueue: Queue::push(SendMail::class, ['to' => ..., 'subject' => ...], 'default')
+// enqueue - a job is [Class::class, 'method'] or 'Class@method', never the class alone:
+// Queue::push([SendMail::class, 'handle'], ['to' => ..., 'subject' => ...], 'default')
+// Queue::run() rejects anything else with InvalidArgumentException.
 
 // Thrown by abort()/redirect()/refresh()/downloads instead of die().
 // Extends \Error, not \Exception, so a catch(\Exception) around a controller
@@ -378,7 +385,11 @@ class Seeder
 Run with `php terminal db seed`, or `db migrate --seed`. A migration can carry its own with
 `public static function oncreateSeeder(?string $db = null)`, which runs when that table is created.
 
-### PushNotification
+### PushNotification — `zFramework\Core\Facades\PushNotification\PushNotification`
+
+The one facade with its own sub-namespace: the directory holds the channels and the
+crypto beside it, so the class repeats its own name.
+
 ```php
 PushNotification::app(string $app): self
 PushNotification::toUser(int|array $users): self       toTopic(string|array $topics): self
