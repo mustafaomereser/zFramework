@@ -21,7 +21,7 @@ class Terminal
 
         if (count($args)) {
             self::$terminate = true;
-            return self::parseCommands(implode(' ', $args));
+            return self::parseCommands($args);
         }
 
         Terminal::text('[color=red]Terminal fired.[/color]');
@@ -40,12 +40,17 @@ class Terminal
     {
         // command add to history.
         if ($commands) {
-            self::$history[] = $commands;
-            readline_add_history($commands);
+            $line = is_array($commands) ? implode(' ', $commands) : $commands;
+            self::$history[] = $line;
+            if (function_exists('readline_add_history')) readline_add_history($line);
         }
         //
 
-        $commands   = explode(' ', $commands);
+        # $argv arrives split the way the shell meant it, quotes already resolved.
+        # Joining it and splitting on spaces again threw that away: --title="two words"
+        # came in as one argument and left as two, the tail landing in $commands where
+        # a subcommand argument was expected.
+        $commands   = is_array($commands) ? array_values($commands) : explode(' ', $commands);
         $parameters = [];
 
         // parse it
