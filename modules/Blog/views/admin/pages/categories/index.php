@@ -21,7 +21,7 @@
         <button class="btn btn-outline-success" onclick="addCategory(0)"><i class="fa fa-plus"></i> Add Category</button>
     </div>
     <div class="tree no-select">
-        <?= Modules\Blog\Helpers\BlogCategories::list(0, 1) ?>
+        <?= modules\Blog\Helpers\BlogCategories::list(0, 1) ?>
     </div>
 </div>
 @endsection

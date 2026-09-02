@@ -1,9 +1,9 @@
 <?php
 
-use Modules\Blog\Controllers\Admin\BlogCategoriesController as AdminBlogCategoriesController;
-use Modules\Blog\Controllers\Admin\BlogController as AdminBlogController;
-use Modules\Blog\Controllers\Client\BlogController as ClientBlogController;
-use Modules\Blog\Controllers\Client\CategoryController as ClientCategoryController;
+use modules\Blog\Controllers\Admin\BlogCategoriesController as AdminBlogCategoriesController;
+use modules\Blog\Controllers\Admin\BlogController as AdminBlogController;
+use modules\Blog\Controllers\Client\BlogController as ClientBlogController;
+use modules\Blog\Controllers\Client\CategoryController as ClientCategoryController;
 use zFramework\Core\Route;
 
 Route::pre('/blog')->group(function () {

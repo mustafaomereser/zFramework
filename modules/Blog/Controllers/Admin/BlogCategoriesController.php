@@ -1,8 +1,8 @@
 <?php
 
-namespace Modules\Blog\Controllers\Admin;
+namespace modules\Blog\Controllers\Admin;
 
-use Modules\Blog\Helpers\BlogCategories;
+use modules\Blog\Helpers\BlogCategories;
 use zFramework\Core\Abstracts\Controller;
 use zFramework\Core\Facades\Alerts;
 use zFramework\Core\Facades\Response;

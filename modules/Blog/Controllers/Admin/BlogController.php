@@ -1,9 +1,9 @@
 <?php
 
-namespace Modules\Blog\Controllers\Admin;
+namespace modules\Blog\Controllers\Admin;
 
-use Modules\Blog\Models\Blogs;
-use Modules\Blog\Models\BlogToCategories;
+use modules\Blog\Models\Blogs;
+use modules\Blog\Models\BlogToCategories;
 use zFramework\Core\Abstracts\Controller;
 use zFramework\Core\Facades\Alerts;
 use zFramework\Core\Facades\Auth;

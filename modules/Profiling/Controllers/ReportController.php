@@ -1,8 +1,8 @@
 <?php
 
-namespace Modules\Profiling\Controllers;
+namespace modules\Profiling\Controllers;
 
-use Modules\Profiling\Recorder;
+use modules\Profiling\Recorder;
 use zFramework\Core\Abstracts\Controller;
 use zFramework\Core\Facades\Config;
 

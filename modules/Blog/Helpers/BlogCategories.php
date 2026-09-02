@@ -1,8 +1,8 @@
 <?php
 
-namespace Modules\Blog\Helpers;
+namespace modules\Blog\Helpers;
 
-use Modules\Blog\Models\Categories;
+use modules\Blog\Models\Categories;
 
 class BlogCategories
 {

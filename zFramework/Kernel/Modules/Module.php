@@ -34,13 +34,19 @@ class Module
     {
         self::assets();
 
-        if (is_dir(base_path("/modules/$name"))) return Terminal::text("[color=red]`$name` module already exists.[/color]");
+        # The directory is capitalised, the url is not. Classes under it are
+        # namespaced `modules\<Name>` and the autoloader turns a class name straight
+        # into a path, so the two spellings have to match - `make ... --module` does
+        # the same ucfirst. The route prefix stays as it was typed.
+        $dir = ucfirst($name);
 
-        foreach (['route', 'views'] as $folder) @mkdir(base_path("/modules/$name/$folder"), 0777, true);
-        file_put_contents(base_path("/modules/$name/route/web.php"), str_replace(['{name}'], [$name], file_get_contents(self::$assets['route'])));
-        file_put_contents(base_path("/modules/$name/info.php"), str_replace(['{name}', '{date}', '{author}', '{framework_version}', '{sort}'], [$name, Date::timestamp(), gethostname(), FRAMEWORK_VERSION, count(scan_dir(base_path("/modules")))], file_get_contents(self::$assets['info'])));
+        if (is_dir(base_path("/modules/$dir"))) return Terminal::text("[color=red]`$dir` module already exists.[/color]");
+
+        foreach (['route', 'views'] as $folder) @mkdir(base_path("/modules/$dir/$folder"), 0777, true);
+        file_put_contents(base_path("/modules/$dir/route/web.php"), str_replace(['{name}'], [$name], file_get_contents(self::$assets['route'])));
+        file_put_contents(base_path("/modules/$dir/info.php"), str_replace(['{name}', '{date}', '{author}', '{framework_version}', '{sort}'], [$name, Date::timestamp(), gethostname(), FRAMEWORK_VERSION, count(scan_dir(base_path("/modules")))], file_get_contents(self::$assets['info'])));
 
         Terminal::text("[color=yellow]" . implode(', ', ['Controllers', 'Middlewares', 'Models', 'Requests', 'Observers', 'migrations']) . " folders do not created, but when you make an related asset its be appear.[/color]");
-        return Terminal::text("[color=green]`$name` module is created.[/color]");
+        return Terminal::text("[color=green]`$dir` module is created.[/color]");
     }
 }

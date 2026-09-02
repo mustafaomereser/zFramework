@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Blog\Models;
+namespace modules\Blog\Models;
 
 use App\Models\User;
 use zFramework\Core\Abstracts\Model;

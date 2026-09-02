@@ -1,19 +1,18 @@
 <?php
 
-namespace Modules\Blog\Controllers\Client;
+namespace modules\Blog\Controllers\Client;
 
-use Modules\Blog\Models\Blogs;
-use Modules\Blog\Models\Categories;
+use modules\Blog\Models\Categories;
 use zFramework\Core\Abstracts\Controller;
 
 #[\AllowDynamicProperties]
-class BlogController extends Controller
+class CategoryController extends Controller
 {
+
 
     public function __construct()
     {
-        $this->posts      = new Blogs;
-        $this->categories = new Categories;
+        $this->category = new Categories;
     }
 
     /** Index page | GET: /
@@ -21,10 +20,7 @@ class BlogController extends Controller
      */
     public function index()
     {
-        $title          = 'Blog & News';
-        $posts          = $this->posts->where('publish', 1)->where('featured_post', 0)->orderBy(['id' => 'DESC'])->paginate();
-        $featured_posts = $this->posts->where('publish', 1)->where('featured_post', 1)->orderBy(['updated_at' => 'DESC'])->get();
-        return view('blog.views.client.pages.index', compact('title', 'posts', 'featured_posts'));
+        abort(404);
     }
 
     /** Show page | GET: /id
@@ -33,12 +29,9 @@ class BlogController extends Controller
      */
     public function show($id)
     {
-        $post       = $this->posts->where('slug', $id);
-        $post       = $post->firstOrFail('This blog is not exists');
-        $author     = $post['author']();
-        $categories = $post['categories']()->get();
-
-        return view('blog.views.client.pages.show', compact('post', 'author', 'categories'));
+        $category = $this->category->where('slug', $id)->firstOrFail('This category not exists.');
+        $posts    = $category['posts']()->paginate();
+        return view('blog.views.client.pages.categories.show', compact('category', 'posts'));
     }
 
     /** Create page | GET: /create

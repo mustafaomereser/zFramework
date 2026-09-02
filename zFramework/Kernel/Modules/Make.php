@@ -18,7 +18,11 @@ class Make
         if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
 
         if (isset(Terminal::$parameters['--module'])) {
-            self::$save        = "Modules/" . ucfirst(Terminal::$parameters['--module']);
+            # Lowercase directory, capitalised module: `modules/Blog`, namespace
+            # `modules\Blog`. The autoloader turns a class name straight into a path,
+            # so the two have to match exactly - on a case-sensitive filesystem
+            # `Modules/` was a directory findModules() never scanned.
+            self::$save        = "modules/" . ucfirst(Terminal::$parameters['--module']);
             self::$save_status = true;
         }
 

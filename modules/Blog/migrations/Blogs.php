@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Blog\Migrations;
+namespace modules\Blog\Migrations;
 
 #[\AllowDynamicProperties]
 class Blogs
