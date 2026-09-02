@@ -414,15 +414,36 @@ class View
 
         for ($i = 0; $i < count($parts); $i++) {
             if ($i % 2 == 0) $parts[$i] = preg_replace(['/\s+(?=(?:[^"\'`]*["\'`][^"\'`]*["\'`])*[^"\'`]*$)/', '/>\s+</'], [' ', '><'], $parts[$i]);
-            # Script blocks are left alone. Minifying javascript with regexes cannot
-            # tell code from a string, a template literal or a regex literal, and every
-            # pass here got that wrong: `//` inside src="//cdn..." or 'https://x' ate the
-            # rest of the line including </script>, so the browser read the remaining
-            # markup as script and the page rendered blank; collapsing newlines joined
-            # two semicolon-less statements into one; and the whitespace pass reached
-            # inside strings, so join(', ') came out as join(','). Measured across every
-            # script block this project ships, the whole thing saved 183 bytes gzipped.
-            else if (strpos($parts[$i], '<script') !== false) $parts[$i] = trim($parts[$i]);
+            else if (strpos($parts[$i], '<script') !== false) {
+                # A script with a src has no body, so there was never anything here to
+                # minify - only its attributes to chew on, which is how src="//cdn..."
+                # lost everything from the slashes to </script> and took the rest of the
+                # page into the script with it.
+                if (preg_match('/<script[^>]*\\ssrc\\s*=/i', $parts[$i])) {
+                    $parts[$i] = trim($parts[$i]);
+                    continue;
+                }
+
+                # String literals come out first and go back last. Without that the
+                # comment stripper read '//example.com' as a comment, and the whitespace
+                # passes reached inside join(', ') and shipped join(','). NUL marks them
+                # because no template holds one and none of the passes below match it.
+                $strings = [];
+                $script  = preg_replace_callback(
+                    '/(\'(?:[^\'\\\\]|\\\\.)*\'|"(?:[^"\\\\]|\\\\.)*"|`(?:[^`\\\\]|\\\\.)*`)/s',
+                    function ($m) use (&$strings) { $strings[] = $m[1]; return "\x00" . (count($strings) - 1) . "\x00"; },
+                    $parts[$i]
+                );
+
+                $script = preg_replace('/(?<!:)\/\/.*|\/\*(?!!)[\s\S]*?\*\//', '', $script);
+                $script = preg_replace('/\s+/', ' ', $script);
+                $script = preg_replace('/\s*([{}:;,])\s*/', '$1', $script);
+                $script = preg_replace('/\s*(\(|\)|\[|\])\s*/', '$1', $script);
+                $script = preg_replace('/([=+\-*\/<>])\s+/', '$1', $script);
+                $script = preg_replace('/\s+([=+\-*\/<>])/', '$1', $script);
+
+                $parts[$i] = trim(preg_replace_callback('/\x00(\d+)\x00/', fn($m) => $strings[(int) $m[1]], $script));
+            }
         }
 
         return implode('', $parts);
