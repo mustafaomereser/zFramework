@@ -43,7 +43,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] **`DB.php:853` — grup where'inde 4. eleman (bağlaç) hiç okunmuyor**
       `prepareWhere()` `$data[3]`'ü görmüyor; bağlaç çağrılan metottan geliyor.
       README'nin `[['views','>',50,'OR']]` örneği sessizce AND üretiyor.
-- [ ] **`RelationShips.php:496` — `with()` batch'lenemeyen ilişkileri iki kez çalıştırıyor**
+- [x] **`RelationShips.php:496` — `with()` batch'lenemeyen ilişkileri iki kez çalıştırıyor**
       `belongsToMany`, `morph*`, `through` — sorguyu yarıya indirmesi gerekirken ikiye katlıyor.
 - [ ] **`Drivers/sqlsrv.php:46,49` — `getLimit()` private olduğu için hiç çağrılmıyor**
       SQL Server'a MySQL `LIMIT` sözdizimi gidiyor. Erişilebilir yapılınca offset'i düşürdüğü
@@ -244,6 +244,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
 - [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `fix(RelationShips)` with() batchlenemeyen iliskiyi iki kez calistiriyordu — `8b9b99a`
 - [x] `fix(DB)` grup where 4. elemanı (bağlaç) okunmuyordu — `48988e3`
 - [x] `fix(DB)` tek koşullu where grubu çift bağlaç üretiyordu — `d1b9ae7`
 - [x] `fix(View)` minify geri geldi: src-only atlanıyor, string literaller korunuyor — `c0449c7`
