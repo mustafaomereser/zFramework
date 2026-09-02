@@ -141,7 +141,11 @@ class WebPush extends Channel
 
         if (($parts['scheme'] ?? null) !== 'https' || empty($parts['host'])) throw new \InvalidArgumentException('Push: an endpoint must be an https url.');
 
-        $host  = $parts['host'];
+        # parse_url keeps the brackets around a literal IPv6 host and
+        # FILTER_VALIDATE_IP rejects them, so `https://[::1]/x` was neither read as an
+        # address nor resolvable as a name - it fell past the address check with
+        # nothing to test, which is the one case this guard exists for.
+        $host  = trim($parts['host'], '[]');
         $hosts = array_filter((array) (config('push-notification.hosts') ?: []));
 
         if ($hosts) {
@@ -165,6 +169,13 @@ class WebPush extends Channel
 
         foreach ($addresses as $address) {
             if (!filter_var($address, FILTER_VALIDATE_IP)) continue;
+
+            # ::ffff:127.0.0.1 is loopback wearing an IPv6 shape, and the private and
+            # reserved range flags do not see through the wrapper. Unwrapped first, and
+            # canonicalised on the way so the expanded spelling is caught as well.
+            $packed = @inet_pton($address);
+            if ($packed !== false && strlen($packed) === 16 && preg_match('/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i', (string) inet_ntop($packed), $mapped)) $address = $mapped[1];
+
             if (!filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) throw new \InvalidArgumentException("Push: `$host` resolves to a private address.");
         }
     }

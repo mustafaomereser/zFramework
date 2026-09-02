@@ -174,6 +174,26 @@ class PushNotification
      */
     public static function send(array|string $payload): array
     {
+        # The filters are cleared however this ends. application() rejects an unknown
+        # app and payload() a message with no title, both before the clear below, and
+        # a throw used to leave toUser() and toTopic() standing - so the next send in
+        # the same process went to whoever the failed one had selected. In a queue
+        # worker that is the next job, and nobody is watching.
+        try {
+            return self::selected($payload);
+        } finally {
+            self::flushRequestState();
+        }
+    }
+
+    /**
+     * Deliver to whatever the filters selected. Always reached through send().
+     *
+     * @param array|string $payload
+     * @return array
+     */
+    private static function selected(array|string $payload): array
+    {
         [$app, $config] = self::application();
 
         $payload = self::payload($payload, $config);
@@ -248,15 +268,21 @@ class PushNotification
 
             if (!$id) continue;
 
+            # Only a failure the push service actually answered counts against the
+            # subscription. A missing VAPID subject or an unusable key returns status 0
+            # and fails identically for every row, so counting those walked the whole
+            # table up to max_failures and deleted it - the report said `removed` and
+            # there was nothing left to resubscribe.
+            $answered = ((int) ($result['status'] ?? 0)) > 0;
             $failures = ((int) ($subscription['failures'] ?? 0)) + 1;
 
-            if ($result['gone'] || ($max > 0 && $failures >= $max)) {
+            if ($result['gone'] || ($answered && $max > 0 && $failures >= $max)) {
                 (new PushNotificationSubscriptions)->where('id', $id)->delete();
                 $report['removed']++;
                 continue;
             }
 
-            (new PushNotificationSubscriptions)->where('id', $id)->update(['failures' => $failures]);
+            if ($answered) (new PushNotificationSubscriptions)->where('id', $id)->update(['failures' => $failures]);
         }
 
         return $report;
