@@ -102,6 +102,11 @@ class File
 
         $path = self::path($path);
         foreach ($file['name'] as $key => $name) {
+            # An optional field nobody touched arrives as UPLOAD_ERR_NO_FILE with an
+            # empty name, and warning about its file type is nonsense - there is no
+            # file. It used to fail the accept check and tell the visitor so.
+            if (($file['error'][$key] ?? UPLOAD_ERR_OK) === UPLOAD_ERR_NO_FILE) continue;
+
             $ext   = strtolower(pathinfo($name, PATHINFO_EXTENSION));
             $error = 0;
 
