@@ -50,7 +50,7 @@ class DB
     /**
      * Every query this request ran, with its bindings and how long it took.
      *
-     * Kept only while app.debug is on - it is what the error page shows under
+     * Kept only while debug is on - it is what the error page shows under
      * "Queries", and what a request that did not fail never needs. Production
      * pays one boolean read per query for it. Capped, because a loop that runs
      * ten thousand queries is exactly the kind of request that fails.
@@ -190,7 +190,7 @@ class DB
      */
     private function logQuery(string $sql, array $data, float $started, ?string $error = null): void
     {
-        if (!config('app.debug') || count(self::$queryLog) >= self::QUERY_LOG_LIMIT) return;
+        if (!Config::debug() || count(self::$queryLog) >= self::QUERY_LOG_LIMIT) return;
 
         # A failure arrives with the start time, a success with the elapsed time.
         $seconds = $error !== null ? microtime(true) - $started : $started;
@@ -234,10 +234,10 @@ class DB
         $this->logQuery($sql, $data, $queryTime);
 
         # SELECT only - EXPLAIN on a write costs a round-trip and suggests
-        # nothing - and never without app.debug, since analysing a query means
+        # nothing - and never without debug, since analysing a query means
         # running it twice. framework.profiling.queryAnalyze is true, false, or a
         # sampling rate.
-        if (!$this->ignoreAnalyze && config('app.debug') && DbCollector::isSelect($sql)) {
+        if (!$this->ignoreAnalyze && Config::debug() && DbCollector::isSelect($sql)) {
             $configured = Config::framework('profiling.queryAnalyze');
 
             # Older applications keep this in app.php. Config::get() answers a
@@ -1240,7 +1240,7 @@ class DB
             'current_page'   => $current_page,
 
             'links'          => function ($view = null) use ($page_count, $current_page, $url, $uniqueID) {
-                if (!$view) $view = config('app.pagination.default-view');
+                if (!$view) $view = Config::framework('pagination.default-view') ?? config('app.pagination.default-view');
 
                 $pages = [];
                 for ($x = 1; $x <= $page_count; $x++) $pages[$x] = [

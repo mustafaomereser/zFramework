@@ -225,7 +225,7 @@ class Page
         if ($stored = (int) ($meta['stored'] ?? 0)) Response::header('Age', (string) max(0, time() - $stored));
         # Debug only: in production it tells a visitor which pages are cached,
         # which is a map of where to look for a stale-token or stale-content bug.
-        if (Config::get('app.debug') ?? false) Response::header('X-Page-Cache', 'HIT');
+        if (Config::debug()) Response::header('X-Page-Cache', 'HIT');
 
         while (!feof($handle)) echo fread($handle, 65536);
         fclose($handle);
@@ -264,7 +264,7 @@ class Page
             # Debug only. The safe behaviour - staying live - is automatic, and a
             # page that will never be cacheable would otherwise write this line on
             # every single request forever.
-            if (Config::get('app.debug') ?? false)
+            if (Config::debug())
                 Log::warning('Page not cached: it contains a csrf token.', ['url' => $_SERVER['REQUEST_URI'] ?? '/']);
 
             return;

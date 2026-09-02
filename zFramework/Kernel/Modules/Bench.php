@@ -482,7 +482,7 @@ class Bench
         self::line('config files, second read (3)', self::ms(hrtime(true) - $t), 'memoised');
 
         $t = hrtime(true);
-        for ($i = 0; $i < 1000; $i++) Config::get('app.debug');
+        for ($i = 0; $i < 1000; $i++) Config::get('app.title');
         self::line('config lookup x1000', self::ms(hrtime(true) - $t), 'DB::prepare() does one per query');
 
         $t = hrtime(true);

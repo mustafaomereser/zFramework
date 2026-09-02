@@ -58,6 +58,7 @@ return (function (array $report): string {
         $out .= '<div class="code-head">';
         $out .= '<div class="code-title"><span class="path">' . $h($rel($file)) . '</span><span class="ln">:' . $line . '</span>';
         if ($frame['compiled']) $out .= '<span class="note">compiled line ' . $frame['compiled']['line'] . '</span>';
+        if ($frame['before']) $out .= '<div class="before">Reported where the parser gave up. The text just before this point is <b>' . $h($rel($frame['before']['file'])) . ':' . $frame['before']['line'] . '</b> - an unclosed <code>&lt;?php</code>, quote or bracket above that line is the usual cause.</div>';
         $out .= '</div>';
         if ($frame['function']) $out .= '<div class="code-fn">' . $h($frame['function']) . '()' . ($frame['via'] ? ' <span class="dim">threw from ' . $h($frame['via']) . '()</span>' : '') . '</div>';
         $out .= '<button class="btn ide" onclick="goIDE(' . $h(json_encode($file)) . ', ' . $line . ')">Open in editor</button>';
@@ -265,7 +266,7 @@ return (function (array $report): string {
 
         <div class="tab queries" id="t-queries">
             <?php if (!$report['queries']): ?>
-                <div class="empty">no queries ran<?= $env['debug'] ? '' : ' (recorded only with app.debug on)' ?></div>
+                <div class="empty">no queries ran<?= $env['debug'] ? '' : ' (recorded only with debug on)' ?></div>
             <?php else: foreach ($report['queries'] as $i => $q): ?>
                 <div class="q<?= !empty($q['error']) ? ' failed' : '' ?>">
                     <div class="q-head"><span class="q-n">#<?= $i + 1 ?></span><span class="q-db"><?= $h($q['db']) ?></span><span class="q-ms<?= $q['ms'] > 100 ? ' slow' : '' ?>"><?= $h($q['ms']) ?> ms</span></div>

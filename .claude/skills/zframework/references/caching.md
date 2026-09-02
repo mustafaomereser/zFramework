@@ -63,7 +63,7 @@ measured:
    declaration is revoked when the status is not 200 — headers included.
 4. **The body contains a csrf token.** Per-session, so the stored copy is wrong for everybody
    who receives it and every form they submit fails with 406. Refused, headers reverted, and
-   with `app.debug` on, a `Log::warning` saying why. This is a real bug that shipped for an
+   with `debug` on, a `Log::warning` saying why. This is a real bug that shipped for an
    hour: the welcome page declared itself cacheable, its form auto-submits on load, and the
    result was a reload loop.
 5. **`shared: false`.** "For this visitor only" and "keep one copy for everyone" are
@@ -167,7 +167,7 @@ application that never declares a cacheable page pays one stat per request and n
 
 ## Debugging
 
-`X-Page-Cache: HIT` is sent on a served entry **only with `app.debug` on**. In production it
+`X-Page-Cache: HIT` is sent on a served entry **only with `debug` on**. In production it
 maps which pages are cached, which is where to look for a stale-content bug.
 
 A hit ends the request before middlewares, route matching and the session — that is where the

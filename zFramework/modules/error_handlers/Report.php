@@ -72,7 +72,7 @@ class Report
                 'elapsed'   => round((microtime(true) - $started) * 1000, 1),
                 'time'      => date('Y-m-d H:i:s'),
                 'timezone'  => date_default_timezone_get(),
-                'debug'     => (bool) Config::get('app.debug'),
+                'debug'     => Config::debug(),
             ],
             'previous' => self::previousReports(),
         ];
@@ -143,6 +143,7 @@ class Report
             'kind'     => 'app',
             'compiled' => null,
             'via'      => null,
+            'before'   => null,
         ];
 
         # A template frame. PHP names the file `View.php(290) : eval()'d code`;
@@ -157,8 +158,13 @@ class Report
 
         # A cached template, served by include: the file is real, the source is not it.
         if (str_ends_with($frame['file'], '.compiled.php') && is_file($frame['file'])) {
-            $source = class_exists(View::class, false) ? View::sourceOf((string) file_get_contents($frame['file']), $line) : null;
+            $text   = (string) file_get_contents($frame['file']);
+            $source = class_exists(View::class, false) ? View::sourceOf($text, $line) : null;
             if ($source) {
+                # See pairArguments(): a parse error is reported where the parser gave up.
+                $before = $line > 1 ? View::sourceOf($text, $line - 1) : null;
+                if ($before && str_replace('\\', '/', $before['file']) !== str_replace('\\', '/', $source['file'])) $frame['before'] = ['file' => str_replace('\\', '/', $before['file']), 'line' => $before['line']];
+
                 $frame['compiled'] = ['file' => $frame['file'], 'line' => $line];
                 $frame['file']     = str_replace('\\', '/', $source['file']);
                 $frame['line']     = $source['line'];
@@ -238,6 +244,14 @@ class Report
                 if ($source) {
                     $frame['file'] = str_replace('\\', '/', $source['file']);
                     $frame['line'] = $source['line'];
+
+                    # A parse error is reported where the parser gave up, not where the
+                    # mistake is: an unclosed `<?php` in a page runs on until the marker
+                    # that hands the text back to the layout, and PHP names that line.
+                    # When the line before belongs to another file, that file is the one
+                    # to look at, and the frame says so.
+                    $before = $frame['compiled']['line'] > 1 ? View::sourceOf($compiled, $frame['compiled']['line'] - 1) : null;
+                    if ($before && str_replace('\\', '/', $before['file']) !== $frame['file']) $frame['before'] = ['file' => str_replace('\\', '/', $before['file']), 'line' => $before['line']];
                 } else {
                     # Nothing to map it with: show the compiled text itself.
                     $frame['snippet'] = $compiled;

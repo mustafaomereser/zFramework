@@ -316,7 +316,8 @@ Lang::locale(?string $lang = null, bool $syncCookie = true)
 Lang::currentLocale(): string     Lang::list(): array
 Lang::get(string $name, array $data = [])        // = _l()
 
-Config::get(string $config, bool $returnbool = true)   // 'app.debug' dot notation
+Config::get(string $config, bool $returnbool = true)   // 'app.title' dot notation
+Config::debug(): bool                                   // framework.debug, or app.debug if not moved
 Config::set(string $config, array $sets, bool $compare = false)
 Config::exists(string $config)   Config::framework(string $key)   Config::clearCache()
 

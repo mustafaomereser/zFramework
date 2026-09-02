@@ -1,11 +1,11 @@
 <a href="https://buymeacoffee.com/mustafaomereser" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;" ></a>
 
-# zFramework v3.1.2
+# zFramework v3.2.0
 
 **Easiest, fastest PHP framework. (Simple)**
 
 ![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-blue)
-![Version](https://img.shields.io/badge/version-3.1.2-green)
+![Version](https://img.shields.io/badge/version-3.2.0-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
 ---
@@ -512,7 +512,7 @@ a filter would mean duplicating every condition into the subquery.
 
 ```php
 // In the view:
-echo $result['links']();                            // uses config('app.pagination.default-view')
+echo $result['links']();                            // uses framework.pagination.default-view
 echo $result['links']('partials.my-pagination');    // custom view
 ```
 
@@ -1089,7 +1089,7 @@ class BlogController extends Controller
 | `shared: false` | "for this visitor" and "one copy for everyone" are opposites |
 | after `Page::vary(...)` | the store's key is fixed and cannot hold variants |
 
-The csrf case is caught by the framework and, with `app.debug` on, logged with the url — the
+The csrf case is caught by the framework and, with `debug` on, logged with the url — the
 failure is otherwise remote from its cause: the page renders fine and only the *next*
 visitor's POST breaks.
 
@@ -1137,7 +1137,7 @@ public function onupdated(array $row)
 ],
 ```
 
-`X-Page-Cache: HIT` is sent on a served entry only while `app.debug` is on. A hit ends the
+`X-Page-Cache: HIT` is sent on a served entry only while `debug` is on. A hit ends the
 request before middlewares, matching and the session — measured at 21.7 ms → 16.2 ms on the
 welcome page. With nothing cached, the cost is one `is_dir()` per request and the class is
 never loaded.
@@ -1829,18 +1829,16 @@ php terminal security key --regen
 
 ```php
 Config::get('app');              // returns entire config/app.php array
-Config::get('app.debug');        // returns a single key (dot notation)
+Config::get('app.title');        // returns a single key (dot notation)
+Config::debug();                 // framework.debug, or app.debug if not moved - the one debug switch
 Config::set('app', [...]);       // overwrite the entire file
-config('app.debug');             // shortcut for Config::get()
+config('app.title');             // shortcut for Config::get()
 ```
 
 **config/app.php**
 
 ```php
 return [
-    'debug'        => true,
-    'force-https'  => false,
-    'x-powered-by' => false,
     'lang'         => 'en',
     'public'       => '/public',
     'pagination'   => ['default-view' => 'partials.pagination'],
@@ -1851,6 +1849,11 @@ return [
 
 ```php
 return [
+    'debug'        => true,    // the one switch: error page, query log, analyzer, unminified compile
+    'error'        => ['logging' => true, 'keep_days' => 14, 'stream' => false, 'mask' => [], 'previous' => 10, 'callback' => fn($path, $html) => null],
+    'force-https'  => false,   // redirect http → https
+    'x-powered-by' => true,    // false hides the header
+    'pagination'   => ['default-view' => 'layouts.pagination.default'],
     'view'     => ['caching' => true, 'minify' => true],
     'route'    => ['caching' => true, 'auto-check' => false],
     'log'      => ['enabled' => true, 'level' => 'debug', 'days' => 14],
@@ -1866,7 +1869,7 @@ return [
         'enabled'      => false,   // write a record per request to analysis/profiling/
         'rate'         => 1,       // or a fraction: 0.05 records one request in twenty
         'keep'         => 200,     // stop writing once this many records exist
-        'queryAnalyze' => false,   // EXPLAIN every SELECT (needs app.debug; re-runs the query)
+        'queryAnalyze' => false,   // EXPLAIN every SELECT (needs debug; re-runs the query)
     ],
 ];
 ```
@@ -2131,20 +2134,22 @@ back.
 
 Nothing needs rewriting; these are the changes an existing project will notice.
 
-- **`error` moved from `config/app.php` to `config/framework.php`**, with two new keys, `mask`
-  and `previous`. The old place is still read, so an untouched `app.php` keeps working; move the
-  block when you next open the file.
+- **`debug`, `error`, `force-https`, `x-powered-by` and `pagination` moved from `config/app.php`
+  to `config/framework.php`** - `app.php` is now only what the application is (title, version,
+  lang, public); `error` gained `mask` and `previous`. The old place is still read for each of
+  them, so an untouched `app.php` keeps working; move them when you next open the file. Read
+  the switch with `Config::debug()` rather than `config('app.debug')`.
 - **The error page is new** (§19). It shows everything - request values included - unless
   `error.mask` names keys to hide. Reports are named after the exception class; a client that
   asks for JSON gets JSON; a fatal (out of memory, time limit) is reported too.
-- **Templates compile without minify while `app.debug` is on**, so an error can name the
+- **Templates compile without minify while `debug` is on**, so an error can name the
   template line. Compiled views carry `/*#zf:file:line*/` markers. Clear the view cache once
   (`php terminal cache clear views`) so nothing compiled by 3.1 lingers.
 - **`route cache` no longer refuses a table with closures**: their files stay live and the rest
   is cached. Run it again after upgrading.
 - **API mode no longer touches the session** - a header-authenticated request leaves no session
   file behind. Nothing to do unless something of yours read `Session` inside an API request.
-- **`DB::$queryLog`** records every query while `app.debug` is on; production pays nothing.
+- **`DB::$queryLog`** records every query while `debug` is on; production pays nothing.
 - **AutoSSL accounts live in `storage/AutoSSL/accounts/<id>/`**; an existing `account.key` at
   the root is moved there on first use, same account. `PUBLIC_DIR` is defined from cron now, so
   `renewAll()` runs from a cron script at all.
@@ -2231,7 +2236,7 @@ view('app.pages.posts.index', compact('posts'));
 route('posts.show', ['id' => 1]);
 csrf();
 _l('lang.key', ['name' => 'Ali']);
-config('app.debug');
+Config::debug();
 
 // HTML helpers
 e($value);             // htmlspecialchars; returns '-' if empty (with $emptycheck = true)
@@ -2453,9 +2458,10 @@ SSL::install('example.com', $cert, $key, $caBundle);
 
 ## 19. Going to Production
 
-### config/app.php
+### config/framework.php
 
 ```php
+// framework.php
 'debug'        => false,   // REQUIRED. Also gates the query analyzer, the query log and stack-trace args.
 'x-powered-by' => false,   // stop leaking the framework version
 'force-https'  => true,
@@ -2730,7 +2736,7 @@ to almost nobody.
 
 ### Checklist
 
-- [ ] `debug => false`, `x-powered-by => false`
+- [ ] `framework.php`: `debug => false`, `x-powered-by => false`, `force-https => true`
 - [ ] `view.caching => true`, view cache cleared on deploy
 - [ ] opcache on, FPM reloaded by the deploy script
 - [ ] `zFramework/storage/` and `error_logs/` writable by the web user, and not

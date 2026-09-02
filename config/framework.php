@@ -1,12 +1,81 @@
 <?php
 
 /**
- * Framework behaviour: caching, sessions, redis, profiling, errors, proxies.
+ * Framework behaviour: debug, errors, caching, sessions, redis, profiling, proxies.
  *
  * Application settings live in app.php. This file is about how the framework
  * itself works, not about what your application is.
  */
 return [
+
+    /**
+     * The switch everything else looks at.
+     *
+     * On: the error page with its frames, arguments and queries; the query log;
+     * the query analyzer; call arguments kept on exceptions; templates compiled
+     * without minify so an error names the template line. Off: a visitor gets a
+     * plain 500 and none of that is paid for. False in production, always.
+     *
+     * Read with Config::debug(). app.debug is still honoured for an application
+     * that has not moved it.
+     */
+    'debug' => true,
+
+    /**
+     * Errors.
+     *
+     * logging    Write each report as a self-contained HTML page under error_logs/.
+     * keep_days  How long one is kept. Each is a whole rendered page and nothing
+     *            used to remove them, so a site failing quietly for a year kept a
+     *            year of them. The sweep runs only on a request that already failed,
+     *            at most once an hour. 0 keeps everything.
+     * stream     Also send a one-line summary to a stream a log collector can read:
+     *            false | 'error_log' | 'stderr' | 'syslog'. Worth turning on as soon
+     *            as there is more than one app server - the HTML files only help
+     *            when you know which machine to look at.
+     * mask       Key names whose values the report shows as ••••••. Empty: nothing is
+     *            hidden - a password field or a cookie is as likely as anything to
+     *            be where the problem is, and whoever reads error_logs/ can read the
+     *            database too. Matched case-insensitively as a substring of the key,
+     *            everywhere: request data, session, cookies, headers, $_SERVER,
+     *            frame arguments. ['password', 'card'] if a policy asks for it.
+     * previous   How many earlier reports the page links to. 0 for none.
+     * callback   Runs after a report is written, with its path and the HTML.
+     *
+     * The page itself is shown only while debug is on; a visitor gets a plain
+     * 500 otherwise, and the report still goes to disk.
+     */
+    'error' => [
+        'logging'   => true,
+        'keep_days' => 14,
+        'stream'    => false,
+        'mask'      => [],
+        'previous'  => 10,
+
+        'callback' => function ($log_path, $log) {
+            # ZF_WORKER: a long-running HTTP worker also runs under the CLI SAPI, and
+            # die() there would kill the worker rather than end the request.
+            if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) die(zFramework\Kernel\Terminal::text("[color=red]-> report written to[/color][color=green] $log_path [/color]"));
+        },
+    ],
+
+    /**
+     * The two headers decided before anything else runs.
+     *
+     * force-https   Redirect a plain http request to https. Off on a development
+     *               machine; on in production, unless the proxy in front does it.
+     * x-powered-by  Send `X-Powered-By: zFramework vX.Y.Z`. Off hides the framework
+     *               and its version from anyone reading response headers.
+     */
+    'force-https'  => false,
+    'x-powered-by' => true,
+
+    /**
+     * The view paginate()'s links() renders when it is not given one.
+     */
+    'pagination' => [
+        'default-view' => 'layouts.pagination.default',
+    ],
 
     /**
      * Views.
@@ -83,44 +152,6 @@ return [
         'window'  => 60,
         'by'      => 'ip',
         'block'   => 0,
-    ],
-
-    /**
-     * Errors.
-     *
-     * logging    Write each report as a self-contained HTML page under error_logs/.
-     * keep_days  How long one is kept. Each is a whole rendered page and nothing
-     *            used to remove them, so a site failing quietly for a year kept a
-     *            year of them. The sweep runs only on a request that already failed,
-     *            at most once an hour. 0 keeps everything.
-     * stream     Also send a one-line summary to a stream a log collector can read:
-     *            false | 'error_log' | 'stderr' | 'syslog'. Worth turning on as soon
-     *            as there is more than one app server - the HTML files only help
-     *            when you know which machine to look at.
-     * mask       Key names whose values the report shows as ••••••. Empty: nothing is
-     *            hidden - a password field or a cookie is as likely as anything to
-     *            be where the problem is, and whoever reads error_logs/ can read the
-     *            database too. Matched case-insensitively as a substring of the key,
-     *            everywhere: request data, session, cookies, headers, $_SERVER,
-     *            frame arguments. ['password', 'card'] if a policy asks for it.
-     * previous   How many earlier reports the page links to. 0 for none.
-     * callback   Runs after a report is written, with its path and the HTML.
-     *
-     * The page itself is shown only while app.debug is on; a visitor gets a plain
-     * 500 otherwise, and the report still goes to disk.
-     */
-    'error' => [
-        'logging'   => true,
-        'keep_days' => 14,
-        'stream'    => false,
-        'mask'      => [],
-        'previous'  => 10,
-
-        'callback' => function ($log_path, $log) {
-            # ZF_WORKER: a long-running HTTP worker also runs under the CLI SAPI, and
-            # die() there would kill the worker rather than end the request.
-            if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) die(zFramework\Kernel\Terminal::text("[color=red]-> report written to[/color][color=green] $log_path [/color]"));
-        },
     ],
 
     /**
@@ -247,7 +278,7 @@ return [
      *               scanned, indexes used, missing-index suggestions. true is
      *               every query, false is off, or a fraction to sample.
      *
-     *               Needs app.debug, so production is unaffected either way. An
+     *               Needs debug, so production is unaffected either way. An
      *               analysed query is executed a second time to measure it, so
      *               it costs about twice what it reports.
      *

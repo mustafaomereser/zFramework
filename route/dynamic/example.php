@@ -30,6 +30,6 @@ use zFramework\Core\Route;
 
 # Disappears when debug goes off, without rebuilding the cache. Delete it once
 # there is something real here.
-if (config('app.debug')) {
+if (\zFramework\Core\Facades\Config::debug()) {
     Route::get('/_dynamic-check', fn() => 'route/dynamic is live: this route is not in the route cache.')->name('dynamic-check');
 }

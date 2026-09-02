@@ -314,7 +314,7 @@ class View
             # an error in it can then say nothing more precise than "line 2". With
             # the line breaks kept the markers compile() leaves point at the exact
             # template line - see sourceOf(). Production minifies as before.
-            if ((self::$config['minify'] ?? false) && !config('app.debug')) $compiled = self::minifyTemplate($compiled);
+            if ((self::$config['minify'] ?? false) && !\zFramework\Core\Facades\Config::debug()) $compiled = self::minifyTemplate($compiled);
             if ($caching && !self::$hasDynamicExtends) $cache = self::saveCache($view_name, $compiled);
 
             # Pushed before and popped only after a clean return: a throw leaves it

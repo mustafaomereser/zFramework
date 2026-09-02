@@ -104,6 +104,26 @@ class Config
      * @param string $key Dotted path, starting with the subject.
      * @return mixed
      */
+    /**
+     * Whether the application runs with debugging on.
+     *
+     * framework.debug, or app.debug for an application that has not moved it.
+     * One place, because a dozen call sites each reading a config key is how a
+     * moved key gets missed by one of them.
+     *
+     * @return bool
+     */
+    public static function debug(): bool
+    {
+        static $debug = null;
+        if ($debug !== null) return $debug;
+
+        $value = self::framework('debug');
+        if ($value === null) $value = self::get('app.debug');
+
+        return $debug = is_scalar($value) && (bool) $value;
+    }
+
     public static function framework(string $key): mixed
     {
         static $framework = null;

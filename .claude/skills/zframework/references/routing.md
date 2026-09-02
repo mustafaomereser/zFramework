@@ -351,7 +351,7 @@ Route::resource('/', WelcomeController::class);      // ← last line, owns /{id
 `route/dynamic/` is included **after** `route/web.php`, so this applies to everything in it:
 a one-segment route there can never win against the root resource. Give those routes two
 segments (`/status/live`) or a prefix. This is why `/_dynamic-check` in
-`route/dynamic/example.php` returns 404 even with `app.debug` on — confirmed by dumping the
+`route/dynamic/example.php` returns 404 even with `debug` on — confirmed by dumping the
 table from inside a request: the route is registered and its segments match, it simply loses
 on position.
 

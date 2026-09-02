@@ -488,7 +488,7 @@ php terminal db migrate --seed
 php terminal route cache                 # does nothing while closure routes exist
 php terminal cache clear views
 ```
-- `config/app.php` → `'debug' => false`, `'force-https' => true`, `'x-powered-by' => false`
+- `config/app.php` → `'debug' => false`; `config/framework.php` → `'force-https' => true`, `'x-powered-by' => false`
 - `config/framework.php` → `view.caching = true`, `view.minify = true`, `route.caching = true`
 - `database/connections.php` → write an **IP, not a hostname** (`localhost` tries IPv6 before
   IPv4 and doubles the wait on a failed connection), and lower `ATTR_TIMEOUT`

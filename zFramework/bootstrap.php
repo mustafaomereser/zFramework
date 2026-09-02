@@ -1,8 +1,16 @@
 <?php
 define('FRAMEWORK_PATH', __DIR__);
-define('FRAMEWORK_VERSION', '3.1.2');
+define('FRAMEWORK_VERSION', '3.2.0');
 $app_config = include(BASE_PATH . "/config/app.php");
-if ($app_config['x-powered-by'] ?? true) header("X-Powered-By: zFramework v" . FRAMEWORK_VERSION);
+
+// Read once, here, because two of its keys decide headers that go out before
+// anything else runs. Config::framework() is handed the same array below so the
+// file is not included twice. With no file the array is empty and every read
+// falls back to app.php, where these settings lived before 3.2.
+$framework = @include(BASE_PATH . "/config/framework.php") ?: [];
+$framework = is_array($framework) ? $framework : [];
+
+if ($framework['x-powered-by'] ?? $app_config['x-powered-by'] ?? true) header("X-Powered-By: zFramework v" . FRAMEWORK_VERSION);
 
 // A response is live unless the page says otherwise - guessing the other way
 // serves one visitor's page to the next. Sent here rather than at the end of the
@@ -23,7 +31,7 @@ date_default_timezone_set('Europe/Istanbul');
 // Debug only: with this on, every argument is retained on the exception and ends up
 // in the error logs too - a failed login would write the plain password next to the
 // trace, and 100 KB per string parameter is a lot of memory to hold on production.
-if ($app_config['debug'] ?? false) {
+if ($framework['debug'] ?? $app_config['debug'] ?? false) {
     ini_set('zend.exception_ignore_args', 0);
     ini_set('zend.exception_string_param_max_len', 100000);
 }
@@ -31,18 +39,16 @@ if ($app_config['debug'] ?? false) {
 // Session settings: Start
 $storage_path = FRAMEWORK_PATH . "/storage";
 if (!isset($cron_mode)) {
-    // Included directly rather than through Config, which is not loaded this
-    // early. Falls back to the old standalone files for applications that have
-    // not moved their settings into framework.php.
+    // framework.php was read at the top. Falls back to the old standalone files
+    // for applications that have not moved their settings into it.
     //
     // Redis only when the session driver asks for it - an include per request is
     // not free on a network filesystem.
-    $framework      = @include(BASE_PATH . "/config/framework.php") ?: [];
-
+    #
     # Config::framework() included this same file a second time for its own
     # cache; hand it what was just read. With no file the global is never set and
     # Config falls back to one config file per subject.
-    if (is_array($framework) && $framework) $GLOBALS['framework_config'] = $framework;
+    if ($framework) $GLOBALS['framework_config'] = $framework;
 
     $session_config = $framework['session'] ?? (@include(BASE_PATH . "/config/session.php") ?: []);
     $redis_config   = ($session_config['driver'] ?? 'file') === 'redis'
@@ -89,7 +95,7 @@ $GLOBALS['databases'] = [
     'connections' => include(BASE_PATH . '/database/connections.php') #db connections strings
 ];
 
-if (!isset($cron_mode) && ($app_config['force-https'] ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off")) die(header('Location: https://' . ($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'])));
+if (!isset($cron_mode) && ($framework['force-https'] ?? $app_config['force-https'] ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off")) die(header('Location: https://' . ($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'])));
 
 include(FRAMEWORK_PATH . '/vendor/autoload.php');
 include(FRAMEWORK_PATH . '/run.php');

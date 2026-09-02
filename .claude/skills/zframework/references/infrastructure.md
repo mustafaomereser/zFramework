@@ -454,7 +454,7 @@ sampling fraction) and `profiling.queryStore`:
 - `'table'` → rows in `system_db_collector`; run `php terminal db migrate` first, and note that it
   writes into the same database it is measuring.
 
-Requires `app.debug`, so production is unaffected either way. **An analysed query is executed a
+Requires `debug`, so production is unaffected either way. **An analysed query is executed a
 second time to measure it** — it costs roughly twice what it reports.
 
 Per-query alternative, no config needed: `$model->sqlDebug(true)`.
@@ -568,7 +568,8 @@ php terminal bench run                              # boot + request cost on thi
   code with `token_get_all()`.
 - **Never echo what `errorHandler()` returns** — it has printed already where printing was
   right. Correct form: `errorHandler($err); die;`
-- **What the caller gets, with `app.debug` on:** a browser gets the page; a client that sends
+- **What the caller gets, with `debug` on (`Config::debug()` - `framework.debug`, or `app.debug`
+  if not moved):** a browser gets the page; a client that sends
   `X-Requested-With` or `Accept: application/json` (`Http::wantsJson()`) gets JSON with the
   chain, frames, arguments and queries; the cli gets coloured text. **With debug off** every
   shape is a 500 with one sentence, and the HTML report still goes to disk. The status is 500
@@ -595,7 +596,7 @@ php terminal bench run                              # boot + request cost on thi
   `DB::prepare()` and its SQL. The **Arguments** tab lists every call that had arguments,
   grouped by area (Application, a module, View, Database, Validation, Auth & Session,
   Mail & Queue, Routing, Framework, Vendor). **User** is the row `Auth::user()` answers.
-- **`DB::$queryLog`** — while `app.debug` is on, every query of the request with bindings,
+- **`DB::$queryLog`** — while `debug` is on, every query of the request with bindings,
   duration, connection and the driver's message when it failed (capped at 500). Read it
   yourself if useful; it is cleared per request. Production pays one boolean per query.
 - `config/framework.php` → `error.logging` writes the report under `error_logs/` as

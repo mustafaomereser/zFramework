@@ -29,7 +29,7 @@ function errorHandlerRender($data): string
     while (ob_get_level()) @ob_end_clean();
 
     $report = Report::build($data);
-    $debug  = (bool) Config::get('app.debug');
+    $debug  = Config::debug();
     $render = fn(string $format) => include __DIR__ . "/render/$format.php";
 
     # A failed request is a 500 whatever it was going to be - a browser, a

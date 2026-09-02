@@ -20,7 +20,7 @@ resource/views/
     modals/<name>.php
   errors/<app>/main.php
   errors/<app>/404.php
-  layouts/pagination/default.php  overridable via config/app.php
+  layouts/pagination/default.php  overridable via framework.pagination.default-view
 ```
 
 Real files following it: `resource/views/app/main.php`,
@@ -283,7 +283,7 @@ walks back to the nearest marker and counts on from it, and the error page uses 
 `resource/views/app/partials/nav.php:3` rather than line 66 of a cache file - through
 `@extends`, `@include`, a partial inside a partial, and a `@section` yielded into a layout.
 
-**A debug compile does not minify.** Folded lines cannot be mapped, so with `app.debug` on the
+**A debug compile does not minify.** Folded lines cannot be mapped, so with `debug` on the
 compiled text keeps the template's line breaks (`view.minify` is honoured only when debug is
 off). A cache compiled in debug therefore serves unminified until it is rebuilt - clear it on
 deploy as always. `{{-- --}}` comments spanning lines leave their line breaks behind for the
@@ -325,6 +325,6 @@ Binds re-run on every request even when the compiled cache hits (`View.php:78-88
 `paginate()` returns `['items' => [...], 'links' => callable, ...]`. In the template:
 
 ```php
-<?= $posts['links']() ?>                        <!-- config/app.php: layouts.pagination.default -->
+<?= $posts['links']() ?>                        <!-- framework.php: pagination.default-view -->
 <?= $posts['links']('app.layouts.pagination') ?> <!-- per-call override -->
 ```
