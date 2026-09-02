@@ -34,6 +34,21 @@ findings.
   gone, on every screen. A response with a body (an `abort()` page, a download) is
   cleared as before, because it did get its chance to render them.
 - **Rows are arrays.** `$row->col` does not work — it yields `null` plus a warning.
+- **A query consumes the builder.** `prepare()` ends in `reset()`, so every `where`, `limit` and
+  `orderBy` is gone the moment a query runs — by design, so one model instance can be reused.
+  What bites is asking the same builder a second time:
+
+  ```php
+  $q     = (new Post)->where('user_id', Auth::id());
+  $total = $q->count();               // runs, and clears the where
+  $items = $q->limit(0, 20)->get();   // every user's posts
+  ```
+
+  Nothing errors and the count is right, so the wrong list looks correct. `paginate()` is safe —
+  it snapshots `buildQuery` and puts it back. Everywhere else, either build the second query from
+  scratch or take the row and use the closures it carries: `$row['update']($sets)`,
+  `$row['delete']()`, which re-establish `where(primary, id)` themselves. That is what
+  `updateOrInsert()` and `toggleAttach()` do now; before, they wrote to the whole table.
 - **`@include` is inlined, so `return` in a partial kills the rest of the page.** The compiler
   merges every partial into one compiled file, so a guard clause like
   `if (!$show) return;` at the top of an included view aborts the *parent* view too — the table
