@@ -4,11 +4,6 @@ if (isset($_GET['crypt-key-create'])) {
     refresh();
 }
 ?>
-
-<div class="error-type">⚠️ Her proje için benzersiz bir şifreleme anahtarı oluşturmanız gerekir.</div>
-<div class="error-description">
-    <a href="<?= host() . uri() ?>?crypt-key-create=true" class="ide-button">Şifreleme Dosyasını Oluştur</a>
-    <div style="margin-top: 10px">
-        Eğer buton işe yaramıyor ise, Terminalde Komut şudur: <kbd>php terminal security key --regen</kbd>
-    </div>
-</div>
+<p>Every installation needs its own encryption key, and this one has none yet.</p>
+<p style="margin:8px 0 0"><a href="<?= host() . uri() ?>?crypt-key-create=true" class="btn">Generate the key now</a>
+<span style="margin-left:10px;color:var(--fg-3)">or run <code>php terminal security key --regen</code></span></p>

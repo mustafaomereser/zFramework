@@ -86,6 +86,42 @@ return [
     ],
 
     /**
+     * Errors.
+     *
+     * logging    Write each report as a self-contained HTML page under error_logs/.
+     * keep_days  How long one is kept. Each is a whole rendered page and nothing
+     *            used to remove them, so a site failing quietly for a year kept a
+     *            year of them. The sweep runs only on a request that already failed,
+     *            at most once an hour. 0 keeps everything.
+     * stream     Also send a one-line summary to a stream a log collector can read:
+     *            false | 'error_log' | 'stderr' | 'syslog'. Worth turning on as soon
+     *            as there is more than one app server - the HTML files only help
+     *            when you know which machine to look at.
+     * mask       Extra key names whose values the report never shows, on top of the
+     *            built-in list (password, secret, token, auth, csrf, cookie ...).
+     *            Matched case-insensitively as a substring of the key, everywhere:
+     *            request data, session, headers, $_SERVER, frame arguments.
+     * previous   How many earlier reports the page links to. 0 for none.
+     * callback   Runs after a report is written, with its path and the HTML.
+     *
+     * The page itself is shown only while app.debug is on; a visitor gets a plain
+     * 500 otherwise, and the report still goes to disk.
+     */
+    'error' => [
+        'logging'   => true,
+        'keep_days' => 14,
+        'stream'    => false,
+        'mask'      => [],
+        'previous'  => 10,
+
+        'callback' => function ($log_path, $log) {
+            # ZF_WORKER: a long-running HTTP worker also runs under the CLI SAPI, and
+            # die() there would kill the worker rather than end the request.
+            if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) die(zFramework\Kernel\Terminal::text("[color=red]-> report written to[/color][color=green] $log_path [/color]"));
+        },
+    ],
+
+    /**
      * Addresses allowed to speak for someone else.
      *
      * ip() answers with REMOTE_ADDR - the address the connection actually came

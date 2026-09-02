@@ -96,7 +96,13 @@ register_shutdown_function(function () {
     }
 
     try {
-        $stream = class_exists(\zFramework\Core\Facades\Config::class, false) ? \zFramework\Core\Facades\Config::get('app.error.stream') : 'error_log';
+        # framework.error first, app.error for an application that has not moved it.
+        $stream = 'error_log';
+        if (class_exists(\zFramework\Core\Facades\Config::class, false)) {
+            $stream = \zFramework\Core\Facades\Config::framework('error.stream');
+            if ($stream === null) $stream = \zFramework\Core\Facades\Config::get('app.error.stream');
+            if (is_array($stream)) $stream = 'error_log';
+        }
 
         match ($stream ?: 'error_log') {
             'syslog' => syslog(LOG_ERR, $summary),

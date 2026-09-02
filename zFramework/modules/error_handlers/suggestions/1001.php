@@ -4,18 +4,12 @@ if (isset($_GET['migrate-it'])) {
     \zFramework\Kernel\Terminal::begin('db migrate' . (isset($_GET['all']) ? ' --all --force' : ''));
     refresh();
 }
+
+$here = method() == 'GET' ? host() . uri() : null;
 ?>
-
-<div class="error-type">⚠️ Tablo veritabanında bulunmuyor gibi görünüyor eğer migrasyon dosyanız var ise migrasyon almanız işe yarayabilir.</div>
-<div class="error-description">
-    <div style="margin-bottom: 10px;">
-        Migrasyon almak için butona basabilirsiniz: <a href="<?= method() == 'GET' ? host() . uri() : null ?>?migrate-it=true" class="ide-button"><kbd>php terminal db migrate</kbd></a>
-    </div>
-    <div style="margin-bottom: 10px;">
-        Eğer sorun hala devam ediyorsa <a href="<?= method() == 'GET' ? host() . uri() : null  ?>?migrate-it=true&all=true" class="ide-button"><kbd>php terminal db migrate --all --force</kbd></a> seçeneğini kullanabilirsiniz.
-    </div>
-
-    <div>
-        Eğer butonlar çalışmıyorsa buton içindeki komut isteğini KOMUT İSTEMİ üzerinden çalıştırabilirsiniz.
-    </div>
-</div>
+<p>The table is not in the database. If a migration for it exists, running it is usually the whole fix.</p>
+<p style="margin:8px 0 0">
+    <a href="<?= $here ?>?migrate-it=true" class="btn">php terminal db migrate</a>
+    <a href="<?= $here ?>?migrate-it=true&amp;all=true" class="btn" style="margin-left:6px">db migrate --all --force</a>
+    <span style="margin-left:10px;color:var(--fg-3)">or run either from a terminal</span>
+</p>

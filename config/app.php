@@ -3,30 +3,8 @@
 return [
     'debug'       => true, # turn false on production.
 
-    # 'analyze' moved to config/framework.php - it belongs with the other
-    # framework behaviour, and is still read from here if you have not moved it.
-
-    'error'       => [
-        'logging'  => true,
-
-        # How long a report under error_logs/ is kept, in days. Each one is a whole
-        # rendered page and nothing used to remove them, so a site that had been
-        # failing quietly for a year kept a year of them. The sweep runs only on a
-        # request that already failed, and at most once an hour. 0 keeps everything.
-        'keep_days' => 14,
-
-        # Also send a one-line summary to a stream a log collector can read.
-        # false | 'error_log' | 'stderr' | 'syslog'. Worth turning on as soon as
-        # there is more than one app server - the HTML files under error_logs/
-        # only help when you know which machine to look at.
-        'stream'   => false,
-
-        'callback' => function ($log_path, $log) {
-            # ZF_WORKER: a long-running HTTP worker also runs under the CLI SAPI, and
-            # die() there would kill the worker rather than end the request.
-            if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) die(zFramework\Kernel\Terminal::text("[color=red]-> unexcepted terminal error[/color][color=green] $log_path [/color]"));
-        }
-    ],
+    # 'analyze' and 'error' moved to config/framework.php - they belong with the
+    # other framework behaviour, and are still read from here if you have not moved them.
 
     'force-https'      => false, # force redirect https.
     'x-powered-by'     => true,  # set false to hide X-Powered-By response header.
