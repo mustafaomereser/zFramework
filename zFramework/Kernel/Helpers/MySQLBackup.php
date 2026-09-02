@@ -66,14 +66,17 @@ class MySQLBackup
 
     private function save()
     {
+        # Before $output is built, not after. These append to $this->sql, and the
+        # array was already copied out by then - so every backup ever taken held the
+        # tables and none of the triggers, functions or procedures, without saying so.
+        $this->dumpTriggers();
+        $this->dumpFunctions();
+        $this->dumpProcedures();
+
         $output = [];
         foreach ($this->sql as $table_name => $sql) @$output[$this->config['separate'] ? $this->dbname . "." . $table_name : $this->dbname] .= $sql;
 
         if (!count($output)) return Terminal::text("[color=dark-gray]-> $this->dbname is empty.[/color]");
-
-        $this->dumpTriggers();
-        $this->dumpFunctions();
-        $this->dumpProcedures();
 
         $write = false;
         foreach ($output as $key => $sql) {
