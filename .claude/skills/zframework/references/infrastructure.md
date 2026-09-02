@@ -285,12 +285,21 @@ should not share a tick with anything else.
 > who can read the code.
 
 ```bash
-php terminal update --check       # is a newer version out
-php terminal update               # update the core, report config drift
-php terminal update --config      # also write the merged config files
-php terminal update --rollback    # restore the last backup
-php terminal update --force       # update even when the versions match
+php terminal update --check                  # list the branches; is a newer version out
+php terminal update                          # list the branches, ask which, install; report config drift
+php terminal update --branch=main            # install main (development) - or v3.0.0-release / 3.0.0
+php terminal update --config                 # also write the merged config files
+php terminal update --rollback               # restore the last backup
+php terminal update --force                  # same version again, or an older release
 ```
+
+Releases are branches named `vX.Y.Z-release`; `main` is development. `--branch` is required
+where nobody can be asked (the welcome page's terminal). A downgrade needs `--force`.
+
+**Config merge follows a key that moved between files.** A key no longer shipped in one file
+and new in another is written to the new place with the application's value, closures
+included - a value is the whole expression up to the comma, not its first token. What is
+still left to a human: a container where both sides added keys (reported as `!`).
 
 The archive carries a whole project, so most of it is the application. Only the core is
 replaced: `bootstrap.php`, `run.php`, `Core/`, `Kernel/`, `modules/`.

@@ -112,11 +112,35 @@ class ConfigMerge
                 continue;
             }
 
+            # The whole expression, not its first token. A value is whatever sits
+            # between the arrow and the comma that ends it at this depth: `-1` is two
+            # tokens, `60 * 60` five, `BASE_PATH . '/x'` three, and a closure is a
+            # body full of them. Taking the first alone wrote `'gc' => -,` for -1,
+            # `60` for an hour, and the shipped closure over a customised one - and
+            # then walked into the closure's body and read its array literals as
+            # config keys. The tokens of the value are stepped over afterwards.
+            $end  = $value;
+            $nest = 0;
+            for ($j = $value; $j < $count; $j++) {
+                $t  = $tokens[$j];
+                $ch = is_array($t) ? null : $t;
+
+                if ($ch === '(' || $ch === '[' || $ch === '{' || (is_array($t) && in_array($t[0], [T_CURLY_OPEN, T_DOLLAR_OPEN_CURLY_BRACES], true))) $nest++;
+                elseif ($ch === ')' || $ch === ']' || $ch === '}') {
+                    if ($nest === 0) break;
+                    $nest--;
+                } elseif ($ch === ',' && $nest === 0) break;
+
+                if (!(is_array($t) && in_array($t[0], $skip, true))) $end = $j;
+            }
+
             $found[self::path($stack, $depth, $key)] = [
                 'type'   => 'scalar',
                 'offset' => $offsets[$value],
-                'length' => strlen(is_array($tokens[$value]) ? $tokens[$value][1] : $tokens[$value]),
+                'length' => $offsets[$end] + strlen(is_array($tokens[$end]) ? $tokens[$end][1] : $tokens[$end]) - $offsets[$value],
             ];
+
+            $i = $end;
         }
 
         return $found;

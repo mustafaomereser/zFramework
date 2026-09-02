@@ -1936,8 +1936,9 @@ php terminal schedule run                 # everything due this minute
 php terminal schedule list
 
 # Updating the framework
-php terminal update --check               # is there a newer version
-php terminal update                       # update the core; reports config drift
+php terminal update --check               # list the branches; is there a newer version
+php terminal update                       # choose a branch, install it; reports config drift
+php terminal update --branch=main         # or --branch=v3.0.0-release; --branch=3.0.0 works too
 php terminal update --config              # also write the merged config files
 php terminal update --rollback            # restore the last backup
 
@@ -2070,12 +2071,20 @@ something you do not want sharing a tick with anything else.
 ### 14.3. Updating the Framework
 
 ```bash
-php terminal update --check       # is a newer version out
-php terminal update               # update the core, report what config would change
-php terminal update --config      # also write the merged config files
-php terminal update --rollback    # restore the last backup
-php terminal update --force       # update even when the versions match
+php terminal update --check                  # list the branches; is a newer version out
+php terminal update                          # list the branches, ask which, install it; report config drift
+php terminal update --branch=main            # install main as it stands (development)
+php terminal update --branch=v3.0.0-release  # install a release; --branch=3.0.0 is the same
+php terminal update --config                 # also write the merged config files
+php terminal update --rollback               # restore the last backup
+php terminal update --force                  # install the same version again, or an older one
 ```
+
+Every release is a branch, `vX.Y.Z-release`, and `main` is what is being worked on. Without
+`--branch` the branches are listed - newest first, the installed one marked - and asked
+for; from the welcome page's terminal there is nobody to ask, so `--branch` is required
+there. Going to an older release is allowed, since that is what the branches are for, but
+only with `--force`.
 
 **What is replaced, and what is not.** The repository archive carries a whole project — `App/`,
 `config/`, `route/`, `resource/`, `public_html/` — and all of that is your application. Only
@@ -2121,10 +2130,15 @@ The last row is the honest one: no merge can resolve it, so it says so rather th
 Nothing is written without `--config`, and the file it replaces is kept as
 `<name>.php.before-update`.
 
-**What it cannot do** is follow a setting that moved to another file — a `view` key
-becoming `framework.php['view']`. Only the change's author knows where it went; the framework
-handles that case with a runtime fallback in `Config::framework()` instead, so the old file
-keeps working.
+**A setting that moved to another file follows.** When a key stops being shipped in one
+file and starts in another — `error`, `debug` and the rest went from `app.php` to
+`framework.php` in 3.2 — the value the application had is written into the new place
+(`moved error.stream from app.php, kept your 'syslog'`) rather than the shipped default.
+That covers a customised closure too: a value is the whole expression between the arrow
+and the comma, so `-1`, `60 * 60 * 24`, `BASE_PATH . '/x'` and a closure body all come
+through whole. Verified on a 3.1.2 checkout updated to 3.2.0 with `error.logging`,
+`error.stream` and a custom `error.callback` set: all three landed in `framework.php`
+unchanged, and `--rollback` put 3.1.2 back.
 
 **After updating**, run `composer install` if it said so, and re-check anything the config
 report flagged. If something is wrong, `php terminal update --rollback` puts the previous core
