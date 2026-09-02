@@ -103,7 +103,10 @@ class mysql
      * Get limits
      * @return null|string
      */
-    private function getLimit(): null|string
+    # protected, not private: sqlsrv overrides this and a private method is not
+    # polymorphic - build() below resolved to this one whatever the driver was, so
+    # sqlsrv shipped MySQL LIMIT syntax to SQL Server and every limited query failed.
+    protected function getLimit(): null|string
     {
         $limit = @$this->parent->buildQuery['limit'];
         return $limit ? " LIMIT " . ($limit[0] . ($limit[1] ? ", " . $limit[1] : null)) : null;

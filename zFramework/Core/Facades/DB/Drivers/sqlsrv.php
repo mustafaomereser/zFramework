@@ -43,9 +43,18 @@ class sqlsrv extends mysql
      * Get limits
      * @return null|string
      */
-    private function getLimit(): null|string
+    protected function getLimit(): null|string
     {
         $limit = @$this->parent->buildQuery['limit'];
-        return $limit ? " OFFSET " . (!$limit[1] ? $limit[0] : 0) . " ROWS FETCH NEXT " . ($limit[1] ? $limit[1] : $limit[0]) . " ROWS ONLY" : null;
+        if (!$limit) return null;
+
+        # limit(a) means "take a"; limit(a, b) means "skip a, take b" - the same
+        # reading mysql gives them. The two were the wrong way round here: an offset
+        # was dropped whenever one was asked for, and invented when it was not, so
+        # paginate() served page one forever. Hidden until now behind the private
+        # parent above, which meant this method never ran.
+        [$offset, $count] = $limit[1] ? [$limit[0], $limit[1]] : [0, $limit[0]];
+
+        return " OFFSET " . (int) $offset . " ROWS FETCH NEXT " . (int) $count . " ROWS ONLY";
     }
 }
