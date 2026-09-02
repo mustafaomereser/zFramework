@@ -18,7 +18,9 @@ class Db
     {
         if (!in_array(@Terminal::$commands[1], $methods)) return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
 
-        self::connectDB(Terminal::$parameters['db'] ?? array_keys($GLOBALS['databases']['connections'])[0]);
+        # --db is what the docblocks advertise and what parseCommands() stores, dashes
+        # and all; the bare key is kept so anything already typed that way still works.
+        self::connectDB(Terminal::$parameters['--db'] ?? Terminal::$parameters['db'] ?? array_keys($GLOBALS['databases']['connections'])[0]);
         self::$all_modules = array_column(Run::findModules(base_path('/modules'))::$modules, 'module');
         self::{Terminal::$commands[1]}();
     }

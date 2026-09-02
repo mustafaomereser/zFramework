@@ -142,7 +142,7 @@ class Make
             (!self::$save_status ? 'Database' : self::$save) . '\Migrations',
             str_replace(
                 ['{table}', '{dbname}'],
-                [(Terminal::$parameters['table'] ?? self::parseName()['table_name']), (Terminal::$parameters['dbname'] ?? array_keys($GLOBALS['databases']['connections'])[0])],
+                [(Terminal::$parameters['--table'] ?? Terminal::$parameters['table'] ?? self::parseName()['table_name']), (Terminal::$parameters['--dbname'] ?? Terminal::$parameters['dbname'] ?? array_keys($GLOBALS['databases']['connections'])[0])],
                 $make
             )
         );
@@ -169,7 +169,7 @@ class Make
             self::$save . '\Models',
             str_replace(
                 ['{table}'],
-                [(Terminal::$parameters['table'] ?? self::parseName()['table_name'])],
+                [(Terminal::$parameters['--table'] ?? Terminal::$parameters['table'] ?? self::parseName()['table_name'])],
                 $make
             )
         );
