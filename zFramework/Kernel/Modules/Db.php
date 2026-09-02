@@ -64,7 +64,7 @@ class Db
 
     /**
      * Description: Migrate database
-     * Usage: php kernel db migrate [--fresh] [--force] [--seed] [--all] [--module=blog] [--db=default] [--path=sub]
+     * Usage: php terminal db migrate [--fresh] [--force] [--seed] [--all] [--module=blog] [--db=default] [--path=sub]
      * @param --fresh            (optional) drop all tables and re-migrate
      * @param --force            (optional) force migration even if unchanged
      * @param --seed             (optional) run seeders after migrate
@@ -454,7 +454,7 @@ class Db
 
     /**
      * Description: Run database seeders
-     * Usage: php kernel db seed [--db=default]
+     * Usage: php terminal db seed [--db=default]
      * @param --db={key}  (optional) db connection key, defaults to first
      */
     public static function seed()
@@ -472,7 +472,7 @@ class Db
 
     /**
      * Description: Backup database to file
-     * Usage: php kernel db backup [--compress] [--separate]
+     * Usage: php terminal db backup [--compress] [--separate]
      * @param --compress  (optional) gzip compress the backup file
      * @param --separate  (optional) save each table as a separate file
      */
@@ -490,7 +490,7 @@ class Db
 
     /**
      * Description: Restore a database backup (interactive)
-     * Usage: php kernel db restore [--db=default]
+     * Usage: php terminal db restore [--db=default]
      * @param --db={key}  (optional) db connection key, defaults to first
      */
     /**

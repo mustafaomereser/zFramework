@@ -26,7 +26,7 @@ class Release
 
     /**
      * Description: Make a release zip of changed files.
-     * Usage: php kernel release make [--name=default] [--date=2024-01-01] [--minify]
+     * Usage: php terminal release make [--name=default] [--date=2024-01-01] [--minify]
      * @param --name={profile} (optional) release profile name, default: default
      * @param --date={Y-m-d}   (optional) include files modified after this date
      * @param --minify         (optional) minify css and js files in the zip

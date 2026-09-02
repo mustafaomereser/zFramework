@@ -96,7 +96,7 @@ class Make
 
     /**
      * Description: Create a Request class
-     * Usage: php kernel make request StoreUserRequest [--module=blog]
+     * Usage: php terminal make request StoreUserRequest [--module=blog]
      * @param {name}           (third argument)
      * @param --module={name}  (optional)
      */
@@ -107,7 +107,7 @@ class Make
 
     /**
      * Description: Create a Controller class
-     * Usage: php kernel make controller UserController [--resource] [--module=blog]
+     * Usage: php terminal make controller UserController [--resource] [--module=blog]
      * @param {name}           (third argument)
      * @param --resource       (optional) generate resource methods
      * @param --module={name}  (optional)
@@ -119,7 +119,7 @@ class Make
 
     /**
      * Description: Create a Middleware class
-     * Usage: php kernel make middleware AuthMiddleware [--module=blog]
+     * Usage: php terminal make middleware AuthMiddleware [--module=blog]
      * @param {name}           (third argument)
      * @param --module={name}  (optional)
      */
@@ -130,7 +130,7 @@ class Make
 
     /**
      * Description: Create a Migration file
-     * Usage: php kernel make migration CreateUsersTable [--table=users] [--dbname=default] [--module=blog]
+     * Usage: php terminal make migration CreateUsersTable [--table=users] [--dbname=default] [--module=blog]
      * @param {name}             (third argument)
      * @param --table={table}    (optional) defaults to snake_case of name
      * @param --dbname={key}     (optional) defaults to first db connection
@@ -158,7 +158,7 @@ class Make
 
     /**
      * Description: Create a Model class
-     * Usage: php kernel make model User [--table=users] [--module=blog]
+     * Usage: php terminal make model User [--table=users] [--module=blog]
      * @param {name}           (third argument)
      * @param --table={table}  (optional) defaults to snake_case of name
      * @param --module={name}  (optional)
@@ -183,7 +183,7 @@ class Make
 
     /**
      * Description: Create a Seeder class
-     * Usage: php kernel make seeder UserSeeder
+     * Usage: php terminal make seeder UserSeeder
      * @param {name}  (third argument)
      */
     public static function seeder($make)
@@ -193,7 +193,7 @@ class Make
 
     /**
      * Description: Create an Observer class
-     * Usage: php kernel make observer UserObserver [--module=blog]
+     * Usage: php terminal make observer UserObserver [--module=blog]
      * @param {name}           (third argument)
      * @param --module={name}  (optional)
      */

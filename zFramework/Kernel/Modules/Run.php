@@ -8,8 +8,8 @@ class Run
 {
     /**
      * Run the project.
-     * Usage: php kernel run [--host=0.0.0.0] [--port=8080]
-     * Usage: php kernel run roadrunner [serve|reset|workers|stop]
+     * Usage: php terminal run [--host=0.0.0.0] [--port=8080]
+     * Usage: php terminal run roadrunner [serve|reset|workers|stop]
      * @param roadrunner (optional) run under RoadRunner instead of the dev server
      * @param --host (optional)
      * @param --port (optional)

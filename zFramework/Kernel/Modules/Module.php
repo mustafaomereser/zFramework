@@ -27,7 +27,7 @@ class Module
 
     /**
      * Description: Create a module
-     * Usage: php kernel module create {module_name}
+     * Usage: php terminal module create {module_name}
      * @param {module_name} (second argument)
      */
     public static function create($name)
