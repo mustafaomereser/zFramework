@@ -467,7 +467,9 @@ that do not profile. Do not remove that guard.
 
 ## RoadRunner / long-running workers
 
-Config `.rr.yaml`, worker `zFramework/Kernel/worker.php`, which defines `ZF_WORKER`.
+Config `.rr.yaml`, worker `zFramework/Kernel/worker.php`, which defines `ZF_WORKER`. So does
+`php terminal queue work`: the constant means "this process outlives one unit of work", not
+"this is the HTTP worker".
 
 ```bash
 php terminal run roadrunner          # serve
@@ -546,6 +548,8 @@ php terminal bench run                              # boot + request cost on thi
   (`false` | `'error_log'` | `'stderr'` | `'syslog'`) also emits a one-line summary, which is what
   you want as soon as more than one machine serves the site.
 - `error.callback` receives `($log_path, $log)`. The shipped one dies on CLI **unless `ZF_WORKER`
-  is defined** — dying in a worker would kill the worker rather than end the request.
+  is defined** — dying in a long-running process would kill it rather than end one unit of work.
+  `worker.php` and `php terminal queue work` both define it. If you write your own callback and
+  it can exit, guard it the same way.
 - Suggestion files map driver error codes to advice:
   `zFramework/modules/error_handlers/suggestions/<code>.php` (1000, 1001, 42S02 exist).

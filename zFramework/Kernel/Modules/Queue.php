@@ -24,6 +24,11 @@ class Queue
      */
     public static function work()
     {
+        # The callback config/app.php ships dies on CLI unless this is defined, and this
+        # loop is the case it means: a process that outlives one unit of work. Without
+        # it the first job to exhaust its tries takes the worker down with it.
+        if (!defined('ZF_WORKER')) define('ZF_WORKER', true);
+
         $queue = @Terminal::$commands[2] ?: QueueFacade::DEFAULT_QUEUE;
         $once  = in_array('--once', Terminal::$parameters);
         $tries = (int) (Terminal::$parameters['--tries'] ?? 3);
@@ -52,7 +57,15 @@ class Queue
             } catch (\Throwable $e) {
                 $requeued = QueueFacade::retry($entry, $tries);
                 Terminal::text("[color=red]-> $label failed: " . $e->getMessage() . "[/color]" . ($requeued ? " [color=yellow](requeued)[/color]" : " [color=red](dropped after $tries attempts)[/color]"), true);
-                if (function_exists('errorHandler') && !$requeued) errorHandler($e);
+                # errorHandler() logs and then aborts, and the abort throws. There is no
+                # request to end here, so the signal would only unwind out of the loop and
+                # leave the queue unattended. The log is written before it arrives.
+                if (function_exists('errorHandler') && !$requeued) {
+                    try {
+                        errorHandler($e);
+                    } catch (\zFramework\Core\ResponseSignal) {
+                    }
+                }
             }
 
             if ($once) return;

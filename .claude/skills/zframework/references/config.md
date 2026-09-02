@@ -16,6 +16,7 @@ commit it, never hand-write it.
     'logging'  => true,      // HTML reports under error_logs/
     'stream'   => false,     // false | 'error_log' | 'stderr' | 'syslog' — one-line summary
     'callback' => fn($log_path, $log) => ...,   // dies on CLI unless ZF_WORKER is defined
+                                                //   (worker.php and `queue work` both define it)
 ],
 'force-https'  => false,     // redirect http → https
 'x-powered-by' => true,      // false hides the response header
