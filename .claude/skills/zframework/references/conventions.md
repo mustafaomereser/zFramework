@@ -46,9 +46,10 @@ findings.
   as a Closure and `json_decode` on it silently produced `[]`, i.e. all JSON fields vanished.
   Name helpers so they cannot collide (`field()`, `config()`, `langCode()`), or read with
   `closureMode(false)`.
-- **`Str::slug()` keeps Latin only.** An Arabic or Cyrillic title reduces to the divider alone
-  (`"-"`), and `Str::slug($t) ?: 'fallback'` does *not* catch it because `"-"` is truthy. Strip
-  the dividers before testing, and keep `\p{L}` if you want non-Latin slugs.
+- **`Str::slug()` keeps Latin only.** An Arabic or Cyrillic title reduces to an empty string, so
+  `Str::slug($t) ?: 'fallback'` does catch it. Add `\p{L}` to the character class if you want
+  non-Latin slugs. Every run of non-alphanumerics collapses to one divider and the divider is
+  trimmed off both ends, so `"naber - selam"` is `naber-selam` and `"  Merhaba!  "` is `merhaba`.
 - **`Route` matches the raw `REQUEST_URI`.** Route parameters arrive percent-encoded, so a
   non-ASCII slug has to be `rawurldecode()`d before it is compared with a database value.
 - **`json_encode($row)`** writes relation closures as `{}`. Use `closureMode(false)` or
