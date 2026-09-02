@@ -659,11 +659,15 @@ trait RelationShips
      */
     public function toggleAttach(string $pivotTable, string $foreignKey, string $foreignValue, string $relatedKey, string $relatedValue, array $extra = [])
     {
-        $db = (new \zFramework\Core\Facades\DB)->table($pivotTable)
+        $row = (new \zFramework\Core\Facades\DB)->table($pivotTable)
             ->where($foreignKey, $foreignValue)
-            ->where($relatedKey, $relatedValue);
+            ->where($relatedKey, $relatedValue)
+            ->first();
 
-        if ($db->count() > 0) return $db->delete();
+        # Not count() then delete() on the same builder: the count runs a query and
+        # prepare() ends in reset(), so the delete lost both conditions and emptied
+        # the pivot table. The row deletes itself by primary key.
+        if (count($row)) return $row['delete']();
 
         return $this->attach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue, $extra);
     }

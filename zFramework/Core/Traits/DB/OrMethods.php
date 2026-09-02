@@ -29,10 +29,14 @@ trait OrMethods
      */
     public function updateOrInsert(array $sets = [])
     {
-        $find = $this->first();
-        if (count($find)) $process = $this->update($sets);
-        else $process = $this->insert($sets);
-        return $process;
+        $row = $this->first();
+
+        # Not $this->update(): first() ran a query and prepare() ends in reset(), so the
+        # where that found the row is already gone and the update would rewrite the
+        # whole table. The row carries its own update closure, keyed on the primary.
+        if (count($row)) return $row['update']($sets);
+
+        return $this->insert($sets);
     }
 
     /**
