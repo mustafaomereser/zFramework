@@ -587,8 +587,14 @@ php terminal bench run                              # boot + request cost on thi
 - **Template frames name the template.** A frame in `eval()`'d code or a `*.compiled.php` file
   is mapped through `View::sourceOf()` to the `resource/views/...` file and line it came from,
   and "Open in editor" opens that. See `views.md` → "Errors point at the template".
-- **Frames are tagged by prefix:** APP, VIEW, FRAMEWORK (`zFramework/`), VENDOR
-  (`zFramework/vendor/`). The first APP or VIEW frame opens by default; `f` hides the rest.
+- **Frames are tagged by prefix:** app, view, framework (`zFramework/`, and the entry point),
+  vendor (`zFramework/vendor/`). The first app or view frame opens by default; "app only"
+  (on unless switched off, remembered) hides the rest. Each frame shows the function running
+  in it with its arguments as name · type · value; an internal function that threw
+  (`PDOStatement::execute()`) is a note on the frame, and the frame carries the caller -
+  `DB::prepare()` and its SQL. The **Arguments** tab lists every call that had arguments,
+  grouped by area (Application, a module, View, Database, Validation, Auth & Session,
+  Mail & Queue, Routing, Framework, Vendor). **User** is the row `Auth::user()` answers.
 - **`DB::$queryLog`** — while `app.debug` is on, every query of the request with bindings,
   duration, connection and the driver's message when it failed (capped at 500). Read it
   yourself if useful; it is cleared per request. Production pays one boolean per query.

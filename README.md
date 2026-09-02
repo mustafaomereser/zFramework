@@ -2447,12 +2447,14 @@ page, it turns off three things that are expensive or unsafe on production:
 
 With `debug` on, an uncaught throwable renders a page: the exception class and its
 `getPrevious()` chain, every frame with the function running in it and that function's
-arguments (named by reflection), the code around each frame coloured by PHP's own lexer,
+arguments (name, type and value, named by reflection - and all of them together on an
+Arguments tab, grouped by area), the code around each frame coloured by PHP's own lexer,
 request / headers / cookies / session / matched route / middlewares, every query the
 request ran with bindings and timing (the failed one marked), memory and elapsed time, and
 links to the previous reports. A frame inside a template names the template file and line
-it came from, not the compiled cache, and "Open in editor" opens that. `j`/`k` move
-between frames, `o` opens the editor, `f` hides framework frames, `t` flips the theme.
+it came from, not the compiled cache, and "Open in editor" opens that. Framework frames
+start hidden ("app only"); `j`/`k` move between frames, `o` opens the editor, `f` shows or
+hides the framework's, `t` flips the theme.
 
 A client that asks for JSON (`X-Requested-With`, or `Accept: application/json`) gets the
 same report as JSON; the terminal gets it as text. **With `debug` off** every shape is a

@@ -9,6 +9,9 @@
 return function (array $report, bool $colour = false): string {
     $c = fn(string $code, string $text) => $colour ? "\033[{$code}m{$text}\033[0m" : $text;
 
+    $base = defined('BASE_PATH') ? str_replace('\\', '/', BASE_PATH) . '/' : null;
+    $rel  = fn(string $path) => $base && str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
+
     $out   = [];
     $req   = $report['request'];
     $env   = $report['env'];
@@ -20,7 +23,7 @@ return function (array $report, bool $colour = false): string {
 
         foreach ($ex['frames'] as $f) {
             $tag   = str_pad(strtoupper($f['kind']), 9);
-            $where = $f['file'] . ':' . $f['line'];
+            $where = $rel($f['file']) . ':' . $f['line'];
             $args  = [];
             foreach ($f['args'] as $name => $arg) $args[] = $name . ' = ' . (is_array($arg['value']) ? json_encode($arg['value'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : var_export($arg['value'], true)) . ' ' . $c('90', $arg['type']);
             $out[] = sprintf('  %s %s %s', $c($f['kind'] === 'app' || $f['kind'] === 'view' ? '32' : '90', $tag), $c($f['kind'] === 'app' || $f['kind'] === 'view' ? '0' : '90', $where), $f['function'] ? $c('36', $f['function'] . '(' . implode(', ', $args) . ')') : '');

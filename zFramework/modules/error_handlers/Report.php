@@ -541,12 +541,15 @@ class Report
         $limit = (int) (self::setting('previous') ?? 10);
         if ($limit < 1) return [];
 
-        $files = glob(ERROR_LOG_DIR . '/*.html') ?: [];
+        # The shutdown handler writes a fatal as one line of text, not a page; it
+        # belongs in the same list, and reads its message from the line itself.
+        $files = glob(ERROR_LOG_DIR . '/*.{html,fatal.txt}', GLOB_BRACE) ?: [];
         rsort($files);
 
         $out = [];
         foreach (array_slice($files, 0, $limit) as $file) {
-            $name = basename($file, '.html');
+            $name  = preg_replace('/\.(html|fatal\.txt)$/', '', basename($file));
+            $fatal = str_ends_with($file, '.fatal.txt');
             # Y-m-d-H-i-s-hex[-Class]
             $entry = [
                 'file'    => $file,
@@ -562,7 +565,8 @@ class Report
             if ($handle = @fopen($file, 'rb')) {
                 $first = (string) fgets($handle, 8192);
                 fclose($handle);
-                if (preg_match('/^<!--zf:(.*?)-->/', $first, $m) && is_array($meta = json_decode($m[1], true))) $entry = array_merge($entry, array_intersect_key($meta, array_flip(['class', 'message', 'url'])));
+                if ($fatal && preg_match('/^\[zFramework\] FATAL (.*?) in (.*?):(\d+) \((.*)\)\s*$/', $first, $m)) $entry = array_merge($entry, ['class' => 'Fatal', 'message' => $m[1], 'url' => $m[4]]);
+                elseif (preg_match('/^<!--zf:(.*?)-->/', $first, $m) && is_array($meta = json_decode($m[1], true))) $entry = array_merge($entry, array_intersect_key($meta, array_flip(['class', 'message', 'url'])));
             }
 
             $out[] = $entry;
