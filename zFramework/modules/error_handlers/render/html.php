@@ -47,7 +47,7 @@ return (function (array $report): string {
         $out .= '<div class="code-head"><div>';
         $out .= '<div class="file">' . $h($frame['file']) . '<span class="ln">:' . $frame['line'] . '</span></div>';
         if ($frame['function']) $out .= '<div class="fn">' . $h($frame['function']) . '()</div>';
-        if ($frame['compiled']) $out .= '<div class="compiled">compiled: ' . $h(basename($frame['compiled']['file'])) . ':' . $frame['compiled']['line'] . '</div>';
+        if ($frame['compiled']) $out .= '<div class="compiled">compiled line ' . $frame['compiled']['line'] . '</div>';
         $out .= '</div>';
         $out .= '<button class="btn ide" onclick="goIDE(' . $h(json_encode($frame['file'])) . ', ' . (int) $frame['line'] . ')">↗ Open in editor</button>';
         $out .= '</div>';
@@ -169,7 +169,7 @@ return (function (array $report): string {
         <div class="panel">
             <div class="panel-head">
                 <span>Stack <span class="count"><?= count($ex['frames']) ?> frames</span></span>
-                <?php if ($ci === 0): ?><label class="switch"><input type="checkbox" id="hide-framework"> hide framework</label><?php endif ?>
+                <?php if ($ci === 0): ?><label class="switch"><input type="checkbox" id="hide-framework" checked> hide framework</label><?php endif ?>
             </div>
             <div class="frames">
                 <?php $default = $defaultFrame($ex['frames']); foreach ($ex['frames'] as $f): ?>
@@ -254,7 +254,6 @@ return (function (array $report): string {
         <option value="idea">IntelliJ</option>
         <option value="sublime">Sublime</option>
     </select>
-    <span class="keys">j/k · o · f · t</span>
 </div>
 <div class="toast" id="toast"></div>
 <pre id="as-text" hidden><?= $h($asText) ?></pre>

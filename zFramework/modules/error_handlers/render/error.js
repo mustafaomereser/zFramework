@@ -43,10 +43,11 @@
     var hide = document.getElementById('hide-framework');
     function applyHide() {
         document.querySelectorAll('.frames').forEach(function (l) { l.classList.toggle('hide-framework', hide.checked); });
-        try { localStorage.setItem('zf-error-hide', hide.checked ? '1' : '0'); } catch (e) {}
     }
-    try { hide.checked = localStorage.getItem('zf-error-hide') === '1'; } catch (e) {}
-    hide.addEventListener('change', applyHide);
+    // Checked unless it was unchecked before - the framework's own frames are the
+    // ones that are hardly ever the answer. Only a change is remembered, never the default.
+    try { var h = localStorage.getItem('zf-error-frames'); if (h !== null) hide.checked = h === 'app'; } catch (e) {}
+    hide.addEventListener('change', function () { applyHide(); try { localStorage.setItem('zf-error-frames', hide.checked ? 'app' : 'all'); } catch (e) {} });
     applyHide();
 
     showChain(0);
@@ -104,7 +105,7 @@
             case 'ArrowUp':   case 'k': if (idx > 0) pick(frames[idx - 1]); e.preventDefault(); break;
             case 't': toggleTheme(); break;
             case 'o': openActive(); break;
-            case 'f': hide.checked = !hide.checked; applyHide(); break;
+            case 'f': hide.checked = !hide.checked; hide.dispatchEvent(new Event('change')); break;
         }
     });
 })();
