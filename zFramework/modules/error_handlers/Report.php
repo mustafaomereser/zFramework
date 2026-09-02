@@ -182,6 +182,11 @@ class Report
 
         if ($framework && str_starts_with($file, $framework . 'vendor/')) return 'vendor';
         if ($framework && str_starts_with($file, $framework)) return 'framework';
+
+        # The entry point sits in the public directory but is the framework's own -
+        # there is nothing of the application in it to read.
+        if (defined('PUBLIC_DIR') && $file === str_replace('\\', '/', PUBLIC_DIR) . '/index.php') return 'framework';
+
         if (!is_file($file)) return 'internal';
 
         return 'app';
