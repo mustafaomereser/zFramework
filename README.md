@@ -1919,7 +1919,8 @@ php terminal db backup --compress
 php terminal db restore
 
 # Modules
-php terminal module create blog
+php terminal module create blog          # creates modules/Blog - the directory is capitalised, the
+                                          # /blog url is not; views are view('Blog.views.…')
 
 # Cache
 php terminal cache clear views

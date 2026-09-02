@@ -75,7 +75,7 @@ Validator::validate(?array $data, array $rules, array $attributeNames = [], ?Clo
 
 **A Request class per endpoint is not required.** When store and update validate the same
 columns and both need the same derived fields, one method on the controller is less code and
-keeps the derivation next to the rules. `modules/blog` does this and it is a good pattern to
+keeps the derivation next to the rules. `modules/Blog` does this and it is a good pattern to
 copy:
 
 ```php

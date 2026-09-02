@@ -50,13 +50,13 @@
             </div>
             <div class="row">
                 <div class="col-md-8 col-12 mb-2">
-                    <?php foreach ($posts['items'] as $post) echo view('blog.views.client.components.post', compact('post')) ?>
+                    <?php foreach ($posts['items'] as $post) echo view('Blog.views.client.components.post', compact('post')) ?>
                     <div class="mt-4">
                         <?= $posts['links']() ?>
                     </div>
                 </div>
                 <div class="col-md-4 col-12">
-                    <?= view('blog.views.client.components.news-letter') ?>
+                    <?= view('Blog.views.client.components.news-letter') ?>
                 </div>
             </div>
         </div>

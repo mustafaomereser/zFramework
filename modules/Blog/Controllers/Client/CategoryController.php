@@ -31,7 +31,7 @@ class CategoryController extends Controller
     {
         $category = $this->category->where('slug', $id)->firstOrFail('This category not exists.');
         $posts    = $category['posts']()->paginate();
-        return view('blog.views.client.pages.categories.show', compact('category', 'posts'));
+        return view('Blog.views.client.pages.categories.show', compact('category', 'posts'));
     }
 
     /** Create page | GET: /create

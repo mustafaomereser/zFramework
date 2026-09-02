@@ -24,8 +24,8 @@ resource/views/
 ```
 
 Real files following it: `resource/views/app/main.php`,
-`modules/blog/views/admin/pages/index.php`,
-`modules/blog/views/admin/pages/categories/{index,edit-or-create}.php`.
+`modules/Blog/views/admin/pages/index.php`,
+`modules/Blog/views/admin/pages/categories/{index,edit-or-create}.php`.
 
 Rules, in order of how often they get broken:
 
@@ -282,7 +282,8 @@ are tried in order (`View.php:630-637`):
 3. `<path>.php` relative to the project root
 
 So `view('app.pages.posts.index')` → `resource/views/app/pages/posts/index.php`, and
-`view('blog.views.admin.pages.index')` → `modules/blog/views/admin/pages/index.php`.
+`view('Blog.views.admin.pages.index')` → `modules/Blog/views/admin/pages/index.php`. The module
+segment is the directory name, capitalised: `blog.views…` resolves on Windows and on nothing else.
 
 `view()` returns the rendered markup as a string — that is how mail bodies are built.
 

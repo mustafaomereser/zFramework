@@ -426,7 +426,8 @@ View::clearCache()
 View::setSettings(array $config)                          // the framework sets this; leave it
 ```
 Root: `resource/views`. `view('a.b.c')` → `resource/views/a/b/c.php`.
-Module view: `blog.views.client.pages.index` → `modules/blog/views/client/pages/index.php`.
+Module view: `Blog.views.client.pages.index` → `modules/Blog/views/client/pages/index.php` -
+the module segment is spelled as the directory is, capitalised, or Linux does not find it.
 
 **The directive list, the directory contract and the engine's real behaviour are in
 `references/views.md`.** Do not write a template from memory of Blade — several directives that

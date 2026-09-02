@@ -24,7 +24,7 @@ class BlogController extends Controller
         $title          = 'Blog & News';
         $posts          = $this->posts->where('publish', 1)->where('featured_post', 0)->orderBy(['id' => 'DESC'])->paginate();
         $featured_posts = $this->posts->where('publish', 1)->where('featured_post', 1)->orderBy(['updated_at' => 'DESC'])->get();
-        return view('blog.views.client.pages.index', compact('title', 'posts', 'featured_posts'));
+        return view('Blog.views.client.pages.index', compact('title', 'posts', 'featured_posts'));
     }
 
     /** Show page | GET: /id
@@ -38,7 +38,7 @@ class BlogController extends Controller
         $author     = $post['author']();
         $categories = $post['categories']()->get();
 
-        return view('blog.views.client.pages.show', compact('post', 'author', 'categories'));
+        return view('Blog.views.client.pages.show', compact('post', 'author', 'categories'));
     }
 
     /** Create page | GET: /create

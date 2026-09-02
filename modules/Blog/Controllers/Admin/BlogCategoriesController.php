@@ -22,7 +22,7 @@ class BlogCategoriesController extends Controller
      */
     public function index()
     {
-        return view('blog.views.admin.pages.categories.index');
+        return view('Blog.views.admin.pages.categories.index');
     }
 
     /** Show page | GET: /id
@@ -39,7 +39,7 @@ class BlogCategoriesController extends Controller
      */
     public function create()
     {
-        return view('blog.views.admin.pages.categories.edit-or-create');
+        return view('Blog.views.admin.pages.categories.edit-or-create');
     }
 
     /** Edit page | GET: /id/edit
@@ -49,7 +49,7 @@ class BlogCategoriesController extends Controller
     public function edit($id)
     {
         $category = BlogCategories::$categories->where('id', $id)->firstOrFail('This category not exists.');
-        return view('blog.views.admin.pages.categories.edit-or-create', compact('category'));
+        return view('Blog.views.admin.pages.categories.edit-or-create', compact('category'));
     }
 
     /** POST page | POST: /

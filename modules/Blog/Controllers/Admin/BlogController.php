@@ -27,7 +27,7 @@ class BlogController extends Controller
     public function index()
     {
         $posts = $this->posts->orderBy(['id' => 'DESC'])->paginate();
-        return view('blog.views.admin.pages.index', compact('posts'));
+        return view('Blog.views.admin.pages.index', compact('posts'));
     }
 
     /** Show page | GET: /id
@@ -44,7 +44,7 @@ class BlogController extends Controller
      */
     public function create()
     {
-        return view('blog.views.admin.pages.edit-or-create');
+        return view('Blog.views.admin.pages.edit-or-create');
     }
 
     /** Edit page | GET: /id/edit
@@ -55,7 +55,7 @@ class BlogController extends Controller
     {
         $post       = $this->posts->where('id', $id)->firstOrFail('This blog is not exists.');
         $categories = $post['categories']()->get();
-        return view('blog.views.admin.pages.edit-or-create', compact('post', 'categories'));
+        return view('Blog.views.admin.pages.edit-or-create', compact('post', 'categories'));
     }
 
     public function setAll()

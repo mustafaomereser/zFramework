@@ -15,7 +15,7 @@
                 <div class="col-md-8 col-12 mb-2">
                     <?php foreach ($posts['items'] as $post) :
                         $post   = $post['post']();
-                        echo view('blog.views.client.components.post', compact('post'))
+                        echo view('Blog.views.client.components.post', compact('post'))
                     ?>
                     <?php endforeach ?>
                     <div class="mt-4">
@@ -23,7 +23,7 @@
                     </div>
                 </div>
                 <div class="col-md-4 col-12">
-                    <?= view('blog.views.client.components.news-letter') ?>
+                    <?= view('Blog.views.client.components.news-letter') ?>
                 </div>
             </div>
         </div>
