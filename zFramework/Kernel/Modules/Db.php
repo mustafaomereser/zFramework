@@ -27,7 +27,16 @@ class Db
     {
         self::$db                = new FacadesDB($db);
         self::$db->ignoreAnalyze = true;
-        self::$dbname            = self::$db->prepare('SELECT database() AS dbname')->fetch(\PDO::FETCH_ASSOC)['dbname'];
+
+        $previous     = self::$dbname;
+        self::$dbname = self::$db->prepare('SELECT database() AS dbname')->fetch(\PDO::FETCH_ASSOC)['dbname'];
+
+        # $tables lists what exists in the database we are connected to, so it stops
+        # being an answer the moment that changes. migrate() reconnects per migration
+        # class, and a stale list reported a table missing - which is how a populated
+        # table in the second database met DROP TABLE IF EXISTS without --fresh.
+        # Compared rather than cleared: one query per database, not per migration.
+        if ($previous !== self::$dbname) self::$tables = null;
     }
 
     private static function table_exists($table = null)
