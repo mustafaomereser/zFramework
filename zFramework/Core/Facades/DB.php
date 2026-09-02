@@ -1310,12 +1310,28 @@ class DB
     {
         # Bindings passed in win over the ones on the current query, so a caller
         # can render a statement that is no longer being built.
-        $data      = count($data) ? $data : $this->buildQuery['data'] ?? [];
-        $debug_sql = $sql;
+        $data = count($data) ? $data : $this->buildQuery['data'] ?? [];
 
-        foreach ($data as $key => $value) $debug_sql = str_replace(":$key", !$value ? 'null' : $this->connection()->quote($value), $debug_sql);
+        # One pass over the placeholders rather than one str_replace per binding.
+        # Replacing `:name` first also ate the head of `:name_2` and left `'veli'_2`
+        # behind, and which of the two went first was down to the order of the array.
+        #
+        # Numbers go in unquoted: this string is handed to EXPLAIN ANALYZE further
+        # down, and a quoted integer changes how the server reads an index - the
+        # analysis would describe a query nobody ran.
+        return preg_replace_callback('/:([a-zA-Z_][a-zA-Z0-9_]*)/', function ($m) use ($data) {
+            if (!array_key_exists($m[1], $data)) return $m[0];
 
-        return $debug_sql;
+            $value = $data[$m[1]];
+
+            # Only null is null. `!$value` also caught 0, '' and '0', so a row matched
+            # on status = 0 was reported as status = null.
+            if ($value === null) return 'NULL';
+            if (is_bool($value)) return $value ? '1' : '0';
+            if (is_int($value) || is_float($value)) return (string) $value;
+
+            return $this->connection()->quote((string) $value);
+        }, $sql);
     }
 
     /**
