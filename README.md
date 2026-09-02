@@ -2127,6 +2127,33 @@ keeps working.
 report flagged. If something is wrong, `php terminal update --rollback` puts the previous core
 back.
 
+### Upgrading to 3.2.0
+
+Nothing needs rewriting; these are the changes an existing project will notice.
+
+- **`error` moved from `config/app.php` to `config/framework.php`**, with two new keys, `mask`
+  and `previous`. The old place is still read, so an untouched `app.php` keeps working; move the
+  block when you next open the file.
+- **The error page is new** (§19). It shows everything - request values included - unless
+  `error.mask` names keys to hide. Reports are named after the exception class; a client that
+  asks for JSON gets JSON; a fatal (out of memory, time limit) is reported too.
+- **Templates compile without minify while `app.debug` is on**, so an error can name the
+  template line. Compiled views carry `/*#zf:file:line*/` markers. Clear the view cache once
+  (`php terminal cache clear views`) so nothing compiled by 3.1 lingers.
+- **`route cache` no longer refuses a table with closures**: their files stay live and the rest
+  is cached. Run it again after upgrading.
+- **API mode no longer touches the session** - a header-authenticated request leaves no session
+  file behind. Nothing to do unless something of yours read `Session` inside an API request.
+- **`DB::$queryLog`** records every query while `app.debug` is on; production pays nothing.
+- **AutoSSL accounts live in `storage/AutoSSL/accounts/<id>/`**; an existing `account.key` at
+  the root is moved there on first use, same account. `PUBLIC_DIR` is defined from cron now, so
+  `renewAll()` runs from a cron script at all.
+- **The module directory is capitalised** - `modules/Blog`, namespace `modules\Blog`, views
+  `Blog.views.…`. Windows never noticed; Linux did. Rename yours if you made one under 3.1.
+- `Terminal::begin()` takes a line as well as an argv; `File::upload()` returns a list for a
+  `multiple` input whatever survived; `updateOrInsert()` updates every matching row.
+
+
 ---
 
 ## 15. API
