@@ -129,8 +129,12 @@ class Schedule
             (int) date('w', $at),   # day of week, 0 = Sunday
         ];
 
+        # Where each field starts counting. `*/2` steps from the field's own minimum,
+        # so on day-of-month it means 1,3,5 - not the even days a plain modulo gives.
+        $minimums = [0, 0, 1, 1, 0];
+
         foreach ($fields as $index => $field)
-            if (!self::fieldMatches($field, $now[$index], $index === 4)) return false;
+            if (!self::fieldMatches($field, $now[$index], $minimums[$index], $index === 4)) return false;
 
         return true;
     }
@@ -143,11 +147,17 @@ class Schedule
      */
     public static function run(?callable $report = null): int
     {
-        $ran    = 0;
-        $minute = date('YmdHi');
+        $ran = 0;
+
+        # One reading of the clock for the whole tick. due() was left to call time()
+        # itself, so a task that took two minutes moved the clock under everything
+        # queued behind it - a daily('03:00') sitting after a slow backup was asked
+        # whether it was due at 03:02, said no, and did not run that day at all.
+        $at     = time();
+        $minute = date('YmdHi', $at);
 
         foreach (self::$tasks as [$expression, $job, $name]) {
-            if (!self::due($expression)) continue;
+            if (!self::due($expression, $at)) continue;
 
             # Cron firing twice in the same minute, or `schedule run` invoked by
             # hand while the crontab entry is also running.
@@ -212,7 +222,7 @@ class Schedule
      * @param bool   $isDayOfWeek 7 means Sunday there, as it does in crontab.
      * @return bool
      */
-    private static function fieldMatches(string $field, int $value, bool $isDayOfWeek = false): bool
+    private static function fieldMatches(string $field, int $value, int $minimum = 0, bool $isDayOfWeek = false): bool
     {
         foreach (explode(',', $field) as $part) {
             $step = 1;
@@ -223,7 +233,7 @@ class Schedule
             }
 
             if ($part === '*' || $part === '') {
-                if ($value % $step === 0) return true;
+                if (($value - $minimum) % $step === 0) return true;
                 continue;
             }
 
@@ -233,13 +243,13 @@ class Schedule
                 $from = $to = (int) $part;
             }
 
-            if ($isDayOfWeek) {
-                if ($from === 7) $from = 0;
-                if ($to === 7) $to = 0;
-            }
+            if ($from > $to) continue;
 
-            if ($value < $from || $value > $to) continue;
-            if (($value - $from) % $step === 0) return true;
+            # 0 and 7 both mean Sunday, but rewriting the bound turned 5-7 into 5..0,
+            # a range that matches nothing - so the days are walked and only the value
+            # compared is folded. The widest field here is 0-59, so this is cheap.
+            for ($candidate = $from; $candidate <= $to; $candidate += $step)
+                if (($isDayOfWeek && $candidate === 7 ? 0 : $candidate) === $value) return true;
         }
 
         return false;
