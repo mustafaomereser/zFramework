@@ -133,7 +133,7 @@ return (function (array $report): string {
     <div class="banner">
         <div class="class">
             <span><?= $h($report['class']) ?></span>
-            <?php if ($report['code']): ?><span class="code">code <?= $h($report['code']) ?></span><?php endif ?>
+            <?php if ($report['code']): ?><span class="errcode">code <?= $h($report['code']) ?></span><?php endif ?>
         </div>
         <div class="message"><?= $h($report['message']) ?></div>
 
