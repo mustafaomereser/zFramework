@@ -167,3 +167,12 @@ details.tree .kv th { width: auto; }
 .controls select { background: var(--bg-2); color: var(--fg-1); border: 1px solid var(--line-strong); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px; }
 .toast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: var(--fg-0); color: var(--bg-0); padding: 8px 14px; border-radius: 8px; font-size: 12.5px; opacity: 0; transition: opacity .2s; pointer-events: none; }
 .toast.show { opacity: 1; }
+
+/* ── all arguments ───────────────────────────────────── */
+.argsall .call { padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r); margin-bottom: 8px; background: var(--bg-1); }
+.call-head { display: flex; justify-content: space-between; gap: 14px; font-family: var(--mono); font-size: 12.5px; margin-bottom: 4px; }
+.call-fn { color: var(--fg-0); }
+.call-at { color: var(--fg-4); font-size: 11.5px; white-space: nowrap; }
+.argsall .kv th { width: 1%; white-space: nowrap; color: var(--t-v); }
+.argsall .kv td.type { width: 1%; white-space: nowrap; color: var(--fg-4); }
+.argsall .kv th, .argsall .kv td { padding: 3px 12px 3px 0; border: 0; }

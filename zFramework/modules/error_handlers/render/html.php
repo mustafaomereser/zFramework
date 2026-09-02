@@ -59,7 +59,7 @@ return (function (array $report): string {
         $out .= '<div class="code-title"><span class="path">' . $h($rel($file)) . '</span><span class="ln">:' . $line . '</span>';
         if ($frame['compiled']) $out .= '<span class="note">compiled line ' . $frame['compiled']['line'] . '</span>';
         $out .= '</div>';
-        if ($frame['function']) $out .= '<div class="code-fn">' . $h($frame['function']) . '()</div>';
+        if ($frame['function']) $out .= '<div class="code-fn">' . $h($frame['function']) . '()' . ($frame['via'] ? ' <span class="dim">threw from ' . $h($frame['via']) . '()</span>' : '') . '</div>';
         $out .= '<button class="btn ide" onclick="goIDE(' . $h(json_encode($file)) . ', ' . $line . ')">Open in editor</button>';
         $out .= '</div>';
 
@@ -195,6 +195,7 @@ return (function (array $report): string {
     <section class="tabs-wrap">
         <nav class="tabs">
             <button class="active" data-tab="t-request">Request</button>
+            <button data-tab="t-args">Arguments</button>
             <button data-tab="t-user">User</button>
             <button data-tab="t-route">Route</button>
             <button data-tab="t-queries">Queries<?php if ($report['queries']): ?> <span class="count"><?= count($report['queries']) ?></span><?php endif ?></button>
@@ -215,6 +216,43 @@ return (function (array $report): string {
                     <?= $section('Headers', $table(['Method' => $req['method'], 'URL' => $req['url'], 'IP' => $req['ip']] + $req['headers'])) ?>
                 </div>
             </div>
+        </div>
+
+        <div class="tab argsall" id="t-args">
+            <?php
+            # Every call on the way to the error, with what it was handed - grouped by
+            # the part of the system it belongs to, so "what did the database see" or
+            # "what did the controller get" is one glance rather than a walk of the stack.
+            $areas = [];
+            foreach ($report['chain'] as $ci => $ex) foreach ($ex['frames'] as $f) if ($f['function']) $areas[$f['area'] ?? 'Other'][] = [$ci, $f];
+            $order = ['Application', 'View', 'Database', 'Validation', 'Auth & Session', 'Mail & Queue', 'Routing', 'Framework', 'Vendor', 'PHP'];
+            uksort($areas, function ($a, $b) use ($order) {
+                $ia = array_search($a, $order, true); $ib = array_search($b, $order, true);
+                if (str_starts_with($a, 'Module:')) $ia = 0.5; if (str_starts_with($b, 'Module:')) $ib = 0.5;
+                return ($ia === false ? 99 : $ia) <=> ($ib === false ? 99 : $ib);
+            });
+            ?>
+            <?php if (!$areas): ?><div class="empty">no calls with arguments</div><?php endif ?>
+            <?php foreach ($areas as $area => $calls): ?>
+                <section class="group">
+                    <h4><?= $h($area) ?> <span class="dim"><?= count($calls) ?></span></h4>
+                    <?php foreach ($calls as [$ci, $f]): ?>
+                        <div class="call">
+                            <div class="call-head">
+                                <span class="call-fn"><?= $h($f['function']) ?>()</span>
+                                <span class="call-at"><?= $h($rel($f['file'])) ?>:<?= $f['line'] ?><?= $ci ? ' · caused by #' . $ci : '' ?></span>
+                            </div>
+                            <?php if ($f['args']): ?>
+                                <table class="kv">
+                                    <?php foreach ($f['args'] as $name => $arg): ?>
+                                        <tr><th><?= $h($name) ?></th><td class="type"><?= $h($arg['type']) ?></td><td><?= $value($arg['value'], 0) ?></td></tr>
+                                    <?php endforeach ?>
+                                </table>
+                            <?php else: ?><div class="empty">no arguments</div><?php endif ?>
+                        </div>
+                    <?php endforeach ?>
+                </section>
+            <?php endforeach ?>
         </div>
 
         <div class="tab" id="t-user"><?= $table($report['user']) ?></div>

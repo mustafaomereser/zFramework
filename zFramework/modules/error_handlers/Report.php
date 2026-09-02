@@ -95,15 +95,18 @@ class Report
         # trace[i+1] - the entry that made the call - which is why each frame keeps
         # the index of the entry that describes it. An internal frame has no file
         # and is not shown, but it still names the function of the frame above it.
-        $frames[] = self::frame($e->getFile(), $e->getLine(), $trace[0] ?? [], 0, 0);
+        # An internal function that throws - strtoupper([]), PDOStatement::execute() -
+        # is reported at its call site, and trace[0] is that same call. Then the
+        # function running at the throw site is trace[1] - DB::prepare() around the
+        # execute() - and the internal call is kept as a note on the frame.
+        $internal = isset($trace[0]['file']) && $trace[0]['file'] === $e->getFile() && ($trace[0]['line'] ?? null) === $e->getLine();
+
+        $frames[] = self::frame($e->getFile(), $e->getLine(), $trace[$internal ? 1 : 0] ?? [], 0, $internal ? 1 : 0);
+        if ($internal) $frames[0]['via'] = ($trace[0]['class'] ?? '') . ($trace[0]['type'] ?? '') . ($trace[0]['function'] ?? '');
 
         foreach ($trace as $i => $t) {
             if (!isset($t['file'])) continue;
-
-            # An internal function that throws - strtoupper([]) - is reported at its
-            # call site, and trace[0] is that same call. One frame, not two; the
-            # throw-site frame above already carries the function and its arguments.
-            if ($i === 0 && $t['file'] === $e->getFile() && ($t['line'] ?? null) === $e->getLine()) continue;
+            if ($i === 0 && $internal) continue;
 
             $frames[] = self::frame($t['file'], $t['line'] ?? 0, $trace[$i + 1] ?? [], count($frames), $i + 1);
         }
@@ -139,6 +142,7 @@ class Report
             'args'     => [],
             'kind'     => 'app',
             'compiled' => null,
+            'via'      => null,
         ];
 
         # A template frame. PHP names the file `View.php(290) : eval()'d code`;
@@ -218,6 +222,8 @@ class Report
             # argument is recognised by its name and not only by its value.
             $names = self::parameterNames($entry);
 
+            $frame['area'] = self::area($frame);
+
             foreach (array_values($args) as $n => $value) {
                 $label = $names[$n] ?? "#$n";
                 # Type beside value: an empty string, null and false all print as
@@ -241,6 +247,43 @@ class Report
         }
 
         return $frames;
+    }
+
+    /**
+     * Which part of the system a frame belongs to, for grouping: Database, View,
+     * Routing, Auth & Session, Application, a module's name, Vendor, PHP.
+     *
+     * Read from the function's class where there is one, else from the file.
+     *
+     * @param array $frame
+     * @return string
+     */
+    private static function area(array $frame): string
+    {
+        $name = (string) ($frame['function'] ?? '');
+        $file = $frame['file'];
+
+        if ($frame['kind'] === 'view') return 'View';
+        if ($frame['kind'] === 'vendor') return 'Vendor';
+        if ($frame['kind'] === 'internal') return 'PHP';
+
+        if ($frame['kind'] === 'framework') {
+            $probe = $name !== '' ? $name : str_replace('/', '\\', $file);
+            return match (true) {
+                (bool) preg_match('/Facades\\\\DB\b|Traits\\\\DB\b|Facades\\\\Redis\b|PDO/', $probe)       => 'Database',
+                (bool) preg_match('/Core\\\\View\b/', $probe)                                          => 'View',
+                (bool) preg_match('/Core\\\\Route\b|zFramework\\\\Run\b|Middleware/', $probe)           => 'Routing',
+                (bool) preg_match('/Facades\\\\(Auth|Session|Cookie)\b|Core\\\\Csrf\b/', $probe)         => 'Auth & Session',
+                (bool) preg_match('/Facades\\\\(Mail|PushNotification)|Jobs\\\\|Facades\\\\Queue\b/', $probe) => 'Mail & Queue',
+                (bool) preg_match('/Validator/', $probe)                                                 => 'Validation',
+                default                                                                                 => 'Framework',
+            };
+        }
+
+        # Application code: a module by its name, otherwise the application.
+        if (preg_match('#(?:^|/)modules/([^/]+)/#', $file, $m)) return 'Module: ' . $m[1];
+
+        return 'Application';
     }
 
     /**
