@@ -53,7 +53,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 
 ## 3. Terminal / CLI
 
-- [ ] **`Make.php:141,168` + `Db.php:21` — `--table=` / `--dbname=` / `--db=` sessizce yok sayılıyor**
+- [x] **`Make.php:141,168` + `Db.php:21` — `--table=` / `--dbname=` / `--db=` sessizce yok sayılıyor**
       `parseCommands` anahtarı tireleriyle saklıyor (`$parameters['--table']`), kod tiresiz
       okuyor. `db seed/backup/restore` yanlış veritabanına gidiyor.
       **Ek:** boşluk içeren bayrak değeri kesiliyor (`--title=Merhaba dunya` → `"Merhaba"`).
@@ -244,6 +244,8 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
 - [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `fix(terminal)` --table/--dbname/--db bayraklari okunmuyordu — `0559d30`
+- [x] `fix(Terminal)` argv tekrar bolunuyordu, bosluklu bayrak degeri kesiliyordu
 - [x] `fix(DB)` debugSQL yanlis SQL basiyordu — `fef28b4`
 - [x] `fix(RelationShips)` with() batchlenemeyen iliskiyi iki kez calistiriyordu — `8b9b99a`
 - [x] `fix(DB)` grup where 4. elemanı (bağlaç) okunmuyordu — `48988e3`
