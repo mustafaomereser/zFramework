@@ -50,8 +50,8 @@ commit it, never hand-write it.
     'logging'   => true,     // a self-contained HTML report per error under error_logs/
     'keep_days' => 14,       // how long one is kept; 0 keeps everything
     'stream'    => false,    // false | 'error_log' | 'stderr' | 'syslog' — one-line summary
-    'mask'      => [],       // extra key names never shown (built-in: password, token, secret,
-                             //   auth, csrf, cookie ...) — substring match on the key, everywhere
+    'mask'      => [],       // key names shown as •••••• — empty means nothing is hidden;
+                             //   substring match on the key, everywhere in the report
     'previous'  => 10,       // earlier reports the page links to
     'callback'  => fn($log_path, $log) => ...,   // dies on CLI unless ZF_WORKER is defined
 ],

@@ -2458,12 +2458,13 @@ A client that asks for JSON (`X-Requested-With`, or `Accept: application/json`) 
 same report as JSON; the terminal gets it as text. **With `debug` off** every shape is a
 500 with one sentence, and the report still goes to `error_logs/` for you.
 
-**Secrets never reach the page or the file.** Any key containing `password`, `secret`,
-`token`, `auth`, `csrf`, `cookie`, `authorization`, `private`, `salt` or `credential` -
-in the request, session, headers, `$_SERVER` or a frame argument - is shown as `••••••`;
-`framework.error.mask` adds your own. Cookie values are never shown, long strings are cut,
-and the user block is id and email from what `Auth` already loaded - the page never runs a
-query of its own.
+**Nothing is hidden by default.** A password field or a cookie is as likely as anything
+to be where the problem is - an injection attempt arrives in exactly those fields - and
+whoever can read `error_logs/` can read the database too. If a policy asks for it,
+`framework.error.mask` names keys to show as `••••••`, and one list covers the request,
+session, cookies, headers, `$_SERVER` and frame arguments alike. Long strings are cut
+with their length noted; the user block is id and email from what `Auth` already loaded -
+the page never runs a query of its own.
 
 `config/framework.php` → `error`: `logging`, `keep_days` (reports older than this are
 swept, at most once an hour, only on a request that already failed), `stream` for a

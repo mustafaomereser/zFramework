@@ -97,10 +97,12 @@ return [
      *            false | 'error_log' | 'stderr' | 'syslog'. Worth turning on as soon
      *            as there is more than one app server - the HTML files only help
      *            when you know which machine to look at.
-     * mask       Extra key names whose values the report never shows, on top of the
-     *            built-in list (password, secret, token, auth, csrf, cookie ...).
-     *            Matched case-insensitively as a substring of the key, everywhere:
-     *            request data, session, headers, $_SERVER, frame arguments.
+     * mask       Key names whose values the report shows as ••••••. Empty: nothing is
+     *            hidden - a password field or a cookie is as likely as anything to
+     *            be where the problem is, and whoever reads error_logs/ can read the
+     *            database too. Matched case-insensitively as a substring of the key,
+     *            everywhere: request data, session, cookies, headers, $_SERVER,
+     *            frame arguments. ['password', 'card'] if a policy asks for it.
      * previous   How many earlier reports the page links to. 0 for none.
      * callback   Runs after a report is written, with its path and the HTML.
      *

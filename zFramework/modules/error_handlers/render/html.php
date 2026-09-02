@@ -101,7 +101,17 @@ return (function (array $report): string {
     # A text rendering for the clipboard, produced once here rather than in JS.
     $asText = (include __DIR__ . '/text.php')($report, false);
 
+    # A one-line summary ahead of the markup, for the listing of earlier reports:
+    # class, message and url without parsing a page. `--` cannot appear inside an
+    # HTML comment, so it is stripped from the message here.
+    $summary = json_encode([
+        'class'   => $report['class'],
+        'message' => str_replace('--', '- -', mb_strimwidth($report['message'], 0, 300, '…')),
+        'url'     => str_replace('--', '- -', $req['method'] . ' ' . mb_strimwidth($req['url'], 0, 200, '…')),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+
     ob_start();
+    echo '<!--zf:' . $summary . "-->\n";
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -236,7 +246,12 @@ return (function (array $report): string {
         <div class="tab prev" id="t-previous">
             <?php if (!$report['previous']): ?><div class="empty" style="padding:8px 10px">nothing under error_logs/</div>
             <?php else: foreach ($report['previous'] as $p): ?>
-                <a href="file:///<?= $h(str_replace('\\', '/', $p['file'])) ?>" target="_blank"><span class="t"><?= $h($p['time']) ?></span><span class="c"><?= $h($p['class'] ?? $p['name']) ?></span></a>
+                <a href="file:///<?= $h(str_replace('\\', '/', $p['file'])) ?>" target="_blank">
+                    <span class="t"><?= $h($p['time']) ?></span>
+                    <span class="c"><?= $h($p['class'] ?? $p['name']) ?></span>
+                    <span class="m"><?= $h($p['message'] ?? '') ?></span>
+                    <span class="u"><?= $h($p['url'] ?? '') ?></span>
+                </a>
             <?php endforeach; endif ?>
         </div>
     </div>

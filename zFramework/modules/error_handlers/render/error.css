@@ -154,8 +154,10 @@ details.tree .kv th { width: auto; }
 
 .prev a { display: flex; gap: 14px; padding: 8px 10px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12.5px; color: var(--fg-1); }
 .prev a:hover { background: var(--bg-hover); }
-.prev a .t { color: var(--fg-3); width: 160px; flex: 0 0 160px; }
-.prev a .c { color: var(--red); }
+.prev a .t { color: var(--fg-3); width: 150px; flex: 0 0 150px; }
+.prev a .c { color: var(--red); width: 200px; flex: 0 0 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prev a .m { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prev a .u { color: var(--fg-4); flex: 0 1 280px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 
 /* ── controls ────────────────────────────────────────── */
 .controls { position: fixed; right: 18px; bottom: 18px; display: flex; gap: 6px; align-items: center; padding: 6px; background: var(--bg-1); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.35); }

@@ -19,18 +19,20 @@ use zFramework\Core\View;
 class Report
 {
     /**
-     * Keys whose values are never shown. Matched case-insensitively against the
-     * key name, as a substring, in request data, session, cookies, headers,
-     * server variables and frame arguments alike. framework.error.mask adds to it.
+     * Nothing is hidden unless framework.error.mask names it. A password or a
+     * cookie is as likely as anything to be where the problem is - an injection
+     * attempt arrives in exactly those fields - and a report that blanks them
+     * cannot show it. Whoever reads error_logs/ can read the database too. Name
+     * a key in the config and every value under it, anywhere in the report, is
+     * shown as MASKED; the match is a case-insensitive substring of the key.
      */
-    private const MASK = ['password', 'passwd', 'secret', 'token', 'api_key', 'apikey', 'auth', 'csrf', 'cookie', 'authorization', 'private', 'salt', 'credential'];
-
     private const MASKED = '••••••';
 
     /**
-     * Longest string shown in full inside a frame argument.
+     * Longest string shown in full. Long enough for a payload to be read whole;
+     * a 100 KB upload body is cut, with its length noted.
      */
-    private const ARG_LENGTH = 200;
+    private const ARG_LENGTH = 2000;
 
     /**
      * @param \Throwable|array $thrown A Throwable, or the (array) cast of one that older callers pass.
@@ -317,14 +319,14 @@ class Report
     }
 
     /**
-     * The built-in list plus framework.error.mask.
+     * framework.error.mask, lower-cased. Empty unless the application says otherwise.
      *
      * @return array
      */
     private static function maskList(): array
     {
         $extra = self::setting('mask');
-        return array_map('strtolower', array_merge(self::MASK, is_array($extra) ? $extra : []));
+        return is_array($extra) ? array_map('strtolower', array_filter($extra, 'is_string')) : [];
     }
 
     /**
@@ -361,10 +363,10 @@ class Report
 
         $server = array_filter($_SERVER, fn($k) => !str_starts_with($k, 'HTTP_'), ARRAY_FILTER_USE_KEY);
 
-        # Cookies are stored under encrypted names; shown under the names they were
-        # set with where those can be recovered, and values stay masked either way.
-        $cookies = [];
-        foreach (array_keys($_COOKIE) as $name) $cookies[$name] = self::MASKED;
+        # As the browser sent them. The framework's own cookies travel under
+        # Crypter-derived names with Crypter-encoded values, so those read as noise;
+        # anything else - and anything a caller made up - reads as it arrived.
+        $cookies = self::sanitize($_COOKIE, $mask);
 
         $session = [];
         try {
@@ -472,12 +474,24 @@ class Report
         foreach (array_slice($files, 0, $limit) as $file) {
             $name = basename($file, '.html');
             # Y-m-d-H-i-s-hex[-Class]
-            $out[] = [
-                'file'  => $file,
-                'name'  => $name,
-                'time'  => preg_match('/^(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})-(\d{2})/', $name, $m) ? "$m[1] $m[2]:$m[3]:$m[4]" : $name,
-                'class' => preg_match('/^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}-[0-9a-f]{6}-(.+)$/', $name, $m) ? str_replace('.', '\\', $m[1]) : null,
+            $entry = [
+                'file'    => $file,
+                'name'    => $name,
+                'time'    => preg_match('/^(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})-(\d{2})/', $name, $m) ? "$m[1] $m[2]:$m[3]:$m[4]" : $name,
+                'class'   => preg_match('/^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}-[0-9a-f]{6}-(.+)$/', $name, $m) ? str_replace('.', '\\', $m[1]) : null,
+                'message' => null,
+                'url'     => null,
             ];
+
+            # The report's first line is a comment carrying its own summary, so the
+            # message and url are read without opening the page - see render/html.php.
+            if ($handle = @fopen($file, 'rb')) {
+                $first = (string) fgets($handle, 8192);
+                fclose($handle);
+                if (preg_match('/^<!--zf:(.*?)-->/', $first, $m) && is_array($meta = json_decode($m[1], true))) $entry = array_merge($entry, array_intersect_key($meta, array_flip(['class', 'message', 'url'])));
+            }
+
+            $out[] = $entry;
         }
 
         return $out;

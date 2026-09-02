@@ -578,12 +578,12 @@ php terminal bench run                              # boot + request cost on thi
   request/headers/cookies/session, the matched route and middlewares, the query log (see
   below), timing and memory, the user (id and email, from what `Auth` already loaded — it
   never queries), and links to the last `error.previous` reports.
-- **Masking is one list, applied everywhere before rendering:** a key containing `password`,
-  `passwd`, `secret`, `token`, `api_key`, `auth`, `csrf`, `cookie`, `authorization`,
-  `private`, `salt` or `credential` — plus `framework.error.mask` — shows `••••••` whether it
-  sits in `$_POST`, the session, a header, `$_SERVER` or a frame argument. Cookie values are
-  never shown. Strings over 200 characters are cut. What is on disk under `error_logs/` is
-  the same page, so the same rules protect it.
+- **Nothing is hidden by default.** A password field or a cookie is as likely as anything to
+  be where the problem is - an injection attempt arrives in exactly those fields - and
+  whoever reads `error_logs/` can read the database too. `framework.error.mask` names keys
+  to show as `••••••` (case-insensitive substring of the key) if a policy asks for it, and
+  one list covers `$_POST`, the session, cookies, headers, `$_SERVER` and frame arguments
+  alike. Strings over 2000 characters are cut with their length noted.
 - **Template frames name the template.** A frame in `eval()`'d code or a `*.compiled.php` file
   is mapped through `View::sourceOf()` to the `resource/views/...` file and line it came from,
   and "Open in editor" opens that. See `views.md` → "Errors point at the template".
