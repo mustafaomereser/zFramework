@@ -136,7 +136,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 
 ## 9. Cache
 
-- [ ] **`Page.php:320` — `forgetUrl()` anahtara çağıranın dilini katıyor**
+- [x] **`Page.php:320` — `forgetUrl()` anahtara çağıranın dilini katıyor**
       CLI'dan hiçbir kaydı silemiyor; farklı dildeki admin yalnız kendi varyantını siliyor.
 - [ ] **`Page.php:204` — `serve()` `Age` başlığı basmadan `Cache-Control`'ü tekrarlıyor**
       Aşağı akıştaki cache TTL'i ikiye katlıyor.
@@ -154,7 +154,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [ ] **`route/web.php:29` — GET `/sign-out` CSRF'siz**
       `Route::any()` GET'i de eşliyor, `Csrf::check()` GET'te token aramıyor.
       `<img src="/sign-out">` ile oturum kapatılabiliyor.
-- [ ] **`run.php:105` — `resetState()` worker'da 16 sınıfın hepsini autoload ediyor** *(kazanç)*
+- [x] **`run.php:105` — `resetState()` worker'da 16 sınıfın hepsini autoload ediyor** *(kazanç)*
       `method_exists()` kullandığı için `Mail`, `cURL`, `PushNotification`, `Redis`, `Defer`,
       `Profiler` kullanılmasa bile yükleniyor.
 
@@ -244,6 +244,8 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
 - [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `fix(Page)` forgetUrl kayitlara ulasamiyordu — `a051b73`
+- [x] `perf(worker)` resetState 16 sinifi autoload ediyordu
 - [x] `fix(lang)` yedi validator mesaji Turkce + {blocked} — `d8ee17f`
 - [x] `fix(File)` bos opsiyonel dosya alani yanlis uyari veriyordu — `14f0935`
 - [x] `fix(Folder)` delete() alt klasorlere inmiyordu — `1b4ca97`
