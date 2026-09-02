@@ -102,7 +102,13 @@ class Run
     {
         if (PHP_SAPI !== 'cli') return;
 
-        foreach (self::REQUEST_STATE as $class) if (method_exists($class, 'flushRequestState')) $class::flushRequestState();
+        # class_exists($class, false) first: method_exists() autoloads, so asking
+        # sixteen classes whether they can be reset loaded all sixteen - Mail, cURL,
+        # PushNotification, Redis, Defer and Profiler came into every worker whether
+        # the application used them or not. A class that was never loaded holds no
+        # state to clear.
+        foreach (self::REQUEST_STATE as $class)
+            if (class_exists($class, false) && method_exists($class, 'flushRequestState')) $class::flushRequestState();
 
         # Back to what boot collected; see $bootIncluded.
         if (self::$bootIncluded !== null && count(self::$included) > self::$bootIncluded)
