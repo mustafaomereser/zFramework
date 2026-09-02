@@ -333,6 +333,7 @@ cURL::set(string $url)->post(mixed $fields = [])->headers(array $h)
     ->options(array $opts)->send(?\Closure $callback = null)
 
 Http::isAjax(): bool             Http::abort(int $code = 418, $message = null)
+Http::wantsJson(): bool          // isAjax(), or Accept: application/json not led by text/html
 ```
 
 ### File / Folder / Assets / _Array
