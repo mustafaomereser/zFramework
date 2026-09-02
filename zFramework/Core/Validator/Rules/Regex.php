@@ -20,9 +20,17 @@ class Regex extends Rule
         $pattern = (string) $data['equivalent'];
         $result  = @preg_match('/' . str_replace('/', '\/', $pattern) . '/u', (string) $data['value']);
 
-        # An invalid pattern is a developer error, and passing silently would
-        # hide it behind a form that accepts anything.
-        if ($result === false) throw new \Exception("Validator: regex `$pattern` is not a valid pattern.");
+        if ($result === false) {
+            # /u makes preg_match fail on a value that is not valid UTF-8, which is
+            # the visitor's doing rather than the pattern's. Throwing here answered
+            # 500 and pointed the developer at a pattern that was never wrong.
+            # Bytes that are not text are not in the expected format either.
+            if (preg_last_error() === PREG_BAD_UTF8_ERROR) return false;
+
+            # An invalid pattern is a developer error, and passing silently would
+            # hide it behind a form that accepts anything.
+            throw new \Exception("Validator: regex `$pattern` is not a valid pattern.");
+        }
 
         return (bool) $result;
     }
