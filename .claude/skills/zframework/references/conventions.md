@@ -45,10 +45,11 @@ findings.
   ```
 
   Nothing errors and the count is right, so the wrong list looks correct. `paginate()` is safe —
-  it snapshots `buildQuery` and puts it back. Everywhere else, either build the second query from
-  scratch or take the row and use the closures it carries: `$row['update']($sets)`,
-  `$row['delete']()`, which re-establish `where(primary, id)` themselves. That is what
-  `updateOrInsert()` and `toggleAttach()` do now; before, they wrote to the whole table.
+  it snapshots `buildQuery` and puts it back, and so does `updateOrInsert()`. Everywhere else,
+  either build the second query from scratch - `toggleAttach()` does - or take the row and use
+  the closures it carries: `$row['update']($sets)`, `$row['delete']()`, which re-establish
+  `where(primary, id)` themselves. Those closures exist only when the row holds the primary key,
+  so they are not an option on a pivot without one or after a `select()` that left the id out.
 - **`@include` is inlined, so `return` in a partial kills the rest of the page.** The compiler
   merges every partial into one compiled file, so a guard clause like
   `if (!$show) return;` at the top of an included view aborts the *parent* view too — the table

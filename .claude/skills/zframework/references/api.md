@@ -308,7 +308,7 @@ Str::limit($text, 50, '...')      Str::wordLimit($text, 3, '...')
 Str::rand(int $length = 5, bool $unique = false)
 Str::slug($text, '-')             Str::base64UrlEncode($binary)   Str::base64UrlDecode($text)
 
-Date::now('d.m.Y H:i')            Date::format(?string $date, 'd.m.Y')
+Date::now('d.m.Y H:i')            Date::format(string|int|null $date, 'd.m.Y')   // a date string, or a unix timestamp (int or numeric string)
 Date::timestamp('-0 days')        Date::timeago($date)      Date::timediff($t1, $t2)
 Date::setLocale(string $set)      Date::locale()
 
