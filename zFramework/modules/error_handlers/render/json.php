@@ -36,7 +36,7 @@ return function (array $report, bool $debug): string {
         'status'    => 500,
         'exception' => $chain[0],
         'previous'  => array_slice($chain, 1),
-        'request'   => ['method' => $report['request']['method'], 'url' => $report['request']['url'], 'route' => $report['route']],
+        'request'   => ['method' => $report['request']['method'], 'url' => $report['request']['url'], 'route' => $report['route'], 'user' => $report['user']],
         'queries'   => $report['queries'],
         'env'       => $report['env'],
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_PRETTY_PRINT);

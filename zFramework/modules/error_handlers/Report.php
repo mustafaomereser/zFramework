@@ -60,7 +60,7 @@ class Report
             'line'     => $chain[0]['line'],
             'request'  => self::request($mask),
             'route'    => self::route(),
-            'user'     => self::user(),
+            'user'     => self::user($mask),
             'queries'  => self::queries($mask),
             'env'      => [
                 'php'       => PHP_VERSION,
@@ -220,7 +220,9 @@ class Report
 
             foreach (array_values($args) as $n => $value) {
                 $label = $names[$n] ?? "#$n";
-                $frame['args'][$label] = self::sanitize($value, $mask, $label);
+                # Type beside value: an empty string, null and false all print as
+                # nothing, and "array(3)" says more than its three members do at a glance.
+                $frame['args'][$label] = ['type' => self::typeOf($value), 'value' => self::sanitize($value, $mask, $label)];
             }
 
             if ($frame['kind'] === 'view' && $frame['compiled'] && !str_ends_with($frame['compiled']['file'], '.compiled.php')) {
@@ -239,6 +241,28 @@ class Report
         }
 
         return $frames;
+    }
+
+    /**
+     * A short type label: string(12), int, float, bool, null, array(3), Foo\Bar, Closure.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    public static function typeOf(mixed $value): string
+    {
+        return match (true) {
+            $value === null     => 'null',
+            is_bool($value)     => 'bool',
+            is_int($value)      => 'int',
+            is_float($value)    => 'float',
+            is_string($value)   => 'string(' . mb_strlen($value) . ')',
+            is_array($value)    => 'array(' . count($value) . ')',
+            $value instanceof \Closure => 'Closure',
+            is_object($value)   => get_class($value),
+            is_resource($value) => 'resource',
+            default             => gettype($value),
+        };
     }
 
     /**
@@ -424,23 +448,30 @@ class Report
     }
 
     /**
-     * Who was logged in - only what is already loaded, never a query from here.
+     * Who was logged in - the row as Auth sees it, or a word saying nobody was.
      *
-     * The old page called Auth::user() to fill this, which opened a database
-     * connection while reporting an error that was, often enough, the database.
-     * And it printed the row whole, hash and api token included, into a file.
+     * Auth::user() may open the database to answer, and the error being reported
+     * may be the database; that is caught and reported as such rather than
+     * becoming a second error inside the first.
      *
-     * @return array|null
+     * @param array $mask
+     * @return array|string
      */
-    private static function user(): ?array
+    private static function user(array $mask): array|string
     {
-        if (!class_exists(Auth::class, false) || !is_array(Auth::$user)) return null;
+        if (!class_exists(Auth::class, false)) return 'auth not loaded';
 
-        $user = Auth::$user;
-        $out  = [];
-        foreach (['id', 'username', 'name', 'email'] as $key) if (isset($user[$key]) && is_scalar($user[$key])) $out[$key] = $user[$key];
+        try {
+            if (!Auth::check()) return 'not logged in';
 
-        return $out ?: ['id' => $user['id'] ?? '?'];
+            $user = Auth::user();
+            if (!is_array($user)) return 'not logged in';
+
+            # The row carries closures for its relations; those are not the user.
+            return self::sanitize(array_filter($user, fn($v) => !($v instanceof \Closure)), $mask);
+        } catch (\Throwable $e) {
+            return 'unavailable: ' . $e->getMessage();
+        }
     }
 
     /**

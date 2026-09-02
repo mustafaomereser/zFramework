@@ -20,12 +20,12 @@
     // ── exception chain ───────────────────────────────────
     var chains = document.querySelectorAll('[data-chain]');
     function showChain(i) {
-        document.querySelectorAll('.chain button').forEach(function (b) { b.classList.toggle('active', b.dataset.pick == i); });
+        document.querySelectorAll('[data-pick]').forEach(function (b) { b.classList.toggle('active', b.dataset.pick == i); });
         chains.forEach(function (c) { c.hidden = c.dataset.chain != i; });
         var first = document.querySelector('[data-chain="' + i + '"]:not([hidden]) .frame.default') || document.querySelector('[data-chain="' + i + '"] .frame');
         if (first) pick(first);
     }
-    document.querySelectorAll('.chain button').forEach(function (b) { b.addEventListener('click', function () { showChain(b.dataset.pick); }); });
+    document.querySelectorAll('[data-pick]').forEach(function (b) { b.addEventListener('click', function () { showChain(b.dataset.pick); }); });
 
     // ── frames ────────────────────────────────────────────
     function pick(frame) {

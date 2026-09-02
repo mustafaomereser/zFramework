@@ -21,7 +21,9 @@ return function (array $report, bool $colour = false): string {
         foreach ($ex['frames'] as $f) {
             $tag   = str_pad(strtoupper($f['kind']), 9);
             $where = $f['file'] . ':' . $f['line'];
-            $out[] = sprintf('  %s %s %s', $c($f['kind'] === 'app' || $f['kind'] === 'view' ? '32' : '90', $tag), $c($f['kind'] === 'app' || $f['kind'] === 'view' ? '0' : '90', $where), $f['function'] ? $c('36', $f['function'] . '()') : '');
+            $args  = [];
+            foreach ($f['args'] as $name => $arg) $args[] = $name . ' = ' . (is_array($arg['value']) ? json_encode($arg['value'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : var_export($arg['value'], true)) . ' ' . $c('90', $arg['type']);
+            $out[] = sprintf('  %s %s %s', $c($f['kind'] === 'app' || $f['kind'] === 'view' ? '32' : '90', $tag), $c($f['kind'] === 'app' || $f['kind'] === 'view' ? '0' : '90', $where), $f['function'] ? $c('36', $f['function'] . '(' . implode(', ', $args) . ')') : '');
         }
         $out[] = '';
     }
@@ -30,7 +32,7 @@ return function (array $report, bool $colour = false): string {
     $out[] = '  ' . $req['method'] . ' ' . $req['url'];
     if ($report['route']) $out[] = '  route: ' . ($report['route']['name'] ?? '—') . ($report['route']['handler'] ? ' → ' . $report['route']['handler'] : '');
     if ($req['ip']) $out[] = '  ip: ' . $req['ip'];
-    if ($report['user']) $out[] = '  user: ' . json_encode($report['user'], JSON_UNESCAPED_UNICODE);
+    $out[] = '  user: ' . (is_array($report['user']) ? json_encode($report['user'], JSON_UNESCAPED_UNICODE) : $report['user']);
     if ($req['get']) $out[] = '  query: ' . json_encode($req['get'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($req['post']) $out[] = '  body: ' . json_encode($req['post'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     $out[] = '';
