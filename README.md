@@ -1843,8 +1843,6 @@ return [
     'x-powered-by' => false,
     'lang'         => 'en',
     'public'       => '/public',
-    'crypt'        => ['key' => '...', 'salt' => '...'],
-    'error'        => ['logging' => true, 'callback' => null],
     'pagination'   => ['default-view' => 'partials.pagination'],
 ];
 ```
@@ -1858,6 +1856,7 @@ return [
     'log'      => ['enabled' => true, 'level' => 'debug', 'days' => 14],
     'throttle' => ['enabled' => true, 'limit' => 60, 'window' => 60, 'by' => 'ip', 'block' => 0],
     'trusted-proxies' => [],   // addresses ip() may read a forwarded header from
+    'error'    => ['logging' => true, 'keep_days' => 14, 'stream' => false, 'mask' => [], 'previous' => 10, 'callback' => fn($path, $html) => null],
     'session'  => ['driver' => 'file', 'gc_probability' => 1],
     'response' => ['ajax' => ['include-alerts' => true], 'cache-ttl' => 600, 'page-cache' => true],
     'cache'    => ['apcu' => true],
@@ -2037,7 +2036,7 @@ Then one crontab entry per script, in cPanel or wherever the host keeps them:
 session setup and the `force-https` redirect — neither means anything without a browser. It
 also never loads routes, providers or modules, so the route table is empty.
 
-**Errors follow `config/app.php` like everywhere else.** `cron.php` installs the same handler
+**Errors follow `config/framework.php` like everywhere else.** `cron.php` installs the same handler
 `terminal` does, so an uncaught throwable in a cron script is written to `error_logs/` when
 `error.logging` is on. Without that it went to stderr only — and a crontab line ending in
 `>> /dev/null 2>&1`, which is how they are usually written, threw that away too.
@@ -2430,20 +2429,47 @@ SSL::install('example.com', $cert, $key, $caBundle);
 ### config/app.php
 
 ```php
-'debug'        => false,   // REQUIRED. Also gates the query analyzer and stack-trace args.
+'debug'        => false,   // REQUIRED. Also gates the query analyzer, the query log and stack-trace args.
 'x-powered-by' => false,   // stop leaking the framework version
 'force-https'  => true,
-'error'        => ['logging' => true],
 ```
 
 `debug => false` is the single most important switch. Besides hiding the error
-page, it turns off two things that are expensive or unsafe on production:
+page, it turns off three things that are expensive or unsafe on production:
 
 - the **query analyzer**, which re-executes every analysed SELECT through
   `EXPLAIN ANALYZE`,
+- the **query log** the error page reads (`DB::$queryLog`, one array entry per query),
 - **`zend.exception_ignore_args`**, which otherwise keeps every call argument
-  attached to exceptions — a failed login would write the plain password into
-  the error log next to the trace.
+  attached to exceptions.
+
+### The error page
+
+With `debug` on, an uncaught throwable renders a page: the exception class and its
+`getPrevious()` chain, every frame with the function running in it and that function's
+arguments (named by reflection), the code around each frame coloured by PHP's own lexer,
+request / headers / cookies / session / matched route / middlewares, every query the
+request ran with bindings and timing (the failed one marked), memory and elapsed time, and
+links to the previous reports. A frame inside a template names the template file and line
+it came from, not the compiled cache, and "Open in editor" opens that. `j`/`k` move
+between frames, `o` opens the editor, `f` hides framework frames, `t` flips the theme.
+
+A client that asks for JSON (`X-Requested-With`, or `Accept: application/json`) gets the
+same report as JSON; the terminal gets it as text. **With `debug` off** every shape is a
+500 with one sentence, and the report still goes to `error_logs/` for you.
+
+**Secrets never reach the page or the file.** Any key containing `password`, `secret`,
+`token`, `auth`, `csrf`, `cookie`, `authorization`, `private`, `salt` or `credential` -
+in the request, session, headers, `$_SERVER` or a frame argument - is shown as `••••••`;
+`framework.error.mask` adds your own. Cookie values are never shown, long strings are cut,
+and the user block is id and email from what `Auth` already loaded - the page never runs a
+query of its own.
+
+`config/framework.php` → `error`: `logging`, `keep_days` (reports older than this are
+swept, at most once an hour, only on a request that already failed), `stream` for a
+one-line summary to `error_log` / `stderr` / `syslog`, `mask`, `previous` and `callback`.
+Reports are named `Y-m-d-H-i-s-<hex>-<ExceptionClass>.html` and open on their own — no
+fonts or scripts fetched from anywhere.
 
 ### config/framework.php — the `view` key
 

@@ -11,14 +11,9 @@ commit it, never hand-write it.
 ## `config/app.php` — what the application is
 
 ```php
-'debug'        => true,      // false in production; also gates the query analyzer
-'error' => [
-    'logging'   => true,     // HTML reports under error_logs/
-    'keep_days' => 14,       // how long one is kept; 0 keeps everything
-    'stream'   => false,     // false | 'error_log' | 'stderr' | 'syslog' — one-line summary
-    'callback' => fn($log_path, $log) => ...,   // dies on CLI unless ZF_WORKER is defined
-                                                //   (worker.php and `queue work` both define it)
-],
+'debug'        => true,      // false in production; gates the error page, the query analyzer,
+                             // the query log and stack-trace arguments
+// 'error' moved to config/framework.php (still read from here if an app has not moved it)
 'force-https'  => false,     // redirect http → https
 'x-powered-by' => true,      // false hides the response header
 'lang'         => 'tr',      // fallback when the browser's language is not in config/languages.php
@@ -50,6 +45,15 @@ commit it, never hand-write it.
     'window'  => 60,     // seconds
     'by'      => 'ip',   // ip | token
     'block'   => 0,      // seconds to refuse outright once the limit is passed
+],
+'error' => [
+    'logging'   => true,     // a self-contained HTML report per error under error_logs/
+    'keep_days' => 14,       // how long one is kept; 0 keeps everything
+    'stream'    => false,    // false | 'error_log' | 'stderr' | 'syslog' — one-line summary
+    'mask'      => [],       // extra key names never shown (built-in: password, token, secret,
+                             //   auth, csrf, cookie ...) — substring match on the key, everywhere
+    'previous'  => 10,       // earlier reports the page links to
+    'callback'  => fn($log_path, $log) => ...,   // dies on CLI unless ZF_WORKER is defined
 ],
 'trusted-proxies' => [],       // addresses ip() will read a forwarded header from.
                                // Empty trusts none: REMOTE_ADDR and nothing else.

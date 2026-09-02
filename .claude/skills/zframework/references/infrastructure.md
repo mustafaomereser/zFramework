@@ -562,14 +562,44 @@ php terminal bench run                              # boot + request cost on thi
 
 ## Error handling
 
-- `zFramework/modules/error_handlers/loader.php` defines a thin `errorHandler()`; the 68 KB
-  `handle.php` renderer loads only when an error actually occurs.
-- **Never echo what `errorHandler()` returns** — `handle.php` already prints it. Correct form:
-  `errorHandler($err); die;`
-- `config/app.php` → `error.logging` writes HTML files under `error_logs/`; `error.stream`
-  (`false` | `'error_log'` | `'stderr'` | `'syslog'`) also emits a one-line summary, which is what
-  you want as soon as more than one machine serves the site. `error.keep_days` (14) sweeps old
-  reports - only on a request that already failed, and at most once an hour; 0 keeps everything.
+- `zFramework/modules/error_handlers/loader.php` defines a thin `errorHandler()`; nothing else
+  loads until an error occurs. Then `handle.php` builds a report (`Report.php`) and renders it
+  with `render/html.php`, `render/json.php` or `render/text.php`; `Highlighter.php` colours
+  code with `token_get_all()`.
+- **Never echo what `errorHandler()` returns** — it has printed already where printing was
+  right. Correct form: `errorHandler($err); die;`
+- **What the caller gets, with `app.debug` on:** a browser gets the page; a client that sends
+  `X-Requested-With` or `Accept: application/json` (`Http::wantsJson()`) gets JSON with the
+  chain, frames, arguments and queries; the cli gets coloured text. **With debug off** every
+  shape is a 500 with one sentence, and the HTML report still goes to disk. The status is 500
+  in all cases unless something set one first (`DB::connection()` answers 503).
+- **The report** carries the exception class, the `getPrevious()` chain ("caused by"), every
+  frame with the function running in it and that function's arguments named by reflection,
+  request/headers/cookies/session, the matched route and middlewares, the query log (see
+  below), timing and memory, the user (id and email, from what `Auth` already loaded — it
+  never queries), and links to the last `error.previous` reports.
+- **Masking is one list, applied everywhere before rendering:** a key containing `password`,
+  `passwd`, `secret`, `token`, `api_key`, `auth`, `csrf`, `cookie`, `authorization`,
+  `private`, `salt` or `credential` — plus `framework.error.mask` — shows `••••••` whether it
+  sits in `$_POST`, the session, a header, `$_SERVER` or a frame argument. Cookie values are
+  never shown. Strings over 200 characters are cut. What is on disk under `error_logs/` is
+  the same page, so the same rules protect it.
+- **Template frames name the template.** A frame in `eval()`'d code or a `*.compiled.php` file
+  is mapped through `View::sourceOf()` to the `resource/views/...` file and line it came from,
+  and "Open in editor" opens that. See `views.md` → "Errors point at the template".
+- **Frames are tagged by prefix:** APP, VIEW, FRAMEWORK (`zFramework/`), VENDOR
+  (`zFramework/vendor/`). The first APP or VIEW frame opens by default; `f` hides the rest.
+- **`DB::$queryLog`** — while `app.debug` is on, every query of the request with bindings,
+  duration, connection and the driver's message when it failed (capped at 500). Read it
+  yourself if useful; it is cleared per request. Production pays one boolean per query.
+- `config/framework.php` → `error.logging` writes the report under `error_logs/` as
+  `Y-m-d-H-i-s-<hex>-<ExceptionClass>.html`; `error.stream` (`false` | `'error_log'` |
+  `'stderr'` | `'syslog'`) also emits a one-line summary, which is what you want as soon as
+  more than one machine serves the site. `error.keep_days` (14) sweeps old reports - only on
+  a request that already failed, and at most once an hour; 0 keeps everything. The block
+  used to live in `config/app.php` and is still read from there.
+- `suggestions/<code>.php` is included into the page for a matching exception code (1000,
+  1001, 42S02 ship) — arbitrary PHP behind the debug gate, by design.
 - **A fatal is reported too, by a shutdown handler, not by `errorHandler()`.** Running out of
   memory, passing `max_execution_time` or a parse error in a runtime include never reaches
   `set_exception_handler`, and there is no `set_error_handler` here at all - so those used to

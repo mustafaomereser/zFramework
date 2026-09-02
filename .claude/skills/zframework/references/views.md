@@ -268,6 +268,30 @@ The rest of what exists, for reading other people's templates: `@elseif`, `@else
 - Caching and minify are both on by default (`config/framework.php:19-22`); turn caching off
   while writing templates.
 
+## Errors point at the template
+
+A compiled template is one file - layout, page and partials folded together - and PHP reports
+an error inside it as `View.php(N) : eval()'d code` or as the `*.compiled.php` cache file.
+compile() leaves a marker wherever one file's text gives way to another's:
+
+```php
+<?php /*#zf:resource/views/app/main.php:1*/ ?>
+```
+
+A PHP comment, so it prints nothing and survives minify. `View::sourceOf($compiled, $line)`
+walks back to the nearest marker and counts on from it, and the error page uses it to name
+`resource/views/app/partials/nav.php:3` rather than line 66 of a cache file - through
+`@extends`, `@include`, a partial inside a partial, and a `@section` yielded into a layout.
+
+**A debug compile does not minify.** Folded lines cannot be mapped, so with `app.debug` on the
+compiled text keeps the template's line breaks (`view.minify` is honoured only when debug is
+off). A cache compiled in debug therefore serves unminified until it is rebuilt - clear it on
+deploy as always. `{{-- --}}` comments spanning lines leave their line breaks behind for the
+same reason.
+
+`View::$evaluating` holds the text of every template currently inside `eval()`, innermost
+last; the error page pairs it with the eval frames. Request state, cleared per request.
+
 ## `view()` resolution
 
 ```php
