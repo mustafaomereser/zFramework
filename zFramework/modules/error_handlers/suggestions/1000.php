@@ -1,7 +1,9 @@
 <?php
 if (isset($_GET['crypt-key-create'])) {
     \zFramework\Kernel\Terminal::begin('security key --regen');
-    refresh();
+    # Back to the page without the flag. refresh() reloaded this same url, flag
+    # included, so the command ran again on every load and never let go.
+    redirect(strtok(uri(), '?') ?: '/');
 }
 ?>
 <p>Every installation needs its own encryption key, and this one has none yet.</p>

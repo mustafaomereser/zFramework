@@ -2,7 +2,9 @@
 
 if (isset($_GET['migrate-it'])) {
     \zFramework\Kernel\Terminal::begin('db migrate' . (isset($_GET['all']) ? ' --all --force' : ''));
-    refresh();
+    # Back to the page without the flag. refresh() reloaded this same url, flag
+    # included, so the command ran again on every load and never let go.
+    redirect(strtok(uri(), '?') ?: '/');
 }
 
 $here = method() == 'GET' ? host() . uri() : null;
