@@ -20,7 +20,10 @@ class Cookie
      */
     public static function init()
     {
-        self::$options['expires'] = time() + 86400;
+        # A lifetime, not a moment. init() runs once per process, so a stored timestamp
+        # froze at boot: under a worker still up a day later every cookie went out
+        # already expired and nobody could stay logged in.
+        self::$options['expires'] = 86400;
         // self::$options['domain']  = host();
     }
 
@@ -54,7 +57,7 @@ class Cookie
         $name    = self::keyparse($key);
         $encoded = Crypter::encode($value);
         $options = [
-            'expires'  => $expires ? (time() + $expires) : self::$options['expires'],
+            'expires'  => ($lifetime = $expires ?: self::$options['expires']) ? time() + $lifetime : 0,
             'path'     => self::$options['path'],
             'domain'   => self::$options['domain'],
             'secure'   => self::$options['security'],
