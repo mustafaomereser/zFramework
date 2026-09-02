@@ -178,3 +178,9 @@ details.tree .kv th { width: auto; }
 .argsall .kv th { width: 1%; white-space: nowrap; color: var(--t-v); }
 .argsall .kv td.type { width: 1%; white-space: nowrap; color: var(--fg-4); }
 .argsall .kv th, .argsall .kv td { padding: 3px 12px 3px 0; border: 0; }
+
+.tag.cause { color: var(--amber); background: var(--amber-soft); }
+.frame.hint { padding-left: 30px; background: var(--amber-soft); box-shadow: inset 3px 0 0 var(--amber); }
+.frame.hint.active { box-shadow: inset 3px 0 0 var(--amber); background: var(--bg-2); }
+.code-title .note.cause { color: var(--amber); }
+.t-d { color: var(--t-k); } .t-e { color: var(--t-v); }

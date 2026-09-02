@@ -35,6 +35,11 @@ class Report
     private const ARG_LENGTH = 2000;
 
     /**
+     * Whether the exception being reported is a ParseError. Set per exception.
+     */
+    private static bool $parseError = false;
+
+    /**
      * @param \Throwable|array $thrown A Throwable, or the (array) cast of one that older callers pass.
      * @return array
      */
@@ -88,6 +93,10 @@ class Report
     {
         $trace  = $e->getTrace();
         $frames = [];
+
+        # Read by frame() and pairArguments(): only a parse error is reported away
+        # from its cause, so only then is the text before a template segment named.
+        self::$parseError = $e instanceof \ParseError;
 
         # The throw site is not in getTrace(); it is the exception's own file and
         # line, and the function running there is the one trace[0] names. For every
@@ -162,7 +171,7 @@ class Report
             $source = class_exists(View::class, false) ? View::sourceOf($text, $line) : null;
             if ($source) {
                 # See pairArguments(): a parse error is reported where the parser gave up.
-                $before = $line > 1 ? View::sourceOf($text, $line - 1) : null;
+                $before = self::$parseError && ($source['at'] ?? 1) > 1 ? View::sourceOf($text, $source['at'] - 1) : null;
                 if ($before && str_replace('\\', '/', $before['file']) !== str_replace('\\', '/', $source['file'])) $frame['before'] = ['file' => str_replace('\\', '/', $before['file']), 'line' => $before['line']];
 
                 $frame['compiled'] = ['file' => $frame['file'], 'line' => $line];
@@ -246,11 +255,11 @@ class Report
                     $frame['line'] = $source['line'];
 
                     # A parse error is reported where the parser gave up, not where the
-                    # mistake is: an unclosed `<?php` in a page runs on until the marker
-                    # that hands the text back to the layout, and PHP names that line.
-                    # When the line before belongs to another file, that file is the one
-                    # to look at, and the frame says so.
-                    $before = $frame['compiled']['line'] > 1 ? View::sourceOf($compiled, $frame['compiled']['line'] - 1) : null;
+                    # mistake is: an unclosed `<?php` or quote in a page runs on into the
+                    # layout, and PHP names a line there. The text that ran on ended where
+                    # this file's segment began, so the segment before that one is where
+                    # to look - and the frame says so.
+                    $before = self::$parseError && ($source['at'] ?? 1) > 1 ? View::sourceOf($compiled, $source['at'] - 1) : null;
                     if ($before && str_replace('\\', '/', $before['file']) !== $frame['file']) $frame['before'] = ['file' => str_replace('\\', '/', $before['file']), 'line' => $before['line']];
                 } else {
                     # Nothing to map it with: show the compiled text itself.
@@ -259,8 +268,33 @@ class Report
                 }
             }
         }
+        unset($frame);
 
-        return $frames;
+        # A frame that names the text before its segment gets a frame of its own
+        # right under it, so the likely cause is a click away with its code shown,
+        # not a sentence to act on by hand.
+        $expanded = [];
+        foreach ($frames as $frame) {
+            $expanded[] = $frame;
+            if (!empty($frame['before'])) $expanded[] = [
+                'index'    => 0,
+                'trace'    => $frame['trace'],
+                'file'     => $frame['before']['file'],
+                'line'     => $frame['before']['line'],
+                'function' => null,
+                'args'     => [],
+                'kind'     => 'view',
+                'compiled' => null,
+                'via'      => null,
+                'before'   => null,
+                'hint'     => 'likely cause',
+                'area'     => 'View',
+            ];
+        }
+        foreach ($expanded as $i => &$frame) $frame['index'] = $i;
+        unset($frame);
+
+        return $expanded;
     }
 
     /**

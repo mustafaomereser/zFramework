@@ -58,6 +58,7 @@ return (function (array $report): string {
         $out .= '<div class="code-head">';
         $out .= '<div class="code-title"><span class="path">' . $h($rel($file)) . '</span><span class="ln">:' . $line . '</span>';
         if ($frame['compiled']) $out .= '<span class="note">compiled line ' . $frame['compiled']['line'] . '</span>';
+        if (!empty($frame['hint'])) $out .= '<span class="note cause">likely cause - the parser gave up further on, at the frame above</span>';
         if ($frame['before']) $out .= '<div class="before">Reported where the parser gave up. The text just before this point is <b>' . $h($rel($frame['before']['file'])) . ':' . $frame['before']['line'] . '</b> - an unclosed <code>&lt;?php</code>, quote or bracket above that line is the usual cause.</div>';
         $out .= '</div>';
         if ($frame['function']) $out .= '<div class="code-fn">' . $h($frame['function']) . '()' . ($frame['via'] ? ' <span class="dim">threw from ' . $h($frame['via']) . '()</span>' : '') . '</div>';
@@ -91,6 +92,7 @@ return (function (array $report): string {
     # The first frame that is the application's own opens by default - it is
     # almost always the one to read first. Failing that, the throw site.
     $defaultFrame = function (array $frames): int {
+        foreach ($frames as $f) if (!empty($f['hint'])) return $f['index'];
         foreach ($frames as $f) if (in_array($f['kind'], ['app', 'view'], true)) return $f['index'];
         return 0;
     };
@@ -178,10 +180,10 @@ return (function (array $report): string {
             </div>
             <div class="frames">
                 <?php $default = $defaultFrame($ex['frames']); foreach ($ex['frames'] as $f): ?>
-                    <div class="frame <?= $f['kind'] ?><?= $f['index'] === $default ? ' default' : '' ?>" data-index="<?= $f['index'] ?>" title="<?= $h($rel($f['file'])) ?>">
-                        <span class="where"><?= $h(basename($f['file'])) ?><span class="ln">:<?= $f['line'] ?></span></span>
-                        <span class="tag <?= $f['kind'] ?>"><?= $f['kind'] ?></span>
-                        <span class="fn"><?= $f['function'] ? $h($f['function']) . '()' : '<span class="dim">' . $h(dirname($rel($f['file']))) . '</span>' ?></span>
+                    <div class="frame <?= $f['kind'] ?><?= $f['index'] === $default ? ' default' : '' ?><?= !empty($f['hint']) ? ' hint' : '' ?>" data-index="<?= $f['index'] ?>" title="<?= $h($rel($f['file'])) ?>">
+                        <span class="where"><?= !empty($f['hint']) ? '<span class="dim">↳</span> ' : '' ?><?= $h(basename($f['file'])) ?><span class="ln">:<?= $f['line'] ?></span></span>
+                        <span class="tag <?= !empty($f['hint']) ? 'cause' : $f['kind'] ?>"><?= !empty($f['hint']) ? $f['hint'] : $f['kind'] ?></span>
+                        <span class="fn"><?= !empty($f['hint']) ? '<span class="dim">the text before the reported line - an unclosed &lt;?php, quote or bracket</span>' : ($f['function'] ? $h($f['function']) . '()' : '<span class="dim">' . $h(dirname($rel($f['file']))) . '</span>') ?></span>
                     </div>
                 <?php endforeach ?>
                 <div class="hidden-note">framework frames hidden</div>

@@ -43,7 +43,7 @@ class Highlighter
             $last   = count($pieces) - 1;
 
             foreach ($pieces as $i => $piece) {
-                if ($piece !== '') $current .= $class ? '<span class="t-' . $class . '">' . htmlspecialchars($piece, ENT_QUOTES) . '</span>' : htmlspecialchars($piece, ENT_QUOTES);
+                if ($piece !== '') $current .= $class ? '<span class="t-' . $class . '">' . ($class === 'html' ? self::template(htmlspecialchars($piece, ENT_QUOTES)) : htmlspecialchars($piece, ENT_QUOTES)) . '</span>' : htmlspecialchars($piece, ENT_QUOTES);
                 if ($i < $last) {
                     $lines[] = $current;
                     $current = '';
@@ -54,6 +54,24 @@ class Highlighter
         $lines[] = $current;
 
         return $lines;
+    }
+
+    /**
+     * Template syntax inside inline HTML: @directives and {{ }} / {!! !!} echoes.
+     *
+     * The lexer sees a template as one HTML token, so its own syntax would be
+     * grey. Applied to text that is already escaped, on a single line.
+     *
+     * @param string $html
+     * @return string
+     */
+    private static function template(string $html): string
+    {
+        $html = preg_replace('/\{\{(?:--.*?--|\/\*.*?\*\/)\}\}/', '<span class="t-c">$0</span>', $html);
+        $html = preg_replace('/\{\{(?!--)(.*?)\}\}|\{!!(.*?)!!\}/', '<span class="t-e">$0</span>', $html);
+        $html = preg_replace('/(?<![\w@])@(?:end)?[a-z]+\b/', '<span class="t-d">$0</span>', $html);
+
+        return $html;
     }
 
     /**
