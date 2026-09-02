@@ -52,10 +52,12 @@ The headers still go out; only the server-side copy is refused. Six rules, all o
 measured:
 
 1. **Not a GET.** A POST is never the same for the next visitor.
-2. **The request carries an auth cookie** (`auth-token`, `auth-session`, `auth-stay-in`). A
-   logged-in page must never be stored and handed to someone else. Tested as a cookie rather
-   than `Auth::check()`, which would open a database connection on every request just to
-   decide not to cache.
+2. **The request carries an auth cookie** (`auth-token`, `auth-session`, `auth-stay-in`), or an
+   `Auth-Token` header. A logged-in page must never be stored and handed to someone else. Tested
+   as a cookie rather than `Auth::check()`, which would open a database connection on every
+   request just to decide not to cache. The names are run through `Cookie::keyparse()` first —
+   a cookie is stored under a Crypter-derived name, never the key it was set with, and looking
+   for the raw name matched nothing at all until this was fixed.
 3. **The response is not 200.** A `Page::cache()` in a constructor runs before the method
    decides the outcome, so `abort(404)` used to go out with `public, max-age=600` on it. The
    declaration is revoked when the status is not 200 — headers included.

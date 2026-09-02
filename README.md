@@ -562,7 +562,8 @@ $p->compareColumnsLength(['title' => str_repeat('x', 300)]);
 // Attempt login — checks credentials against the users table
 Auth::attempt(['email' => 'user@example.com', 'password' => 'secret']);
 Auth::attempt(['email' => 'user@example.com', 'password' => 'secret'], staymein: true);
-// staymein: true sets a persistent cookie (auth-stay-in) using the user's api_token
+// staymein: true sets a persistent cookie (auth-stay-in): the user's api_token plus a
+// trace of the password hash, so the cookie stops working when the password changes
 
 // Login directly from a user row (e.g. after OAuth)
 Auth::login($userRow);

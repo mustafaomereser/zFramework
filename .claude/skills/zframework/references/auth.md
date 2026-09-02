@@ -51,8 +51,12 @@ $v = $request->validated();
 Auth::attempt(['email' => $v['email'], 'password' => $v['password']], (bool) $v['keep-logged-in']);
 ```
 
-**3. `$staymein` is the "remember me" flag** — it stores the user's `api_token` as an
-`auth-stay-in` cookie.
+**3. `$staymein` is the "remember me" flag** — it stores `api_token|<trace>` as an `auth-stay-in`
+cookie, where the trace is the tail of the password hash. `auth-token` and `auth-password` expire
+after a day; this one is set to outlive them, so without the trace a device that stayed away past
+the expiry would be let straight back in by a password change it was meant to be locked out of.
+`Auth::restore()` checks the trace against the row before logging anyone in. `api_token` itself is
+never rotated — it authenticates the API.
 
 ## The model side — `special_columns`
 
@@ -97,6 +101,10 @@ Which one is active is decided by whether Redis is configured *and* reachable
 the password hash. Every `Auth::user()` re-reads the row and `hash_equals` the stored hash
 against the cookie — which is how *changing a password ends every other session*. It also
 means one SELECT per request that touches Auth.
+
+Both expire after a day, so that check only reaches a device that comes back within one. Past
+that, `auth-stay-in` is the only cookie left and the trace it carries is what enforces the same
+rule — see `$staymein` above.
 
 **Token mode (Redis).** A random 32-byte token goes in `auth-session`; Redis holds
 `{uid, pwd}` under it, and the user row is cached separately. 200 requests cost one SELECT
