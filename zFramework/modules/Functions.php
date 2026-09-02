@@ -119,7 +119,16 @@ function globals($name, $value = NULL)
 // Get Current Request Method.
 function method()
 {
-    return @strtoupper($_POST['_method'] ?? $_SERVER['REQUEST_METHOD']);
+    $override = $_POST['_method'] ?? null;
+
+    # Refused rather than ignored. _method decides which route runs, so falling
+    # back to the real POST would send a form meant for update() to store() and
+    # write a new row instead of changing one. `_method[]=x` makes it an array,
+    # and strtoupper() on one is a TypeError that @ does not suppress - this ran
+    # before the csrf check, so any caller could answer 500 and fill error_logs.
+    if ($override !== null && !is_string($override)) abort(400, 'Invalid _method.');
+
+    return strtoupper($override ?? $_SERVER['REQUEST_METHOD'] ?? 'GET');
 }
 
 // Show method with ready input
