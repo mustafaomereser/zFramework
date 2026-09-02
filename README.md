@@ -2254,12 +2254,30 @@ $ssl = new AutoSSL(AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');
 $ssl = new AutoSSL(AutoSSL::STAGING);
 ```
 
-### Account Management
+### Accounts
+
+Each ACME account lives in its own directory, `zFramework/storage/AutoSSL/accounts/<id>/`,
+holding `account.key` and `account.kid`. The id is a number — the date and time it was
+created plus three random digits — so a listing sorts by age.
 
 ```php
-$ssl->ensureAccount();   // creates ACME account if none exists
-$ssl->unlinkAccount();   // delete local account files
+$ssl = new AutoSSL(AutoSSL::PROD);                       // the oldest account, or a new one if there is none
+$ssl = new AutoSSL(AutoSSL::PROD, null, '20260902195802774');   // a specific one
+
+$ssl->account();          // id of the account this instance signs with
+$ssl->accounts();         // every account on disk, oldest first:
+                          //   [id => ['id', 'kid', 'registered', 'created', 'current']]
+$id = $ssl->createAccount();   // registers a new account and switches to it; returns its id
+$ssl->useAccount($id);    // switch to an existing one
+$ssl->unlinkAccount();    // forget the current account (or unlinkAccount($id)) - local files only
 ```
+
+Certificates are stored per domain, not per account, so switching accounts does not
+move or hide them. An installation that had the single `account.key` at the root is
+moved into `accounts/<id>/` on first use — same key, same registration, nothing re-issued.
+
+`AutoSSL` works from a cron script and the terminal too: `PUBLIC_DIR` is derived from
+`app.public` when the entry point has not defined it.
 
 ### Listing & Auto-renew
 

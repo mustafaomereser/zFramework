@@ -12,12 +12,21 @@ query analysis, long-running workers, backups, releases.
 ```php
 $ssl = new AutoSSL(AutoSSL::PROD);                    // or AutoSSL::STAGING while testing
 $ssl = new AutoSSL(AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');   // custom openssl.cnf
+$ssl = new AutoSSL(AutoSSL::PROD, null, $accountId);  // sign as a specific account
 ```
 
 ```php
-// Account
-ensureAccount(): string          // creates the ACME account if there is none
-unlinkAccount(): void            // removes the local account files
+// Accounts - one directory each under zFramework/storage/AutoSSL/accounts/<id>/
+// (account.key + account.kid). The id is numeric, date-based, so listings sort by age.
+// With no id given the constructor takes the oldest account, or registers one if none.
+account(): string                // id this instance signs with
+accounts(): array                // [id => [id, kid, registered, created, current]], oldest first
+createAccount(): string          // register a new account, switch to it, return its id
+useAccount(string $id): self     // switch to an existing one; unknown id throws
+ensureAccount(): string          // the kid; registers the current key if it never was
+unlinkAccount(?string $id = null): void   // forget the current (or given) account, local files only
+// Certificates are per domain, not per account: switching does not move them. A root-level
+// account.key from older versions is moved into accounts/<id>/ on first use - same account.
 
 // Inventory
 list(): array                    // locally tracked certificates

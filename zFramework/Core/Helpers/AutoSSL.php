@@ -13,6 +13,15 @@ class AutoSSL
 
     private string $sslPath;
     private string $webChallengePath;
+
+    /**
+     * One directory per ACME account under <sslPath>/accounts/<id>/, holding
+     * account.key and account.kid. The id is a number - date and time the account
+     * was created plus three random digits - so a listing sorts by age and two
+     * created in the same second do not collide.
+     */
+    private string $accountsPath;
+    private string $account;
     private string $accountKeyPath;
     private string $directoryUrl;
     private $accountKeyRes;
@@ -20,27 +29,141 @@ class AutoSSL
     private array $openSSLConfig = ['private_key_bits' => 4096, 'private_key_type' => OPENSSL_KEYTYPE_RSA];
     private ?string $kid = null;
 
-    public function __construct(string $directoryUrl = self::STAGING, ?string $openSSLConfig = null)
+    /**
+     * @param string      $directoryUrl  AutoSSL::PROD or AutoSSL::STAGING.
+     * @param string|null $openSSLConfig Path to an openssl.cnf, for Windows.
+     * @param string|null $account       Which account to work as - an id from accounts().
+     *                                   Null takes the oldest one there is, or registers
+     *                                   a new one when there is none.
+     */
+    public function __construct(string $directoryUrl = self::STAGING, ?string $openSSLConfig = null, ?string $account = null)
     {
         global $storage_path;
         if (!is_null($openSSLConfig)) $this->openSSLConfig['config'] = $openSSLConfig;
 
         $this->sslPath          = $storage_path . "/AutoSSL";
+        $this->accountsPath     = $this->sslPath . '/accounts';
         $this->directoryUrl     = $directoryUrl;
         $this->webChallengePath = public_dir('/.well-known/acme-challenge');
-        $this->accountKeyPath   = $this->sslPath . '/account.key';
 
-        if (!is_dir($this->sslPath)) mkdir($this->sslPath, 0755, true);
+        if (!is_dir($this->accountsPath)) mkdir($this->accountsPath, 0755, true);
         if (!is_dir($this->webChallengePath)) mkdir($this->webChallengePath, 0755, true);
 
-        if (!file_exists($this->accountKeyPath)) $this->generateAccountKey();
-        $this->loadAccountKey();
+        $this->adoptLegacyAccount();
         $this->loadDirectory();
 
-        // load stored kid if exists
-        $kidFile = $this->sslPath . '/account.kid';
-        if (file_exists($kidFile)) $this->kid = trim(file_get_contents($kidFile));
-        else $this->kid = $this->ensureAccount();
+        if ($account !== null) $this->useAccount($account);
+        elseif ($accounts = $this->accounts()) $this->useAccount(array_key_first($accounts));
+        else $this->createAccount();
+    }
+
+    /**
+     * The id of the account this instance signs with.
+     *
+     * @return string
+     */
+    public function account(): string
+    {
+        return $this->account;
+    }
+
+    /**
+     * Every account on disk, oldest first.
+     *
+     * @return array<string, array{id: string, kid: ?string, registered: bool, created: string, current: bool}>
+     */
+    public function accounts(): array
+    {
+        $accounts = [];
+
+        foreach (glob($this->accountsPath . '/*', GLOB_ONLYDIR) ?: [] as $dir) {
+            if (!is_file("$dir/account.key")) continue;
+
+            $id  = basename($dir);
+            $kid = is_file("$dir/account.kid") ? trim((string) file_get_contents("$dir/account.kid")) : null;
+
+            $accounts[$id] = [
+                'id'         => $id,
+                'kid'        => $kid ?: null,
+                'registered' => (bool) $kid,
+                'created'    => date('Y-m-d H:i:s', (int) filemtime("$dir/account.key")),
+                'current'    => isset($this->account) && $this->account === $id,
+            ];
+        }
+
+        ksort($accounts, SORT_STRING);
+
+        return $accounts;
+    }
+
+    /**
+     * Register a new account and switch this instance to it.
+     *
+     * @return string The new account's id.
+     */
+    public function createAccount(): string
+    {
+        do $id = date('YmdHis') . random_int(100, 999);
+        while (is_dir($this->accountsPath . "/$id"));
+
+        mkdir($this->accountsPath . "/$id", 0755, true);
+
+        $this->account        = $id;
+        $this->accountKeyPath = $this->accountsPath . "/$id/account.key";
+        $this->kid            = null;
+
+        $this->generateAccountKey();
+        $this->loadAccountKey();
+        $this->ensureAccount();
+
+        return $id;
+    }
+
+    /**
+     * Switch this instance to an existing account.
+     *
+     * @param string $id
+     * @return self
+     */
+    public function useAccount(string $id): self
+    {
+        $dir = $this->accountsPath . '/' . basename($id);
+        if (!is_file("$dir/account.key")) throw new \InvalidArgumentException("AutoSSL: no account `$id` - see accounts().");
+
+        $this->account        = basename($id);
+        $this->accountKeyPath = "$dir/account.key";
+        $this->kid            = null;
+
+        $this->loadAccountKey();
+
+        # A key that was generated but never registered - the registration call
+        # failed, or the process died between the two - is registered now.
+        if (is_file("$dir/account.kid")) $this->kid = trim((string) file_get_contents("$dir/account.kid")) ?: null;
+        if (!$this->kid) $this->ensureAccount();
+
+        return $this;
+    }
+
+    /**
+     * Move the single account older versions kept at the root into accounts/<id>/.
+     *
+     * Only the files move; the key and the kid are what identify the account to
+     * the CA, so it is the same account afterwards and every certificate it issued
+     * still renews under it.
+     *
+     * @return void
+     */
+    private function adoptLegacyAccount(): void
+    {
+        if (!is_file($this->sslPath . '/account.key')) return;
+
+        $id  = date('YmdHis', (int) filemtime($this->sslPath . '/account.key')) . '000';
+        $dir = $this->accountsPath . "/$id";
+
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        rename($this->sslPath . '/account.key', "$dir/account.key");
+        if (is_file($this->sslPath . '/account.kid')) rename($this->sslPath . '/account.kid', "$dir/account.kid");
     }
 
     private function httpRequest(string $url, string $method = 'GET', $body = null, array $headers = []): array
@@ -165,15 +288,29 @@ class AutoSSL
         $loc = $resp['headers']['Location'] ?? $resp['headers']['location'] ?? null;
         if (!$loc) throw new \Exception("No account Location header");
         $this->kid = $loc;
-        file_put_contents($this->sslPath . '/account.kid', $loc);
+        file_put_contents(dirname($this->accountKeyPath) . '/account.kid', $loc);
         return $loc;
     }
 
-    public function unlinkAccount(): void
+    /**
+     * Forget an account - the current one, or the id given. Local files only; the CA
+     * keeps its side, and certificates issued under it stay where they are.
+     *
+     * @param string|null $id
+     * @return void
+     */
+    public function unlinkAccount(?string $id = null): void
     {
-        $this->kid = null;
-        unlink($this->sslPath . '/account.kid');
-        unlink($this->sslPath . '/account.key');
+        $id  = basename($id ?? $this->account);
+        $dir = $this->accountsPath . "/$id";
+
+        foreach (['account.kid', 'account.key'] as $file) if (is_file("$dir/$file")) unlink("$dir/$file");
+        if (is_dir($dir)) @rmdir($dir);
+
+        if ($id === $this->account) {
+            $this->kid = null;
+            unset($this->account);
+        }
     }
 
     public function checkSSL(string $domain): array
@@ -191,7 +328,8 @@ class AutoSSL
 
     public function list(): array
     {
-        return glob($this->sslPath . '/*', GLOB_ONLYDIR);
+        # accounts/ sits beside the domain folders and is not one.
+        return array_values(array_filter(glob($this->sslPath . '/*', GLOB_ONLYDIR) ?: [], fn($dir) => basename($dir) !== 'accounts'));
     }
 
     public function download(string $domain): array
