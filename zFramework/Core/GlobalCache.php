@@ -143,11 +143,46 @@ class GlobalCache
     }
 
     /**
-     * Clear all cache
+     * Clear this installation's cache - both layers.
+     *
+     * Scoped to the prefix getName() builds. apcu_clear_cache() emptied the whole
+     * shared segment, so clearing one site's cache dropped the schema cache of every
+     * other site under the same FPM master, and they each paid a cold rebuild for it.
+     * Redis is cleared too: with an L2 in place, dropping only L1 refills it from the
+     * same stale values on the next read, which is not a clear at all.
+     *
+     * @return bool
      */
     public static function clear(): bool
     {
+        self::getName('');
+
+        if (self::redisEnabled() && $redis = \zFramework\Core\Facades\Redis::connection('cache')) {
+            try {
+                # SCAN, not KEYS: a cache big enough to want clearing is big enough
+                # that KEYS would block the server while it walks it.
+                $match  = \zFramework\Core\Facades\Redis::key(self::$prefix) . '*';
+                $cursor = null;
+
+                # do/while, not while: a scan pass may match nothing and still be
+                # mid-iteration. The cursor says when it is over, the batch does not.
+                do {
+                    $keys = $redis->scan($cursor, $match, 500);
+                    if ($keys) $redis->del($keys);
+                } while ($cursor);
+            } catch (\Throwable) {
+            }
+        }
+
         if (!self::apcu()) return false;
+
+        # APCUIterator needs the prefix quoted: an install path hashes to hex, but
+        # the dots around it are regex metacharacters.
+        if (class_exists('APCUIterator', false)) {
+            foreach (new \APCUIterator('/^' . preg_quote(self::$prefix, '/') . '/') as $entry) apcu_delete($entry['key']);
+            return true;
+        }
+
         apcu_clear_cache();
         return true;
     }
