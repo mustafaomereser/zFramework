@@ -7,8 +7,11 @@ use modules\Blog\Controllers\Client\CategoryController as ClientCategoryControll
 use zFramework\Core\Route;
 
 Route::pre('/blog')->group(function () {
-    Route::resource('/', ClientBlogController::class);
+    # The root resource registers /blog/{id}, which owns every one-segment url after it -
+    # /blog/categories included. Anything more specific has to be declared above it, as
+    # the admin group below already does.
     Route::resource('/categories', ClientCategoryController::class);
+    Route::resource('/', ClientBlogController::class);
 });
 
 Route::pre('/admin')->middleware([App\Middlewares\Auth::class])->group(function () {
