@@ -217,6 +217,12 @@ class Page
         }
 
         foreach ((array) ($meta['headers'] ?? []) as [$name, $value]) Response::header($name, $value);
+
+        # The stored Cache-Control is replayed verbatim, so max-age reads as "fresh for
+        # that long, starting now" to whoever receives it. A nine-minute-old entry with
+        # max-age=600 bought a second ten minutes downstream - up to twice the ttl that
+        # was asked for. Age is how a cache says how much of the window is already gone.
+        if ($stored = (int) ($meta['stored'] ?? 0)) Response::header('Age', (string) max(0, time() - $stored));
         # Debug only: in production it tells a visitor which pages are cached,
         # which is a map of where to look for a stale-token or stale-content bug.
         if (Config::get('app.debug') ?? false) Response::header('X-Page-Cache', 'HIT');
@@ -247,7 +253,12 @@ class Page
         # remote from its cause: the page renders fine, and only the next
         # visitor's POST breaks. The headers are undone too, or the browser
         # would keep replaying the stale token from its own cache.
-        if (str_contains($body, "name='_token'") || str_contains($body, 'name="_token"')) {
+        # The meta tag counts as well. assets/js/push-notification.js reads
+        # `meta[name="csrf-token"]` and falls back to the hidden input, so a page with
+        # no form at all can still be handing out a token - and that was the shape this
+        # check did not see. Matched loosely on purpose: the cost of a false positive is
+        # one page that stays live.
+        if (str_contains($body, "name='_token'") || str_contains($body, 'name="_token"') || str_contains($body, 'csrf-token')) {
             self::noCache();
 
             # Debug only. The safe behaviour - staying live - is automatic, and a
@@ -266,6 +277,7 @@ class Page
         # is a hash that folds in the visitor's language, and no caller can rebuild it.
         $meta = json_encode([
             'expires' => time() + $ttl,
+            'stored'  => time(),
             'method'  => strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'),
             'url'     => $_SERVER['REQUEST_URI'] ?? '/',
             'headers' => self::storableHeaders(),
