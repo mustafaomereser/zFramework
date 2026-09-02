@@ -12,6 +12,8 @@ function errorHandler($data)
 {
     static $loaded = false;
 
+    errorHandlerReported(true);
+
     if (!$loaded) {
         $loaded = true;
         require_once FRAMEWORK_PATH . '/modules/error_handlers/handle.php';
@@ -19,6 +21,92 @@ function errorHandler($data)
 
     return errorHandlerRender($data);
 }
+
+/**
+ * Whether this request has already reported an error.
+ *
+ * The shutdown handler below asks, because the two overlap: in production
+ * errorHandler() ends with abort(), abort() throws, and a throw from inside an
+ * exception handler is itself a fatal error. That fatal is an artefact of the
+ * reporting, not a second failure, and logging it would bury the real one.
+ *
+ * @param bool $set
+ * @return bool
+ */
+function errorHandlerReported(bool $set = false): bool
+{
+    static $reported = false;
+
+    if ($set) $reported = true;
+    return $reported;
+}
+
+# Memory to give back when there is none left. An OOM fatal leaves the process at
+# its ceiling, and the shutdown handler below cannot allocate so much as the string
+# it wants to write - which is exactly why the one error worth reporting reported
+# nothing. Dropping this makes room for it.
+$GLOBALS['error_handler_reserve'] = str_repeat(' ', 65536);
+
+/**
+ * What is left when nothing else runs.
+ *
+ * set_exception_handler covers a throw. It does not cover running out of memory,
+ * exceeding max_execution_time, or a parse error in a file included at runtime -
+ * and there is no set_error_handler in this framework either. So the heaviest
+ * failures a production site has were the ones nobody heard about: no file under
+ * error_logs, nothing through app.error.stream, nothing in the log, and half a
+ * page delivered to whoever was reading.
+ *
+ * Deliberately plain text and no renderer: handle.php is 68 KB of markup building,
+ * which is the one thing that cannot be asked of a process that just died for want
+ * of memory.
+ */
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if (!$error) return;
+
+    # Warnings and notices already printed themselves; only what ended the request.
+    if (!in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) return;
+
+    if (errorHandlerReported()) return;
+    errorHandlerReported(true);
+
+    unset($GLOBALS['error_handler_reserve']);
+
+    $summary = sprintf(
+        '[zFramework] FATAL %s in %s:%s (%s)',
+        $error['message'],
+        $error['file'],
+        $error['line'],
+        $_SERVER['REQUEST_URI'] ?? (PHP_SAPI === 'cli' ? 'cli' : '?')
+    );
+
+    # Each channel on its own, because any of them can be the broken one - a full
+    # disk, a config that never loaded because the fatal was in boot.
+    try {
+        if (defined('ERROR_LOG_DIR')) {
+            @mkdir(ERROR_LOG_DIR, 0755, true);
+            @file_put_contents(ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '-' . substr(md5($summary), 0, 6) . '.fatal.txt', $summary . PHP_EOL, FILE_APPEND);
+        }
+    } catch (\Throwable) {
+    }
+
+    try {
+        $stream = class_exists(\zFramework\Core\Facades\Config::class, false) ? \zFramework\Core\Facades\Config::get('app.error.stream') : 'error_log';
+
+        match ($stream ?: 'error_log') {
+            'syslog' => syslog(LOG_ERR, $summary),
+            'stderr' => @file_put_contents('php://stderr', $summary . PHP_EOL),
+            default  => error_log($summary),
+        };
+    } catch (\Throwable) {
+        error_log($summary);
+    }
+
+    # A truncated 200 reads as a successful empty page to a browser, a monitor and a
+    # cache alike. Only possible when nothing has been sent yet.
+    if (PHP_SAPI !== 'cli' && !headers_sent()) http_response_code(500);
+});
 
 set_exception_handler(function ($exception) {
     # A response signal thrown outside Run::begin() - from a cron script, a

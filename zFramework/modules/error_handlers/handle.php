@@ -1743,8 +1743,17 @@ function errorHandlerRender($data)
 <?php
     @$error_log = ob_get_clean();
     if (Config::get('app.error.logging')) {
-        $error_log_file_name = ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '.html';
+        # The second per name was not enough. Two errors inside one second overwrote
+        # each other, and they are not rare: Defer reports the exception and then the
+        # slow-job warning it caused, and a busy site fails in bursts - the first
+        # report, the one that says what actually broke, is the one that was lost.
+        $error_log_file_name = ERROR_LOG_DIR . '/' . date('Y-m-d-H-i-s') . '-' . bin2hex(random_bytes(3)) . '.html';
         file_put_contents2($error_log_file_name, $error_log);
+
+        # Before the callback, not after: the shipped callback ends in die() under the
+        # cli, so anything below it never runs on a terminal command.
+        pruneErrorLogs();
+
         Config::get('app.error.callback')($error_log_file_name, $error_log);
     }
 
@@ -1770,4 +1779,32 @@ function errorHandlerRender($data)
     # value - `die(errorHandler($e))` renders the page twice.
     echo $error_log;
     return $error_log;
+}
+
+/**
+ * Drop error reports older than app.error.keep_days.
+ *
+ * Each report is a rendered page, tens to hundreds of KB, and nothing ever removed
+ * one - a site that has been failing quietly for a year keeps a year of them. Set
+ * the config key to 0 or false to keep everything.
+ *
+ * Only ever runs on a request that already failed, and at most once an hour: the
+ * marker's own mtime is the clock, so there is no state to keep anywhere else.
+ *
+ * @return void
+ */
+function pruneErrorLogs(): void
+{
+    $days = Config::get('app.error.keep_days');
+    $days = $days === null ? 14 : (int) $days;
+    if ($days < 1) return;
+
+    $marker = ERROR_LOG_DIR . '/.pruned';
+    if (is_file($marker) && (time() - (int) @filemtime($marker)) < 3600) return;
+    @touch($marker);
+
+    $cutoff = time() - ($days * 86400);
+
+    foreach (glob(ERROR_LOG_DIR . '/*.{html,fatal.txt}', GLOB_BRACE) ?: [] as $old)
+        if ((int) @filemtime($old) < $cutoff) @unlink($old);
 }
