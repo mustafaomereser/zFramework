@@ -29,12 +29,17 @@ trait OrMethods
      */
     public function updateOrInsert(array $sets = [])
     {
-        $row = $this->first();
+        # first() runs a query and prepare() ends in reset(), so the where that found
+        # the row is gone by the time update() would read it - and an update with no
+        # where rewrites the table. The same snapshot paginate() takes: what was built
+        # before the lookup is put back for the write, so every row the caller's
+        # conditions match is updated, whether or not the table has a primary key.
+        $snapshot = $this->buildQuery;
 
-        # Not $this->update(): first() ran a query and prepare() ends in reset(), so the
-        # where that found the row is already gone and the update would rewrite the
-        # whole table. The row carries its own update closure, keyed on the primary.
-        if (count($row)) return $row['update']($sets);
+        if (count($this->first())) {
+            $this->buildQuery = $snapshot;
+            return $this->update($sets);
+        }
 
         return $this->insert($sets);
     }

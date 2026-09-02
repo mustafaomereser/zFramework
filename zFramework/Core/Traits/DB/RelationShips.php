@@ -662,15 +662,15 @@ trait RelationShips
      */
     public function toggleAttach(string $pivotTable, string $foreignKey, string $foreignValue, string $relatedKey, string $relatedValue, array $extra = [])
     {
-        $row = (new \zFramework\Core\Facades\DB)->table($pivotTable)
+        # Built twice on purpose. A query ends in reset(), so count() followed by
+        # delete() on one builder ran the delete with no conditions and emptied the
+        # pivot table. The row's own delete closure is not an option either: it
+        # exists only when the table has a primary key, and a pivot often has none.
+        $pair = fn() => (new \zFramework\Core\Facades\DB)->table($pivotTable)
             ->where($foreignKey, $foreignValue)
-            ->where($relatedKey, $relatedValue)
-            ->first();
+            ->where($relatedKey, $relatedValue);
 
-        # Not count() then delete() on the same builder: the count runs a query and
-        # prepare() ends in reset(), so the delete lost both conditions and emptied
-        # the pivot table. The row deletes itself by primary key.
-        if (count($row)) return $row['delete']();
+        if ($pair()->count() > 0) return $pair()->delete();
 
         return $this->attach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue, $extra);
     }
