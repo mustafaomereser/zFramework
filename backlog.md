@@ -68,7 +68,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
       komut yine de "restored" diyor. Yedekten dönüş sessizce eksik.
 - [x] **`MySQLBackup.php:74` — trigger/function/procedure dökümleri hiçbir dosyaya yazılmıyor**
       Çıktı dizisi kurulduktan sonra üretiliyorlar. Yedek yalnızca CREATE TABLE + INSERT içeriyor.
-- [ ] **`php terminal help` 17 docblock'ta `php kernel` diyor**
+- [x] **`php terminal help` 17 docblock'ta `php kernel` diyor**
       `Cache.php:17`, `Db.php:56,434,452,470`, `Make.php:95,106,118,129,157,182,192`,
       `Module.php:30`, `Release.php:29`, `Run.php:11,12`, `Security.php:19`.
 
@@ -244,6 +244,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
 - [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `docs(terminal)` help ciktisindaki 17 `php kernel` duzeltildi — `c9c7043`
 - [x] `fix(db)` restore noktali virgulde boluyordu, DELIMITER bilmiyordu — `928a33e`
 - [x] `fix(MySQLBackup)` triggerlar dosyaya hic yazilmiyordu
 - [x] `fix(update)` rollback/check alt komutlari tam guncelleme yapiyordu — `80fa44b`
