@@ -63,10 +63,10 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] **`Update.php:40` — `update rollback` / `update check` tam güncelleme çalıştırıyor**
       `begin()` alt komut dispatch'i yapmıyor. Bayraklı form (`--rollback`) doğru çalışıyor,
       ama `php terminal help` bunları alt komut olarak listeliyor.
-- [ ] **`Db.php:508` — `db restore` dump'ı her `;` karakterinde bölüyor**
+- [x] **`Db.php:508` — `db restore` dump'ı her `;` karakterinde bölüyor**
       Tırnak takibi yok. İçinde noktalı virgül geçen metin geri yüklenmiyor, iki 1064 basılıyor,
       komut yine de "restored" diyor. Yedekten dönüş sessizce eksik.
-- [ ] **`MySQLBackup.php:74` — trigger/function/procedure dökümleri hiçbir dosyaya yazılmıyor**
+- [x] **`MySQLBackup.php:74` — trigger/function/procedure dökümleri hiçbir dosyaya yazılmıyor**
       Çıktı dizisi kurulduktan sonra üretiliyorlar. Yedek yalnızca CREATE TABLE + INSERT içeriyor.
 - [ ] **`php terminal help` 17 docblock'ta `php kernel` diyor**
       `Cache.php:17`, `Db.php:56,434,452,470`, `Make.php:95,106,118,129,157,182,192`,
@@ -244,6 +244,8 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
 - [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `fix(db)` restore noktali virgulde boluyordu, DELIMITER bilmiyordu — `928a33e`
+- [x] `fix(MySQLBackup)` triggerlar dosyaya hic yazilmiyordu
 - [x] `fix(update)` rollback/check alt komutlari tam guncelleme yapiyordu — `80fa44b`
 - [x] `fix(db)` migrate --module modulun migrationlarini bulamiyordu — `d405c53`
 - [x] `fix(terminal)` --table/--dbname/--db bayraklari okunmuyordu — `0559d30`
