@@ -656,6 +656,11 @@ class DB
     private function addWhereOrHaving(array $parameters, string $addtype = 'where'): self
     {
         if (gettype($parameters[0]) == 'array') {
+            # A filter array that came out empty is the normal way of saying "nothing to
+            # add", and there is nothing to wrap. Recorded anyway, the driver still
+            # wrote its parentheses: `WHERE publish = :publish ()`.
+            if (!count($parameters[0])) return $this;
+
             $type    = 'group';
             $queries = [];
             foreach ($parameters[0] as $query) {

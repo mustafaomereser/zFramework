@@ -152,8 +152,13 @@ class mysql
                     $this->parent->buildQuery['data'][$hashed_key] = $query['value'];
                 }
 
-                if (count($where['queries']) == 1) $prev = ($where_key + $query_key > 0) ? $query['prev'] : null;
-                else $prev = ($query_key > 0) ? $query['prev'] : null;
+                # By kind, not by count. A group carries its outer connector on the
+                # wrapper below, so its first condition must not repeat it - counting
+                # instead meant a group holding exactly one condition emitted both and
+                # produced `AND (AND title LIKE :title)`, which is a 1064. A row has no
+                # wrapper, so it needs the connector unless it opens the clause.
+                if ($where['type'] == 'group') $prev = ($query_key > 0) ? $query['prev'] : null;
+                else $prev = ($where_key + $query_key > 0) ? $query['prev'] : null;
 
                 $response .= implode(" ", [
                     $prev,
