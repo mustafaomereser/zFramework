@@ -53,8 +53,8 @@ class WelcomeController extends Controller
     public function store(CommandRequest $command)
     {
         $command = $command->validated()['command'];
-        if (!$command) return \zFramework\Kernel\Terminal::begin(["terminal", 'start', "--web"]);
-        return \zFramework\Kernel\Terminal::begin(["terminal", $command, "--web"]);
+        if (!$command) return \zFramework\Kernel\Terminal::begin('start --web');
+        return \zFramework\Kernel\Terminal::begin("$command --web");
     }
 
     /** Update page | PATCH/PUT: /id

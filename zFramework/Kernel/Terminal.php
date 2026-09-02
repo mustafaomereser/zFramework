@@ -13,9 +13,15 @@ class Terminal
     static $textlist   = [];
     static $modules    = [];
 
-    public static function begin($args)
+    /**
+     * @param array|string $args $argv as the shell split it - the script name first,
+     *                           and dropped here - or one line typed somewhere
+     *                           without a shell in front of it, which is split here
+     *                           the way a shell would have.
+     */
+    public static function begin(array|string $args)
     {
-        unset($args[0]);
+        $args = is_array($args) ? array_slice($args, 1) : self::tokenize($args);
 
         Module::getModules();
 
@@ -36,6 +42,39 @@ class Terminal
         return self::parseCommands(readline('Command > '));
     }
 
+    /**
+     * Split a command line the way a shell would.
+     *
+     * Whitespace separates, and a quoted span - "two words" or 'two words' - is one
+     * argument with its quotes removed, so `make model X --table="iki kelime"` typed
+     * into the welcome terminal reads exactly as it does from a real shell.
+     *
+     * @param string $line
+     * @return array
+     */
+    public static function tokenize(string $line): array
+    {
+        preg_match_all('/"((?:[^"\\\\]|\\\\.)*)"|\'((?:[^\'\\\\]|\\\\.)*)\'|([^\s"\']+)/', $line, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+
+        $arguments = [];
+        $end       = null;
+
+        foreach ($matches as $match) {
+            [$whole, $offset] = $match[0];
+
+            $piece = ($match[3][0] ?? '') !== '' ? $match[3][0] : (($match[1][0] ?? '') !== '' ? $match[1][0] : ($match[2][0] ?? ''));
+
+            # --key="a b": the bare `--key=` and the quoted value are two matches that
+            # were one argument, so they are glued back when nothing separated them.
+            if ($end === $offset && $arguments) $arguments[count($arguments) - 1] .= $piece;
+            else $arguments[] = $piece;
+
+            $end = $offset + strlen($whole);
+        }
+
+        return $arguments;
+    }
+
     public static function parseCommands($commands)
     {
         // command add to history.
@@ -49,8 +88,10 @@ class Terminal
         # $argv arrives split the way the shell meant it, quotes already resolved.
         # Joining it and splitting on spaces again threw that away: --title="two words"
         # came in as one argument and left as two, the tail landing in $commands where
-        # a subcommand argument was expected.
-        $commands   = is_array($commands) ? array_values($commands) : explode(' ', $commands);
+        # a subcommand argument was expected. A line - the interactive prompt, the
+        # welcome page's terminal - has no shell in front of it, so it gets the same
+        # quote-aware split here.
+        $commands   = is_array($commands) ? array_values($commands) : self::tokenize($commands);
         $parameters = [];
 
         // parse it

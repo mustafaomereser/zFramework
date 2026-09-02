@@ -1,7 +1,7 @@
 <?php
 
 if (isset($_GET['migrate-it'])) {
-    \zFramework\Kernel\Terminal::begin(array_merge(["terminal", "db migrate"], (isset($_GET['all']) ? ['--all', '--force'] : [])));
+    \zFramework\Kernel\Terminal::begin('db migrate' . (isset($_GET['all']) ? ' --all --force' : ''));
     refresh();
 }
 ?>

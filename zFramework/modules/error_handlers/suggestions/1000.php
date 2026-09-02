@@ -1,6 +1,6 @@
 <?php
 if (isset($_GET['crypt-key-create'])) {
-    \zFramework\Kernel\Terminal::begin(["terminal", "security key --regen"]);
+    \zFramework\Kernel\Terminal::begin('security key --regen');
     refresh();
 }
 ?>
