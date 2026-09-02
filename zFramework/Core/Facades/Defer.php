@@ -124,14 +124,37 @@ class Defer
                 $job();
             } catch (\Throwable $e) {
                 # One bad job must not take the rest of the queue with it.
-                if (function_exists('errorHandler')) errorHandler($e);
+                self::report($e);
             } finally {
                 $ms = round((microtime(true) - $started) * 1000);
-                if ($ms > self::SLOW_JOB_MS && function_exists('errorHandler'))
-                    errorHandler(new \Exception("Defer job `" . ($label ?: 'unnamed') . "` took {$ms}ms - consider a queue."));
+                if ($ms > self::SLOW_JOB_MS)
+                    self::report(new \Exception("Defer job `" . ($label ?: 'unnamed') . "` took {$ms}ms - consider a queue."));
             }
         }
 
         self::$jobs = [];
+    }
+
+    /**
+     * Record a failed or slow job without ending the loop.
+     *
+     * errorHandler() writes the log and then aborts, and the abort throws. That is
+     * right in a request and meaningless here - the response left at
+     * fastcgi_finish_request(), so the signal has nothing to turn into a 500 and
+     * would only skip every job still queued. From the finally block it would take
+     * the job's own exception with it.
+     *
+     * @param \Throwable $e
+     * @return void
+     */
+    private static function report(\Throwable $e): void
+    {
+        if (!function_exists('errorHandler')) return;
+
+        # The log is written before the abort, so nothing is lost by dropping it.
+        try {
+            errorHandler($e);
+        } catch (\zFramework\Core\ResponseSignal) {
+        }
     }
 }
