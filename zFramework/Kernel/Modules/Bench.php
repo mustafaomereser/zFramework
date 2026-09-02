@@ -523,12 +523,13 @@ class Bench
         self::line('routes (static / dynamic)', ($total - $dynamic) . ' / ' . $dynamic);
 
         # Whether the table is actually being served from cache, which is a
-        # different question from whether caching is switched on. One closure
-        # anywhere keeps the whole table out, and then every request re-runs the
-        # route files - the cost of which is this line, not the matching below.
+        # different question from whether caching is switched on. Without one
+        # every request re-runs the route files - the cost of which is this line,
+        # not the matching below. With one, only the files that define closures
+        # are still included per request, and that is priced on its own.
         global $storage_path;
-        $cache    = ($storage_path ?? FRAMEWORK_PATH . '/storage') . '/routes.cache.php';
-        $blockers = RouteFacade::cacheBlockers();
+        $cache = ($storage_path ?? FRAMEWORK_PATH . '/storage') . '/routes.cache.php';
+        $live  = RouteFacade::compilable()['live'];
 
         # Usually the largest line in the summary, so more than one sample. The
         # table is restored between runs: includer() appends, and three passes
@@ -540,19 +541,26 @@ class Bench
         });
         RouteFacade::$routes = $table;
 
-        if (count($blockers)) {
-            self::line('route cache', 'BLOCKED', count($blockers) . ' route(s) use a closure - `route cache` names them');
-            self::line('cost of that', self::ms($defining), self::spread($defining, $definingWorst) ?: 're-running the route files, every request');
-            self::budget('route definitions', $defining, count($blockers) . ' closure route(s) block the cache');
-        } elseif (is_file($cache)) {
+        if (is_file($cache)) {
             self::line('route cache', 'in use', number_format(filesize($cache) / 1024, 1) . ' KB');
             self::line('saved by it', self::ms($defining), 'what defining the routes would have cost');
 
             # What the cached table costs instead: one include, which opcache
-            # serves from memory.
+            # serves from memory, plus reviving the closures from their files.
             $t = hrtime(true);
-            include $cache;
+            $compiled = include $cache;
             self::budget('route cache include', hrtime(true) - $t);
+
+            if ($live) {
+                [$reviving] = self::best(function () use ($table, $compiled) {
+                    RouteFacade::useCompiled($compiled['routes'], $compiled['index'] ?? null);
+                    RouteFacade::revive((array) ($compiled['live'] ?? []));
+                });
+                RouteFacade::$routes = $table;
+
+                self::line('live files', count($live), implode(', ', $live));
+                self::budget('closure revive', $reviving, count($live) . ' file(s) still parsed per request - move their closures to a controller to stop');
+            }
         } else {
             self::line('route cache', 'not built', 'run `php terminal route cache`');
             self::line('cost of that', self::ms($defining), 're-running the route files, every request');

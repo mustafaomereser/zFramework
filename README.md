@@ -2592,9 +2592,18 @@ if (tenant()->hasFeature('reports')) Route::resource('/raporlar', ReportControll
 The cached table and this directory are merged on every request, so the two mix
 freely.
 
-Routes handled by a closure cannot be cached — `var_export()` cannot write one.
-`route cache` refuses the whole table and names them rather than caching half of
-it, since the missing half would 404. Use `[Controller::class, 'method']`.
+A closure cannot be written to the cache — `var_export()` has no way to. It used
+to keep the whole table out; now it keeps only its own file live. The table is
+cached with a note in the closure's place (`['live' => file, 'nth' => n]`), and at
+boot that file alone is included again and its n-th closure put back where the
+note is — same position, same key, so route order is untouched. `route cache`
+lists the live files. With six closures in two files that is ~0.24 ms per
+request against ~0.95 ms for parsing every route file; move the closures to
+`[Controller::class, 'method']` and it is ~0.
+
+A live file that no longer defines what the cache expects — a closure route added
+or removed without `route cache` being run again — is reported as a stale cache
+on the next request rather than served as a 404.
 
 ### APCu (recommended)
 

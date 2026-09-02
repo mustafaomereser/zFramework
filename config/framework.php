@@ -31,8 +31,10 @@ return [
      *             one stat per route file per request, so leave it off in
      *             production where the deploy rebuilds the cache.
      *
-     * A route defined with a closure cannot be cached, and one of them keeps the
-     * whole table out. `route cache` names them.
+     * A route defined with a closure cannot be written to the cache, so its file
+     * stays "live": the table comes from the cache and only that file is included
+     * again per request to put the closure back. `route cache` names those files.
+     * Move the closures to a controller and nothing is parsed per request.
      */
     'route' => [
         'caching'    => true,

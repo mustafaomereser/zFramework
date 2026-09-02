@@ -277,7 +277,13 @@ class Run
                 # The cache carries the lookup index alongside the table, so a
                 # cached boot skips building it too. Older cache files predate it
                 # and simply have none; the first lookup builds one as before.
-                if ($cached) \zFramework\Core\Route::useCompiled($compiled['routes'] ?? $compiled, $compiled['index'] ?? null);
+                if ($cached) {
+                    \zFramework\Core\Route::useCompiled($compiled['routes'] ?? $compiled, $compiled['index'] ?? null);
+
+                    # The files that define closures are the only ones parsed per
+                    # request; everything else is the table above.
+                    \zFramework\Core\Route::revive((array) ($compiled['live'] ?? []));
+                }
             }
 
             $before = self::$included;

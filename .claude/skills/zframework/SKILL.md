@@ -173,11 +173,12 @@ route('admin.posts.show', ['id' => 5]);              // always the full name
 which owns every one-segment url by design - anything more specific goes above it, and a
 one-segment route in `route/dynamic/` (included last) can never win.
 
-**Do not write closure routes** — they block the route cache (`php terminal route cache`).
-Use `[Controller::class, 'method']`. A closure in a **middleware fallback** blocks it just
-the same (`Route.php:298-299` reports the two separately), so `middleware([Auth::class],
-fn($d) => abort(403))` costs the cache for the whole table - name a controller method, or
-accept the 404 the routing path gives by default.
+**Prefer `[Controller::class, 'method']` to a closure.** A closure cannot be written to the
+route cache, so the file defining it stays live - the rest of the table is cached and that
+file alone is re-included per request to put the closure back (`Route::revive()`, order and
+keys intact). A closure in a **middleware fallback** counts the same way, so
+`middleware([Auth::class], fn($d) => abort(403))` keeps its file live too. `route cache`
+lists the live files; none is the goal, one or two small ones is acceptable.
 
 `Route::resource` takes exactly two arguments. There is no `->only()`, `->except()`,
 `->names()`, no `apiResource`, no `Route::where()`, and the prefix helper is `Route::pre()`,

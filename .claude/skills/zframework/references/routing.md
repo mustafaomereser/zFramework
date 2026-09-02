@@ -18,8 +18,12 @@ Route::name(string $name)                 // names the route defined immediately
 `$callback` should be `[Controller::class, 'method']`. The string form `'Controller@method'`
 also works (resolved via `findFile()` through `App/Controllers/`).
 
-**Do not use closures.** They block the route cache — `Route::compilable()` returns false and
-`php terminal route cache` refuses the whole table, not just that route.
+**Prefer `[Controller::class, 'method']` to a closure.** A closure cannot go into the route
+cache, so its file stays live: the table is cached with a `['live' => file, 'nth' => n]`
+note in the closure's place, and at boot that file alone is re-included and the closure put
+back (`Route::revive()`). Order and keys survive. It costs that file's parse per request -
+the shipped Hookshot module's five closures are ~0.16 ms because its file calls `glob()` -
+and `route cache` names the live files so you can see what is still being paid for.
 
 `->name()` must follow the definition directly; it pops the last registered route and re-keys
 it. Route names are array keys, which is why two routes cannot share one.
@@ -369,7 +373,7 @@ arguments. That is how `Request` subclasses get injected and validated.
 ## Cache and inspection
 
 ```bash
-php terminal route cache    # compiles the table; refuses if any route uses a closure
+php terminal route cache    # compiles the table; files with closures stay live and are listed
 php terminal route clear
 php terminal route list
 ```

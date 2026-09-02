@@ -35,18 +35,22 @@ class Route
         $sources = RouteFacade::sources(array_values(array_diff(Run::$included, $before)));
         $total   = count(RouteFacade::$routes);
         $blocked = RouteFacade::cacheBlockers();
-
-        if (count($blocked)) {
-            Terminal::text("[color=red]Cannot cache: " . count($blocked) . " of $total route(s) use a closure.[/color]");
-            foreach ($blocked as $name => $reason) Terminal::text("[color=yellow]-> {$name}[/color] [color=dark-gray]($reason)[/color]");
-            Terminal::text("[color=dark-gray]Replace them with [Controller::class, 'method'] and run this again.[/color]");
-            return;
-        }
+        $live    = RouteFacade::compilable()['live'];
 
         $path = "$storage_path/routes.cache.php";
         if (!RouteFacade::writeCache($path, $sources)) return Terminal::text("[color=red]Could not write $path - check permissions.[/color]");
 
         Terminal::text("[color=green]Routes cached:[/color] $total route(s) from " . count($sources) . " source(s) -> $path");
+
+        if (count($blocked)) {
+            # Not a failure any more, but worth knowing: these files are still parsed
+            # on every request, and they are the ones to move if that is to stop.
+            Terminal::text("[color=yellow]" . count($blocked) . " route(s) use a closure, so " . count($live) . " file(s) stay live and are included per request:[/color]");
+            foreach ($live as $file) Terminal::text("[color=yellow]-> {$file}[/color]");
+            foreach ($blocked as $name => $reason) Terminal::text("[color=dark-gray]   {$name} ($reason)[/color]");
+            Terminal::text("[color=dark-gray]Replace them with [Controller::class, 'method'] and nothing is parsed per request.[/color]");
+        }
+
         Terminal::text("[color=dark-gray]Run `php terminal route clear` after changing a route file.[/color]");
 
         Terminal::text("\n[color=yellow]A cached table is a snapshot of this moment.[/color]");

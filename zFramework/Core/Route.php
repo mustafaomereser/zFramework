@@ -273,20 +273,40 @@ class Route
     }
 
     /**
-     * The route table, if it can be written to a cache file.
+     * The table with every closure swapped for a note of where it came from.
      *
-     * var_export() cannot write a closure, and a half-written table is worse than
-     * none: the missing half would 404. So one closure anywhere means no cache.
+     * var_export() cannot write a closure, and until now one closure anywhere
+     * meant no cache at all - the whole table parsed on every request because of
+     * one route. Instead each closure becomes ['live' => file, 'nth' => n]: the
+     * n-th closure that file defines, counting in table order. At boot the cached
+     * table is loaded, only those files are included again, and their closures
+     * are put back where the notes are - same position, same key, so "first
+     * definition wins" is undisturbed. See revive().
      *
-     * @return array|false The routes, or false naming nothing - see cacheBlockers().
+     * @return array{routes: array, live: array} The table, and the files still included per request.
      */
-    public static function compilable(): array|false
+    public static function compilable(): array
     {
-        return count(self::cacheBlockers()) ? false : self::$routes;
+        $routes = self::$routes;
+        $live   = [];
+
+        foreach (self::closures($routes) as $file => $entries) {
+            $live[] = $file;
+
+            foreach ($entries as $nth => [$key, $slot]) {
+                $note = ['live' => $file, 'nth' => $nth];
+
+                if ($slot === 'callback') $routes[$key]['callback'] = $note;
+                else $routes[$key]['groups']['middlewares'][1] = $note;
+            }
+        }
+
+        return ['routes' => $routes, 'live' => $live];
     }
 
     /**
-     * Routes that cannot be cached, keyed by route name with the reason.
+     * Routes the cache cannot hold as data, keyed by route name with the reason.
+     * Informational now: they are revived from their file rather than blocking.
      *
      * @return array
      */
@@ -300,6 +320,80 @@ class Route
         }
 
         return $blockers;
+    }
+
+    /**
+     * Every closure in a table, grouped by the file that defined it, in table order.
+     *
+     * The order is the contract: a file defines its closures in the same sequence
+     * every time it is included, so "the n-th closure from this file" names the
+     * same one at cache time and at boot.
+     *
+     * @param array $routes
+     * @return array<string, array<int, array{0: int|string, 1: string, 2: \Closure}>> file => [[key, slot, closure], ...]
+     */
+    private static function closures(array $routes): array
+    {
+        $found = [];
+        $base  = str_replace('\\', '/', BASE_PATH) . '/';
+
+        $file = function (\Closure $closure) use ($base): string {
+            $path = str_replace('\\', '/', (string) (new ReflectionFunction($closure))->getFileName());
+            return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
+        };
+
+        foreach ($routes as $key => $route) {
+            if (($route['callback'] ?? null) instanceof \Closure) $found[$file($route['callback'])][] = [$key, 'callback', $route['callback']];
+            if (($route['groups']['middlewares'][1] ?? null) instanceof \Closure) $found[$file($route['groups']['middlewares'][1])][] = [$key, 'fallback', $route['groups']['middlewares'][1]];
+        }
+
+        return $found;
+    }
+
+    /**
+     * Put the closures back into a cached table.
+     *
+     * Each file named in the cache is included once more into a scratch table,
+     * its closures are collected in order, and every ['live' => file, 'nth' => n]
+     * note in the cached table is replaced by the matching one. A file that no
+     * longer yields what the cache expects means the cache is stale - a route was
+     * added or removed there - and that is reported rather than served as a 404.
+     *
+     * @param array $live Files, relative to BASE_PATH, as written by compilable().
+     * @return void
+     */
+    public static function revive(array $live): void
+    {
+        if (!$live) return;
+
+        $table  = self::$routes;
+        $index  = self::$index;
+        $donors = [];
+
+        foreach ($live as $file) {
+            self::$routes     = [];
+            self::$groups     = [];
+            self::$add_groups = [];
+
+            \zFramework\Run::includer(BASE_PATH . '/' . $file);
+
+            foreach (self::closures(self::$routes) as $from => $entries)
+                foreach ($entries as $nth => [, , $closure]) $donors[$from][$nth] = $closure;
+        }
+
+        self::$routes = $table;
+        self::$index  = $index;
+        self::$groups = self::$add_groups = [];
+
+        $resolve = function (array $note) use ($donors): \Closure {
+            return $donors[$note['live']][$note['nth']]
+                ?? throw new \RuntimeException("Route cache is stale: `{$note['live']}` no longer defines closure #{$note['nth']}. Run `php terminal route cache`.");
+        };
+
+        foreach (self::$routes as $key => $route) {
+            if (isset($route['callback']['live'])) self::$routes[$key]['callback'] = $resolve($route['callback']);
+            if (isset($route['groups']['middlewares'][1]['live'])) self::$routes[$key]['groups']['middlewares'][1] = $resolve($route['groups']['middlewares'][1]);
+        }
     }
 
     /**
@@ -342,9 +436,9 @@ class Route
      */
     public static function writeCache(string $path, array $sources): bool
     {
-        # A closure route makes the whole table uncacheable. `route cache` reports
-        # which ones and why - cacheBlockers() names them.
-        if (($routes = self::compilable()) === false) return false;
+        # Closures leave as notes naming their file; those files are included again
+        # at boot and the closures put back - see compilable() and revive().
+        ['routes' => $routes, 'live' => $live] = self::compilable();
 
         # The lookup index goes in with the table. It is derived from $routes and
         # nothing else, and it is entirely scalar, so var_export() handles it.
@@ -352,7 +446,7 @@ class Route
         # on every request, having skipped the parsing precisely to avoid that kind
         # of work.
         $temporary = $path . '.' . getmypid() . '.tmp';
-        $content   = "<?php \nreturn " . var_export(['files' => $sources, 'routes' => $routes, 'index' => self::index()], true) . ";";
+        $content   = "<?php \nreturn " . var_export(['files' => $sources, 'live' => $live, 'routes' => $routes, 'index' => self::index()], true) . ";";
 
         if (!is_dir($directory = dirname($path))) @mkdir($directory, 0755, true);
         if (@file_put_contents($temporary, $content) === false) return false;
