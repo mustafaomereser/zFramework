@@ -68,7 +68,44 @@ class Auth
 
         self::$database_exists = isset($GLOBALS['databases']['connections'][$database]);
 
-        if (self::$database_exists && !self::check() && $api_token = (self::getMode())::get('auth-stay-in')) self::attempt(['api_token' => $api_token]);
+        if (self::$database_exists && !self::check() && $stayIn = (self::getMode())::get('auth-stay-in')) self::restore((string) $stayIn);
+    }
+
+    /**
+     * Log back in from the remember-me cookie.
+     *
+     * The cookie carries a trace of the password hash beside the token, because
+     * auth-password - what ends other sessions when the password changes - expires
+     * with auth-token after a day. Past that this cookie is the only thing left, and
+     * without the trace it would let a device straight back in that the password
+     * change was meant to lock out. api_token is not rotated: it authenticates the
+     * API, and turning it over here would log out every API client.
+     *
+     * @param string $stayIn
+     * @return bool
+     */
+    private static function restore(string $stayIn): bool
+    {
+        [$token, $trace] = array_pad(explode('|', $stayIn, 2), 2, '');
+        if ($token === '' || $trace === '') return false;
+
+        $user = self::model()->select('id, ' . self::columns()['password'])->where('api_token', $token)->first();
+        if (!@$user['id']) return false;
+
+        if (!hash_equals(self::passwordTrace($user[self::columns()['password']] ?? ''), $trace)) return false;
+
+        return self::login($user);
+    }
+
+    /**
+     * The part of a password hash the remember-me cookie carries.
+     *
+     * @param null|string $hash
+     * @return string
+     */
+    private static function passwordTrace(null|string $hash): string
+    {
+        return substr((string) $hash, -12);
     }
 
     /**
@@ -314,7 +351,7 @@ class Auth
 
         if (@$user['id']) {
             self::login($user);
-            if ($staymein) (self::getMode())::set('auth-stay-in', $user['api_token'], time() * 2);
+            if ($staymein) (self::getMode())::set('auth-stay-in', $user['api_token'] . '|' . self::passwordTrace($user[self::columns()['password']] ?? ''), time() * 2);
             return true;
         }
 
