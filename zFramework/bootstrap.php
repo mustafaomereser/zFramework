@@ -78,6 +78,12 @@ if (!isset($cron_mode)) {
 define('ERROR_LOG_DIR', BASE_PATH . '/error_logs');
 // Error log: end
 
+// The web entry point defines this from its own location, and so does the
+// worker. A cron script or a terminal command defined nothing, so public_dir()
+// - and with it AutoSSL, whose http-01 challenge lives under the public root -
+// was a fatal from exactly the place renewAll() is meant to run.
+if (!defined('PUBLIC_DIR')) define('PUBLIC_DIR', BASE_PATH . '/' . trim($app_config['public'] ?? 'public_html', '/'));
+
 $GLOBALS['databases'] = [
     'connected'   => [],
     'connections' => include(BASE_PATH . '/database/connections.php') #db connections strings
