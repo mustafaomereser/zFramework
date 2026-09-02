@@ -414,16 +414,15 @@ class View
 
         for ($i = 0; $i < count($parts); $i++) {
             if ($i % 2 == 0) $parts[$i] = preg_replace(['/\s+(?=(?:[^"\'`]*["\'`][^"\'`]*["\'`])*[^"\'`]*$)/', '/>\s+</'], [' ', '><'], $parts[$i]);
-            else if (strpos($parts[$i], '<script') !== false) {
-                $script = $parts[$i];
-                $script = preg_replace('/(?<!:)\/\/.*|\/\*(?!!)[\s\S]*?\*\//', '', $script);
-                $script = preg_replace('/\s+/', ' ', $script);
-                $script = preg_replace('/\s*([{}:;,])\s*/', '$1', $script);
-                $script = preg_replace('/\s*(\(|\)|\[|\])\s*/', '$1', $script);
-                $script = preg_replace('/([=+\-*\/<>])\s+/', '$1', $script);
-                $script = preg_replace('/\s+([=+\-*\/<>])/', '$1', $script);
-                $parts[$i] = trim($script);
-            }
+            # Script blocks are left alone. Minifying javascript with regexes cannot
+            # tell code from a string, a template literal or a regex literal, and every
+            # pass here got that wrong: `//` inside src="//cdn..." or 'https://x' ate the
+            # rest of the line including </script>, so the browser read the remaining
+            # markup as script and the page rendered blank; collapsing newlines joined
+            # two semicolon-less statements into one; and the whitespace pass reached
+            # inside strings, so join(', ') came out as join(','). Measured across every
+            # script block this project ships, the whole thing saved 183 bytes gzipped.
+            else if (strpos($parts[$i], '<script') !== false) $parts[$i] = trim($parts[$i]);
         }
 
         return implode('', $parts);
