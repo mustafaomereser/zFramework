@@ -40,6 +40,20 @@ class Update
         if (in_array('--rollback', Terminal::$parameters)) return self::rollback();
         if (in_array('--check', Terminal::$parameters))    return self::check();
 
+        # `php terminal help` lists check and rollback under this command, because both
+        # are public and documented - so they get typed as subcommands, and without
+        # this they fell through to run(), which replaces the core instead of reporting
+        # on it or putting it back. An unrecognised word is refused for the same reason:
+        # nothing here should update by accident.
+        $sub = strtolower((string) (Terminal::$commands[1] ?? ''));
+
+        if ($sub !== '') {
+            if (!in_array($sub, $methods, true))
+                return Terminal::text('[color=red]You must select in method list: ' . implode(', ', $methods) . '[/color]');
+
+            return self::{$sub}();
+        }
+
         self::run();
     }
 
