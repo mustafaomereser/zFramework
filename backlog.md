@@ -58,7 +58,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
       okuyor. `db seed/backup/restore` yanlış veritabanına gidiyor.
       **Ek:** boşluk içeren bayrak değeri kesiliyor (`--title=Merhaba dunya` → `"Merhaba"`).
       *Öneri:* kodu düzelt — `['--table'] ?? ['table']`. Doküman 7 yerde `--table=` diyor.
-- [ ] **`Db.php:84` — `db migrate --module=X` yol birleştirmesinde `BASE_PATH."/modules/"` eksik**
+- [x] **`Db.php:84` — `db migrate --module=X` yol birleştirmesinde `BASE_PATH."/modules/"` eksik**
       Komut "migration yok" deyip çıkıyor. Kardeş dallar (78, 88) doğru yazıyor.
 - [ ] **`Update.php:40` — `update rollback` / `update check` tam güncelleme çalıştırıyor**
       `begin()` alt komut dispatch'i yapmıyor. Bayraklı form (`--rollback`) doğru çalışıyor,
@@ -244,6 +244,7 @@ Sıra: üstten aşağı. Biten madde `[x]` işaretlenir, commit hash'i yazılır
 - [x] `fix(db)` tablo listesi bağlantı değişiminde tazelenmiyordu — `7af6f1b`
 - [x] `fix(method)` dizi `_method` 500 yerine 400 — `876bbb3`
 - [x] `fix(View)` script blokları minify edilmiyor (419/421/423) — `a03c372`
+- [x] `fix(db)` migrate --module modulun migrationlarini bulamiyordu — `d405c53`
 - [x] `fix(terminal)` --table/--dbname/--db bayraklari okunmuyordu — `0559d30`
 - [x] `fix(Terminal)` argv tekrar bolunuyordu, bosluklu bayrak degeri kesiliyordu
 - [x] `fix(DB)` debugSQL yanlis SQL basiyordu — `fef28b4`
