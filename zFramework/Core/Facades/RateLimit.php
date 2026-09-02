@@ -105,26 +105,34 @@ class RateLimit
 
         $hash = sha1($key);
 
-        # Checked before the counter is touched: a blocked caller costs one read
-        # and nothing else, which is the point of blocking rather than counting.
-        if ($block > 0) {
-            $blockTtl = (int) $redis->ttl(Redis::key('ratelimit:block:' . $hash));
-            if ($blockTtl > 0) return [0, 0, $blockTtl];
+        # The connection is cached, so one that died after it was opened - a redis
+        # restart mid-process - throws on the first command rather than failing to
+        # connect. Without this the file counter a few lines up was unreachable in
+        # exactly the case it exists for, and the request came back a 500.
+        try {
+            # Checked before the counter is touched: a blocked caller costs one read
+            # and nothing else, which is the point of blocking rather than counting.
+            if ($block > 0) {
+                $blockTtl = (int) $redis->ttl(Redis::key('ratelimit:block:' . $hash));
+                if ($blockTtl > 0) return [0, 0, $blockTtl];
+            }
+
+            $name  = Redis::key('ratelimit:' . $hash);
+            $count = (int) $redis->incr($name);
+
+            if ($count === 1) $redis->expire($name, $window);
+
+            $ttl = (int) $redis->ttl($name);
+
+            if ($block > 0 && $count > $limit) {
+                $redis->set(Redis::key('ratelimit:block:' . $hash), 1, $block);
+                return [$count, $ttl > 0 ? $ttl : $window, $block];
+            }
+
+            return [$count, $ttl > 0 ? $ttl : $window, 0];
+        } catch (\Throwable) {
+            return self::hitFile($key, $window, $limit, $block);
         }
-
-        $name  = Redis::key('ratelimit:' . $hash);
-        $count = (int) $redis->incr($name);
-
-        if ($count === 1) $redis->expire($name, $window);
-
-        $ttl = (int) $redis->ttl($name);
-
-        if ($block > 0 && $count > $limit) {
-            $redis->set(Redis::key('ratelimit:block:' . $hash), 1, $block);
-            return [$count, $ttl > 0 ? $ttl : $window, $block];
-        }
-
-        return [$count, $ttl > 0 ? $ttl : $window, 0];
     }
 
     /**
