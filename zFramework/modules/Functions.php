@@ -46,19 +46,31 @@ function public_path($add = null)
 // Get Run's server's host.
 function host()
 {
-    $host = $_SERVER['HTTP_X_FORWARDED_HOST']
-        ?? $_SERVER['HTTP_HOST']
-        ?? $_SERVER['SERVER_NAME'];
+    $host  = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+    $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 
-    $protocol = 'http';
+    # The forwarded host and scheme are read only from a proxy named in
+    # framework.trusted-proxies - the same gate ip() uses, and for the same reason:
+    # anyone can send X-Forwarded-Host. Read unconditionally, one request naming
+    # `evil.example` made every route() and asset() url in the response point
+    # there, and a page cached on that request served those links to everyone.
+    if (trusted_proxy()) {
+        if (!empty($_SERVER['HTTP_X_FORWARDED_HOST'])) $host = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_HOST'])[0]);
 
-    if (
-        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-        || (!empty($_SERVER['HTTP_CF_VISITOR']) && str_contains($_SERVER['HTTP_CF_VISITOR'], 'https'))
-    ) $protocol = 'https';
+        if ((!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower(trim(explode(',', $_SERVER['HTTP_X_FORWARDED_PROTO'])[0])) === 'https')
+            || (!empty($_SERVER['HTTP_CF_VISITOR']) && str_contains($_SERVER['HTTP_CF_VISITOR'], 'https'))) $https = true;
+    }
 
-    return $protocol . '://' . $host;
+    return ($https ? 'https' : 'http') . '://' . $host;
+}
+
+// Did this request arrive from an address listed in framework.trusted-proxies?
+function trusted_proxy(): bool
+{
+    static $trusted = null;
+    $trusted ??= (array) (\zFramework\Core\Facades\Config::framework('trusted-proxies') ?? []);
+
+    return $trusted && in_array($_SERVER['REMOTE_ADDR'] ?? '', $trusted, true);
 }
 
 // no cache public asset
@@ -178,8 +190,7 @@ function ip()
     # the request actually arrived from an address named as a proxy. Trusting it
     # unconditionally let a caller take a fresh rate-limit bucket on every request,
     # or spend somebody else's address until that one was blocked.
-    $trusted = (array) (\zFramework\Core\Facades\Config::framework('trusted-proxies') ?? []);
-    if (!in_array($remote, $trusted, true)) return $remote;
+    if (!trusted_proxy()) return $remote;
 
     foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR'] as $header) {
         if (empty($_SERVER[$header])) continue;

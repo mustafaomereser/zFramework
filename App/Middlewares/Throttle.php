@@ -113,7 +113,10 @@ class Throttle
      */
     private static function caller(string $by): string
     {
-        $scope = uri();
+        # The path alone. uri() carries the query string, and a counter keyed on it
+        # gave every ?x=1, ?x=2 ... a fresh bucket - the limit on /sign-in could be
+        # walked around by counting up a parameter.
+        $scope = strtok(uri(), '?') ?: '/';
 
         if ($by === 'token' && ($id = Auth::id())) return "user:$id|$scope";
 

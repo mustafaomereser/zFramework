@@ -455,7 +455,10 @@ class Page
      */
     private static function key(string $method, string $uri): string
     {
-        return sha1(strtoupper($method) . '|' . $uri . '|' . self::localeKey());
+        # The host is part of the key: an application answering on two hostnames
+        # renders route() and asset() urls for the one that was asked, and one
+        # host's copy must not answer the other.
+        return sha1(strtoupper($method) . '|' . strtolower($_SERVER['HTTP_HOST'] ?? '') . '|' . $uri . '|' . self::localeKey());
     }
 
     /**
