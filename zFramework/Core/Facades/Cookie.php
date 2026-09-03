@@ -10,8 +10,8 @@ class Cookie
         'expires'   => 0,     // expire time
         'path'      => '/',   // store path
         'domain'    => '',    // store domain
-        'security'  => false, // only ssl
-        'http_only' => false, // only http protocol
+        'security'  => null,  // Secure flag: null = on when the request is https, true/false to force
+        'http_only' => true,  // not readable from javascript - the framework's cookies carry the login
         'samesite'  => 'Lax', // Lax: blocks cross-site POST, allows same-site subdomains
     ];
 
@@ -44,6 +44,19 @@ class Cookie
     }
 
     /**
+     * The Secure flag: forced by the option, otherwise whatever the request is.
+     *
+     * The framework's own cookies carry the login, and went out over http and
+     * https alike before - and readable from javascript, see http_only.
+     *
+     * @return bool
+     */
+    private static function secure(): bool
+    {
+        return self::$options['security'] ?? (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    }
+
+    /**
      * Set a Cookie
      * @param string $key
      * @param mixed $value
@@ -60,7 +73,7 @@ class Cookie
             'expires'  => ($lifetime = $expires ?: self::$options['expires']) ? time() + $lifetime : 0,
             'path'     => self::$options['path'],
             'domain'   => self::$options['domain'],
-            'secure'   => self::$options['security'],
+            'secure'   => self::secure(),
             'httponly' => self::$options['http_only'],
             'samesite' => self::$options['samesite'],
         ];
@@ -124,7 +137,7 @@ class Cookie
             'expires'  => -1,
             'path'     => self::$options['path'],
             'domain'   => self::$options['domain'],
-            'secure'   => self::$options['security'],
+            'secure'   => self::secure(),
             'httponly' => self::$options['http_only'],
             'samesite' => self::$options['samesite'],
         ];

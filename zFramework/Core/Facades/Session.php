@@ -21,11 +21,33 @@ class Session
             # session silently became uncacheable. Caching is the framework's
             # call now - see Response::cache().
             session_cache_limiter('');
+            self::cookieParams();
             session_start();
         }
         self::$cache = $_SESSION ?? [];
         session_write_close();
         register_shutdown_function([self::class, 'flush']);
+    }
+
+    /**
+     * PHPSESSID with the same flags as the framework's own cookies: HttpOnly,
+     * SameSite=Lax, Secure when the request is https. PHP's defaults send it
+     * readable from javascript and over either scheme.
+     *
+     * @return void
+     */
+    private static function cookieParams(): void
+    {
+        if (headers_sent() || PHP_SAPI === 'cli') return;
+        $current = session_get_cookie_params();
+        session_set_cookie_params([
+            'lifetime' => $current['lifetime'],
+            'path'     => $current['path'] ?: '/',
+            'domain'   => $current['domain'],
+            'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
     }
 
     /**

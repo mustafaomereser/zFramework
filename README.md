@@ -2235,8 +2235,8 @@ public_dir('/images');          // same — returns real filesystem path
 asset('/assets/app.css');       // full URL with ?v= cache-busting (filemtime)
 
 // HTTP / Navigation
-redirect('/login');             // Location header + die
-back();                         // redirect to HTTP_REFERER
+redirect('/login');             // Location header, via ResponseSignal (no die)
+back();                         // redirect to HTTP_REFERER - only when it is on this host, else '/'
 back('?saved=1');               // redirect to REFERER with suffix
 refresh();                      // Refresh:0 header + die
 abort(404);                     // abort with HTTP status code
@@ -2287,10 +2287,12 @@ File::upload('/uploads', $_FILES['photo'], [
     'size'   => 5 * 1024 * 1024,       // max bytes
 ]);
 File::upload('/uploads', $_FILES['photos']);      // multiple file input → array of paths
+// with or without `accept`, a name the server would run (php, phtml, phar, cgi, sh,
+// .htaccess, html, svg …) is refused; every dotted segment counts, so x.php.jpg too
 File::save('/uploads', 'https://example.com/image.jpg');  // download remote file
 File::resizeImage('photo.jpg', ['width' => 800, 'height' => 600, 'desired_sizes' => true], 'out.jpg');
 File::convertImage('photo.jpg', 'webp');
-File::delete('uploads/photo.jpg');
+File::delete('uploads/photo.jpg');               // inside public_dir only: '../' resolves outside and is refused
 ```
 
 ---

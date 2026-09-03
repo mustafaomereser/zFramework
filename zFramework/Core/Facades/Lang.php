@@ -27,6 +27,10 @@ class Lang
      */
     private static function canSelect(string $lang): string
     {
+        # A locale is letters, digits and dashes - `..` and `./` are directories
+        # too, and Accept-Language is the visitor's to write.
+        if (!preg_match('/^[A-Za-z0-9_-]{1,20}$/', $lang)) return false;
+
         $path = base_path("resource/lang/$lang");
         if (!is_dir($path)) return false;
         return $path;

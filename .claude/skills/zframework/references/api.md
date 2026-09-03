@@ -203,6 +203,8 @@ Alerts::get(bool $unset_after_get = false): array    // [[$type, $message], ...]
 Alerts::unset()
 
 Cookie::set(string $key, string $value, ?int $expires = null): bool
+    // HttpOnly, SameSite=Lax; Secure when the request is https (Cookie::$options['security'] forces it).
+    // PHPSESSID gets the same flags. Nothing a framework cookie holds is readable from javascript.
 Cookie::get(string $key)                Cookie::delete(string $key): bool
 
 JustOneTime::set(string $name, mixed $value): self   // lives for one request
@@ -341,13 +343,15 @@ Http::wantsJson(): bool          // isAjax(), or Accept: application/json not le
 ```php
 File::upload(string $path, array $file, array $options = []): string|array|false
     // options: ['accept' => ['jpg','png'], 'size' => bytes]
+    // a server-executable name is refused whatever accept says (File::executable())
     // shape follows the input, not the outcome: $_FILES['x'] from a single input
     // returns a string or false; from a `multiple` input, always a list.
 File::save(string $path, string $file): string           // downloads a remote URL
-File::download(string $file): never
+File::download(string $file): never                     // relative to public_dir; '..' outside it -> 404
 File::resizeImage(string $file, array $sizes = [], ?string $new_name = null)
 File::convertImage(string $file, string $to)
-File::delete(string $file): bool
+File::delete(string $file): bool                        // '..' outside public_dir -> false
+File::executable(string $name): bool                    // php/phtml/phar/cgi/sh/.htaccess/html/svg ..., any dotted segment
 File::humanFileSize(float $bytes, int $decimals = 2)
 File::removePublic(string $name): string
 

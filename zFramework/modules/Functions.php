@@ -103,7 +103,17 @@ function redirect($url = "/")
 // Back from current to previous page.
 function back($add = null)
 {
-    return redirect(($_SERVER['HTTP_REFERER'] ?? '/') . $add);
+    # The referer is the visitor's to set. Sent verbatim, a request arriving from
+    # https://attacker.example/phish was answered with a redirect straight back
+    # to it, and so was `//attacker.example` - an open redirect on every back().
+    # A referer on another host, or with no path of its own, goes home instead.
+    $referer = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+    $host    = strtolower((string) parse_url($referer, PHP_URL_HOST));
+    $own     = strtolower(strtok((string) ($_SERVER['HTTP_HOST'] ?? ''), ':'));
+
+    $safe = $referer !== '' && !str_starts_with($referer, '//') && ($host === '' ? str_starts_with($referer, '/') : $host === $own);
+
+    return redirect(($safe ? $referer : '/') . $add);
 }
 
 // Where run it project's dirname.

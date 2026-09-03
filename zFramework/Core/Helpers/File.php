@@ -116,6 +116,16 @@ class File
             $ext   = strtolower(pathinfo($name, PATHINFO_EXTENSION));
             $error = 0;
 
+            # Whatever the accept list says - and with no accept list at all, which
+            # used to mean no check at all - a name the web server would execute
+            # does not land in the webroot under that name. shell.php, and
+            # shell.php.jpg for a server that reads every extension, were kept as
+            # sent, executable, at a url the uploader was then handed.
+            if (self::executable($name)) {
+                $error++;
+                Alerts::danger(Lang::get('errors.file.type', ['file_types' => implode(', ', $options['accept'] ?? [])]));
+            }
+
             if (isset($options['accept'])) {
                 if (!in_array($ext, $options['accept'])) {
                     $error++;
@@ -154,7 +164,7 @@ class File
     public static function download(string $file): never
     {
         $fullPath = public_dir($file);
-        if (!file_exists($fullPath)) abort(404, 'File not exists.');
+        if (!self::inside($fullPath) || !file_exists($fullPath)) abort(404, 'File not exists.');
 
         $headers = [
             'Cache-Control'             => 'public',
@@ -299,7 +309,52 @@ class File
     public static function delete(string $file): bool
     {
         $full = public_dir($file);
-        if (!is_file($full)) return false;
+        if (!self::inside($full) || !is_file($full)) return false;
         return unlink($full);
+    }
+
+    /**
+     * Is this path under the public directory once `..` is resolved?
+     *
+     * public_dir() only concatenates, so `../config/app.php` left the webroot
+     * and download() served it, delete() removed it.
+     *
+     * @param string $path
+     * @return bool
+     */
+    private static function inside(string $path): bool
+    {
+        $root = realpath(PUBLIC_DIR);
+        $real = realpath($path);
+        if ($root === false || $real === false) return false;
+
+        $root = rtrim(str_replace('\\', '/', $root), '/') . '/';
+        $real = str_replace('\\', '/', $real);
+        return str_starts_with($real . '/', $root);
+    }
+
+    /**
+     * Would the web server run this file rather than serve it?
+     *
+     * Every dotted segment after the first is checked, not only the last: Apache
+     * with a multi-extension handler runs shell.php.jpg as php. Server control
+     * files (.htaccess, .user.ini) count too - they change how the directory is
+     * served. html and svg are refused as well: served from the application's
+     * own origin they are a stored script, not a document.
+     *
+     * @param string $name
+     * @return bool
+     */
+    public static function executable(string $name): bool
+    {
+        $base = strtolower(basename($name));
+        if (in_array($base, ['.htaccess', '.htpasswd', '.user.ini', 'web.config'], true)) return true;
+
+        $parts = explode('.', $base);
+        array_shift($parts);
+        foreach ($parts as $ext)
+            if (preg_match('/^(php\d*|phtml|phar|phps|pht|cgi|pl|py|sh|bat|cmd|exe|com|asp|aspx|jsp|jspx|shtml|html?|svg)$/', $ext)) return true;
+
+        return false;
     }
 }

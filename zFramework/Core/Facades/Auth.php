@@ -311,7 +311,13 @@ class Auth
 
         if (!$user_id = self::stored('auth-token')) return false;
         if (self::$user == null) self::$user = self::model()->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
-        if (!@self::$user['id'] || !hash_equals((string) self::$user[self::columns()['password']], (string) self::stored('auth-password'))) return self::logout();
+        # Not `return self::logout()`: that handed back logout()'s true, and the
+        # caller indexing it got a warning where it expected a row or false.
+        if (!@self::$user['id'] || !hash_equals((string) self::$user[self::columns()['password']], (string) self::stored('auth-password'))) {
+            self::logout();
+            return false;
+        }
+
         return self::$user;
     }
 
@@ -341,10 +347,10 @@ class Auth
             if (@$user['id']) Redis::set($cacheKey, $user, self::USER_TTL, 'session');
         }
 
-        if (!@$user['id']) return self::logout();
+        if (!@$user['id']) return self::logout() && false;
 
         # Password changed since this token was issued -> the session is over.
-        if (!hash_equals((string) ($user[self::columns()['password']] ?? ''), (string) ($session['pwd'] ?? ''))) return self::logout();
+        if (!hash_equals((string) ($user[self::columns()['password']] ?? ''), (string) ($session['pwd'] ?? ''))) return self::logout() && false;
 
         return self::$user = self::model()->setClosures([$user])[0];
     }
@@ -393,6 +399,11 @@ class Auth
         $user  = self::model()->select('id, api_token, ' . self::columns()['password']);
         $plain = $fields[self::columns()['password']] ?? null;
         unset($fields[self::columns()['password']]);
+
+        # `password[]=x` passes `required` as a non-empty array and reached
+        # password_verify() as one - a TypeError, and a 500 for anyone to raise.
+        if ($plain !== null && !is_string($plain)) return false;
+
         foreach ($fields as $key => $value) $user->where($key, $value);
         $user = $user->first();
 
