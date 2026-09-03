@@ -492,7 +492,7 @@ compares them.
 - **`references/infrastructure.md`** — the application log, scheduled tasks, rate limiting,
   AutoSSL (ACME), the cPanel classes, the query analyzer,
   profiling, RoadRunner workers and their state rules, `route/dynamic/`, backups, releases,
-  error handling.
+  error handling, the test harness (`php terminal tests`).
 - **`references/conventions.md`** — deliberate design decisions (leave them alone), known traps,
   performance notes.
 

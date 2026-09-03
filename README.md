@@ -111,6 +111,7 @@ replacement for it.
   - [14.1. Scheduled Tasks](#141-scheduled-tasks)
   - [14.2. Cron Scripts](#142-cron-scripts)
   - [14.3. Updating the Framework](#143-updating-the-framework)
+  - [14.4. Tests](#144-tests)
 - [15. API](#15-api)
 - [16. Helper Methods](#16-helper-methods)
 - [17. AutoSSL](#17-autossl)
@@ -2203,6 +2204,62 @@ Nothing needs rewriting; these are the changes an existing project will notice.
 - `Terminal::begin()` takes a line as well as an argv; `File::upload()` returns a list for a
   `multiple` input whatever survived; `updateOrInsert()` updates every matching row.
 
+### 14.4. Tests
+
+No PHPUnit. A test file is plain PHP in `tests/` at the project root, and the
+harness is two small pieces: `test()` plus a handful of assertions
+(`Kernel/Helpers/TestKit.php`), and a runner that executes **one file per
+process** (`Kernel/test-runner.php`) — a test may define `ZF_WORKER`, flip
+config or die fatally, and the next file starts clean.
+
+```bash
+php terminal tests                       # run everything in tests/
+php terminal tests run db                # one file
+php terminal tests run --filter=csrf     # only tests whose name contains it
+php terminal tests run --db=local        # which connection DB tests build on
+php terminal tests list                  # files and their test counts
+php terminal tests make posts            # writes a tests/posts.php skeleton
+```
+
+A file reads top to bottom, like a route file:
+
+```php
+test('empty IN lists mean none / all', function () {
+    same(0, count((new Post)->whereIn('id', [])->get()));
+    truthy((new Post)->whereNotIn('id', [])->get());
+});
+```
+
+Assertions: `same($expect, $got)` (strict), `truthy()` / `falsy()`,
+`contains($needle, $haystack)`, `throws(Class::class, fn)` — each takes an
+optional note that prefixes the failure message. `skip('reason')` ends the
+test as skipped when a service it needs is not there. A failed assertion stops
+that test and the next one still runs; the failure names the `tests/file:line`
+it happened on, and whatever the test printed comes back with it.
+
+**DB tests are safe on a real database** by convention: build on the
+connection `Test::db()` names (the `--db=` key, else the first in
+`connections.php`), call every table `Test::table('posts')` → `zf_test_posts`,
+and drop them in a `Test::cleanup()` — cleanups run after failures and fatals
+alike. `Test::pdo()` hands you the raw handle for setup SQL. A model pins both
+in its constructor:
+
+```php
+class TPost extends Model
+{
+    public function __construct()
+    {
+        $this->db    = Test::db();
+        $this->table = Test::table('posts');
+        parent::__construct();
+    }
+}
+```
+
+The exit code is 1 when anything failed, so `php terminal tests` is a CI step
+as it stands. The shipped files (`db`, `validator`, `view`, `helpers`, `http`)
+double as examples — `tests/http.php` boots `php -S` on a free port and
+drives the real sign-in flow, cookies and csrf included, through curl.
 
 ---
 
@@ -2260,7 +2317,7 @@ back();                         // redirect to HTTP_REFERER - only when it is on
 back('?saved=1');               // redirect to REFERER with suffix
 refresh();                      // Refresh:0 header, via ResponseSignal (no die)
 abort(404);                     // abort with HTTP status code
-abort(403, 'Forbidden');        // abort with message (JSON on AJAX)
+abort(403, 'Forbidden');        // JSON when the client wants it (X-Requested-With, or Accept: application/json), HTML page otherwise
 
 // Request
 uri();                          // current URI path (strips script name)

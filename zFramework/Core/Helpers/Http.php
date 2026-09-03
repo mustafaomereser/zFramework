@@ -54,7 +54,9 @@ class Http
     // Abort to http response.
     public static function abort(int $code = 418, $message = null)
     {
-        if (self::isAjax()) throw new \zFramework\Core\ResponseSignal($code, ['Content-Type' => 'application/json; charset=utf-8'], json_encode(compact('message', 'code'), JSON_UNESCAPED_UNICODE));
+        # wantsJson(), not isAjax(): a fetch() or curl -H 'Accept: application/json'
+        # sends no X-Requested-With, and was handed the HTML error page to parse.
+        if (self::wantsJson()) throw new \zFramework\Core\ResponseSignal($code, ['Content-Type' => 'application/json; charset=utf-8'], json_encode(compact('message', 'code'), JSON_UNESCAPED_UNICODE));
 
         $view = @view(self::$error_view . ".$code", compact('message', 'code'));
         throw new \zFramework\Core\ResponseSignal($code, [], !empty($view) ? $view : (string) $message);

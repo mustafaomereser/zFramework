@@ -18,7 +18,7 @@ script_name(); uri();              // current URI (script name stripped)
 redirect(string $url = "/");
 back(?string $add);                // back to REFERER, with an optional suffix
 refresh();
-abort(int $code = 418, $message = null);   // JSON on AJAX
+abort(int $code = 418, $message = null);   // JSON when Http::wantsJson() (X-Requested-With or Accept: application/json)
 
 // Request
 method();                          // honours the _method override in POST

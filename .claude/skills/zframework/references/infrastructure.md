@@ -636,3 +636,29 @@ php terminal bench run                              # boot + request cost on thi
   it can exit, guard it the same way.
 - Suggestion files map driver error codes to advice:
   `zFramework/modules/error_handlers/suggestions/<code>.php` (1000, 1001, 42S02 exist).
+
+## Tests — `php terminal tests`
+
+The framework's own harness, no PHPUnit. `tests/*.php` at the project root,
+one process per file (`Kernel/test-runner.php`) so a file may define
+`ZF_WORKER`, break a static or die fatally without touching the next.
+Underscore-prefixed files (`tests/_helpers.php`) are never run directly.
+
+```bash
+php terminal tests                        # run all (bare `tests` = `tests run`)
+php terminal tests run db --db=local --filter=csrf
+php terminal tests list
+php terminal tests make posts             # skeleton
+```
+
+Inside a file (vocabulary from `Kernel/Helpers/TestKit.php`, loaded only by
+the runner): `test('name', fn)` — `same($expect, $got, $note?)` strict —
+`truthy/falsy($got)` — `contains($needle, string|array)` — `throws(Class::class, fn)`
+returns the caught throwable — `skip('reason')`. `Test::` is an alias of
+TestKit: `Test::db()` (the --db key), `Test::table('x')` → `zf_test_x`
+(THE naming contract — nothing else may be created), `Test::pdo()`,
+`Test::cleanup(fn)` (runs after failures and fatals too).
+
+Exit code 1 on any failure. Writing a DB-backed model for a test: set
+`$this->db = Test::db(); $this->table = Test::table('x');` in the constructor
+before `parent::__construct()` — see tests/db.php.
