@@ -24,9 +24,16 @@ require_once __DIR__ . '/Report.php';
  */
 function errorHandlerRender($data): string
 {
-    # Every level, not one: a view rendering inside a view is two buffers deep,
-    # and one ob_end_clean() left half a page in front of the report.
-    while (ob_get_level()) @ob_end_clean();
+    # Every level down to the request's own, not one: a view rendering inside a
+    # view is two buffers deep, and one ob_end_clean() left half a page in front
+    # of the report. A worker holds the outermost buffer and reads the response
+    # out of it - that one stays, or the report went to the worker's stdout and
+    # the visitor got an empty 200.
+    $floor = defined('ZF_WORKER') ? 1 : 0;
+    while (ob_get_level() > $floor) @ob_end_clean();
+
+    # The cli that is a terminal, not the cli that is a worker.
+    $terminal = PHP_SAPI === 'cli' && !defined('ZF_WORKER');
 
     $report = Report::build($data);
     $debug  = Config::debug();
@@ -35,20 +42,24 @@ function errorHandlerRender($data): string
     # A failed request is a 500 whatever it was going to be - a browser, a
     # monitor and a cache all read a 200 as success. Something may have chosen
     # already (DB::connection() answers 503 with Retry-After) and that stands.
-    if (PHP_SAPI !== 'cli' && !headers_sent() && (int) http_response_code() === 200) http_response_code(500);
+    # http_response_code() reads false under the cli until something set it, and
+    # the worker reads the status back from the same place, so setting it works
+    # there. headers_sent() is not consulted for a worker: under the cli it turns
+    # true on the first byte the process ever wrote, and stays so.
+    if (!$terminal && (defined('ZF_WORKER') || !headers_sent()) && in_array((int) http_response_code(), [0, 200], true)) http_response_code(500);
 
     $html = null;
 
     # Answered first, logged second: the shipped callback ends in die() on the
     # cli, and the text report has to be on the screen before it does.
     if ($debug) {
-        if (PHP_SAPI === 'cli') {
+        if ($terminal) {
             echo $render('text')($report, true);
         } elseif (Http::wantsJson()) {
-            if (!headers_sent()) header('Content-Type: application/json; charset=utf-8');
+            \zFramework\Core\Facades\Response::header('Content-Type', 'application/json; charset=utf-8');
             echo $render('json')($report, true);
         } else {
-            if (!headers_sent()) header('Content-Type: text/html; charset=utf-8');
+            \zFramework\Core\Facades\Response::header('Content-Type', 'text/html; charset=utf-8');
             echo $html = $render('html')($report);
         }
     }

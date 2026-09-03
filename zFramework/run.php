@@ -320,7 +320,40 @@ class Run
     public static function handle()
     {
         ob_start();
+        $level = ob_get_level();
 
+        # With force-https on, a plain http request is answered here for a worker
+        # rather than in bootstrap: bootstrap's die(header()) is a silent exit under
+        # the CLI SAPI a worker runs as, and killed the worker before it served once.
+        if (defined('ZF_WORKER') && (\zFramework\Core\Facades\Config::framework('force-https') ?? \zFramework\Core\Facades\Config::get('app.force-https') ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === 'off')) {
+            \zFramework\Core\Facades\Response::status(301);
+            \zFramework\Core\Facades\Response::header('Location', 'https://' . ($_SERVER['HTTP_HOST'] ?? '') . ($_SERVER['REQUEST_URI'] ?? '/'));
+            ob_end_flush();
+            return;
+        }
+
+        # Whatever happens inside - an early return on a cache hit, a signal, an
+        # exception - this buffer is closed on the way out and its contents handed
+        # up. Left open, a worker kept one level per request: ob_get_clean() closes
+        # the innermost buffer, and this was innermost, so the worker's own stayed
+        # open and the next request opened another on top - 16 KB a request, for
+        # as long as the worker lived. Under FPM shutdown closed it and nothing
+        # showed. Defer::flush() may already have flushed everything through
+        # fastcgi_finish_request(); then there is nothing left at this level.
+        try {
+            self::serveRequest();
+        } finally {
+            while (ob_get_level() >= $level) ob_end_flush();
+        }
+    }
+
+    /**
+     * The request itself, inside the buffer handle() opened.
+     *
+     * @return void
+     */
+    private static function serveRequest(): void
+    {
         # Full-page cache. Nothing is stored unless a page called Page::cache(),
         # so this config is a kill switch rather than a second opt-in.
         #

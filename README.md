@@ -2870,9 +2870,17 @@ runs as. `Response::header()` and `Cookie::set()` collect them instead and the
 worker attaches them to the response. Calling PHP's `header()` directly works
 under FPM and silently disappears under RoadRunner.
 
-**Routes are registered at boot.** `route/dynamic/` is re-evaluated per request
-under FPM, but a worker executes it once at startup like everything else — so
-conditions that vary per request belong in middleware, not in a route file.
+**Routes are registered at boot.** `route/web.php`, `route/api.php` and the module
+route files are read once, when the worker starts. `route/dynamic/` is the exception:
+`Run::handle()` restores the booted table and re-reads that directory on every
+request, under a worker as under FPM — so a definition there can depend on request
+state. Anything in the other files cannot; conditions that vary per request belong
+in middleware, not in a route file.
+
+**Errors and `force-https` under a worker.** The error page is rendered into the
+worker's response with a real 500 status, exactly as under FPM. `force-https` is
+enforced per request in `Run::handle()` (bootstrap's redirect only runs under a web
+SAPI), so a plain http request gets a 301 to the https url from the worker too.
 
 **Database connections live for hours.** MySQL closes an idle one after
 `wait_timeout`; the first query afterwards fails with "server has gone away".

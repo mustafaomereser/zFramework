@@ -95,7 +95,10 @@ $GLOBALS['databases'] = [
     'connections' => include(BASE_PATH . '/database/connections.php') #db connections strings
 ];
 
-if (!isset($cron_mode) && ($framework['force-https'] ?? $app_config['force-https'] ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off")) die(header('Location: https://' . ($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'])));
+// Not under the CLI SAPI: header() does nothing there and die() would end a worker
+// before it served its first request. The worker enforces this per request in
+// Run::handle(), where it can answer with a real 301.
+if (!isset($cron_mode) && PHP_SAPI !== 'cli' && ($framework['force-https'] ?? $app_config['force-https'] ?? false) && (empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] === "off")) die(header('Location: https://' . ($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'])));
 
 include(FRAMEWORK_PATH . '/vendor/autoload.php');
 include(FRAMEWORK_PATH . '/run.php');
