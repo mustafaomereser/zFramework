@@ -367,7 +367,9 @@ $p->firstOrFail('Custom message');      // first row or abort(404) with message
 $p->find(1);                            // find by primary key
 $p->findOrFail(1);                      // find or abort(404)
 $p->count();                            // row count (int)
-$p->updateOrInsert(['title' => 'Hi']);  // update if row found, otherwise insert
+$p->where('slug', $slug)->updateOrInsert(['title' => 'Hi']);
+// the where() decides both: is there a row (update it) or not (insert). Without
+// one it finds the first row and the update runs unfiltered - every row rewritten
 
 // insert() returns the full inserted row, or the affected row count
 $row = $p->insert(['title' => 'Hello', 'user_id' => 1]);

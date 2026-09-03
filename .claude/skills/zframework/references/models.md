@@ -138,8 +138,10 @@ in the shipped `Users` migration.
 php terminal db migrate [--fresh] [--seed] [--module=blog]
 ```
 
-Migrations are **additive and idempotent**: re-running adds missing columns. Removing a column
-from `columns()` does not drop it. `--fresh` rebuilds every table and loses the data.
+Migrations are **idempotent, not additive**: re-running adds the columns that are missing and
+**drops the ones no longer in `columns()`**, data included - removing a column from a migration
+removes it from the table on the next `db migrate`. `--fresh` rebuilds every table and loses
+all the data.
 
 ## Observers
 
