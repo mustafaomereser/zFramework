@@ -280,17 +280,38 @@ class View
     private static function render(string $view_name, array $data, float $timing = 0)
     {
         $caching = (self::$config['caching'] ?? false) && !empty(self::$config['caches']);
-        $cache   = null;
-        $result  = null;
 
-        # Per render, not per process. A view() called from inside an already compiled
-        # template inherited whatever the outer one had collected, so its manifest
-        # listed files it never uses - any edit invalidated it - and carried the outer
-        # view's binds, which a cache hit then replayed: the first caller's values
-        # baked into every request after it. The recursion inside compile(), which is
-        # where @extends and @include belong, still accumulates as it should.
-        self::$compiledFiles = [];
-        self::$usedBinds     = [];
+        # Each render starts from nothing and gives back what it found. A view()
+        # called from inside a template - or from a bind closure while the outer
+        # template is still compiling - shares these statics with the render around
+        # it. Started dirty, the inner one saw the outer page's sections and yielded
+        # them into a partial that has its own; cleared without giving back, it
+        # wiped the outer compile's file list and bind list, and the manifest written
+        # afterwards named none of the files the page depends on. The recursion
+        # inside compile(), where @extends and @include belong, still accumulates.
+        $outer = [self::$view, self::$view_name, self::$view_path, self::$data, self::$sections, self::$sectionSources, self::$compiledFiles, self::$usedBinds, self::$hasDynamicExtends];
+        self::reset();
+
+        try {
+            return self::renderClean($view_name, $data, $timing, $caching);
+        } finally {
+            [self::$view, self::$view_name, self::$view_path, self::$data, self::$sections, self::$sectionSources, self::$compiledFiles, self::$usedBinds, self::$hasDynamicExtends] = $outer;
+        }
+    }
+
+    /**
+     * render() with the statics already clean. Only reached from render().
+     *
+     * @param string $view_name
+     * @param array  $data
+     * @param float  $timing
+     * @param bool   $caching
+     * @return string
+     */
+    private static function renderClean(string $view_name, array $data, float $timing, bool $caching): string
+    {
+        $cache  = null;
+        $result = null;
 
         if ($caching) $result = self::tryCache($view_name);
 
@@ -330,8 +351,6 @@ class View
 
             array_pop(self::$evaluating);
         }
-
-        self::reset();
 
         if ($timing) \zFramework\Core\Profiler::mark('view', hrtime(true) - $timing);
 
