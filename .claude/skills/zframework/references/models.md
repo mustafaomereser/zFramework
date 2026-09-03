@@ -151,7 +151,8 @@ php terminal make observer PostObserver
 
 Attach with `public $observe = PostObserver::class;` on the model. Hooks:
 `oninsert` / `oninserted` / `onupdate` / `onupdated` / `ondelete` / `ondeleted` — anything not
-defined is simply not called.
+defined is simply not called. A soft delete fires the delete pair only, never the update pair,
+even though it writes through an UPDATE.
 
 ```php
 public function oninsert(array $sets): array

@@ -521,8 +521,16 @@ trait RelationShips
             foreach ($groups as $group) {
                 $wanted = array_values(array_unique(array_filter($group['values'], fn($v) => $v !== null && $v !== '')));
 
-                $related = [];
-                if ($wanted) foreach ((new $group['model'])->whereIn($group['column'], $wanted)->get() as $row)
+                # The rows are grouped back to their parents by the FK column, so
+                # the batch query must return it - a related model that guards the
+                # FK silently gave every parent an empty relation, while the lazy
+                # path (a plain where) still worked.
+                $related  = [];
+                $instance = new $group['model'];
+                if (in_array($group['column'], (array) ($instance->guard ?? []), true))
+                    $instance->select(implode(', ', array_merge($instance->columns(), [$group['column']])));
+
+                if ($wanted) foreach ($instance->whereIn($group['column'], $wanted)->get() as $row)
                     $related[(string) $row[$group['column']]][] = $row;
 
                 foreach ($group['values'] as $index => $value) {

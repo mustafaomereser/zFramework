@@ -801,7 +801,8 @@ class PostObserver extends Observer
     // called after successful update
     public function onupdated(array $args): void  { }
 
-    // called before delete
+    // called before delete. A soft delete fires this pair too - not the
+    // update pair, although it writes through an UPDATE
     public function ondelete(array $args): void   { }
 
     // called after successful delete

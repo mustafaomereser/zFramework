@@ -139,7 +139,7 @@ Note the callback argument changes the control flow — see "What happens on fai
 | `regex:"^[a-z]+$"` | quoted, without delimiters |
 | `same:other` | equal to another field in the input |
 | `confirmed` / `confirmed:field` | equal to `<field>_confirmation`, or the named field |
-| `unique:Model;key:col;ex:5` | not already in the table, optionally excluding one row |
+| `unique:Model;key:col;ex:5` | not already in the table, optionally excluding one row (`ex` compares the model's primary key). Runs through the model, so soft-deleted rows are invisible to it |
 | `exists:Model;key:col` | present in the table |
 
 One class per rule under `zFramework/Core/Validator/Rules/`, registered in `Validator::$ruleMap`.

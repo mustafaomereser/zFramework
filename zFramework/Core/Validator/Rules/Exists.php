@@ -14,7 +14,7 @@ class Exists extends Rule
         if ($data['value'] === null || $data['value'] === '') return true;
 
         $exists = (new $data['equivalent'])->whereRaw(($data['parameters']['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
-        if ($ex = @$data['parameters']['ex']) $exists->where('id', '!=', $ex);
+        if ($ex = @$data['parameters']['ex']) $exists->where($exists->getPrimary() ?? 'id', '!=', $ex);
         if ($exists->count()) return true;
         return false;
     }

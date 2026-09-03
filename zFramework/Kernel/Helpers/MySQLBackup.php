@@ -12,6 +12,7 @@ class MySQLBackup
     private $db;
     private $dbname;
     private $sql;
+    private array $views = [];
 
     /**
      * Backup constructor.
@@ -39,16 +40,27 @@ class MySQLBackup
             $tableName = current($table);
 
             /**
+             * Tablo detayları. SHOW TABLES lists views too, and a view has no
+             * rows of its own: dumped as a table it produced INSERTs into the
+             * view and no CREATE at all, and the restore failed on every line.
+             * The view's DDL is kept and appended after the tables, since it
+             * selects from them.
+             */
+            $tableDetail = $this->getFirst('SHOW CREATE TABLE %s', [$tableName]);
+            if (isset($tableDetail['Create View'])) {
+                $this->views[$tableName] = '-- View: ' . $tableName . str_repeat(PHP_EOL, 2)
+                    . 'DROP VIEW IF EXISTS `' . $tableName . '`;' . PHP_EOL
+                    . $tableDetail['Create View'] . ';' . str_repeat(PHP_EOL, 3);
+                continue;
+            }
+
+            /**
              * Tablo satırları
              */
             $rows = $this->getAll('SELECT * FROM %s', [$tableName]);
 
             @$this->sql[$tableName] .= '-- Tablo Adı: ' . $tableName . "\n-- Satır Sayısı: " . count($rows) . str_repeat(PHP_EOL, 2);
 
-            /**
-             * Tablo detayları
-             */
-            $tableDetail = $this->getFirst('SHOW CREATE TABLE %s', [$tableName]);
             $this->sql[$tableName] .= $tableDetail['Create Table'] . ';' . str_repeat(PHP_EOL, 3);
 
             /**
@@ -69,6 +81,10 @@ class MySQLBackup
         # Before $output is built, not after. These append to $this->sql, and the
         # array was already copied out by then - so every backup ever taken held the
         # tables and none of the triggers, functions or procedures, without saying so.
+        # Views first: they select from the tables above and belong in the same
+        # per-database file (separate mode keys them like a table).
+        foreach ($this->views as $name => $ddl) @$this->sql[$name] .= $ddl;
+
         $this->dumpTriggers();
         $this->dumpFunctions();
         $this->dumpProcedures();

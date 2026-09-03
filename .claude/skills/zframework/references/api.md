@@ -129,6 +129,7 @@ firstOrFail(mixed $exception = null)
 insert(array $sets, bool $just_insert = false): array|int
 update(array $sets): int          delete(): int
 updateOrInsert(array $sets)     // scope it with where() first: no where = first row found, every row updated
+getPrimary(): ?string           // the table's primary key column (model $primary, else schema)
 paginate(int $per_page = 20, string $page_id = 'page', ?string $cache_id = null): array
 prepare(string $sql, array $data = []): object     // raw PDO statement
 ```

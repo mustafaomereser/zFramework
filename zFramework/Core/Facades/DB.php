@@ -425,7 +425,7 @@ class DB
      * Get primary key.
      * @return string|null
      */
-    protected function getPrimary(): string|null
+    public function getPrimary(): string|null
     {
         if (!$this->table) throw new \Exception('firstly you must select a table for get primary key.');
         return $this->primary ?? @$GLOBALS["DB"][$this->dbname]["TABLE_COLUMNS"][$this->table]['primary'] ?? null;
@@ -1263,7 +1263,10 @@ class DB
         }
 
         $uniqueID         = uniqid();
-        $current_page     = (request($page_id) ?? 1);
+
+        # The page number is the visitor's to send: ?page=1.7 produced start 2.4
+        # and "2.4 / 3.4" in the strip; ?page[] was an array. An int, at least 1.
+        $current_page     = max(1, (int) (is_scalar($page = request($page_id)) ? $page : 1));
         $page_count       = ceil($row_count / $per_page);
 
         if ($current_page > $page_count) $current_page = $page_count;
@@ -1350,9 +1353,28 @@ class DB
      */
     public function update(array $sets = []): int
     {
-        $this->buildQuery['sets'] = " SET ";
-
         if ($new_sets = $this->trigger('update', $sets)) $sets = $new_sets;
+
+        $update = $this->writeSets($sets);
+        if ($update) $this->trigger('updated');
+
+        return $update;
+    }
+
+    /**
+     * The UPDATE itself, without the update observers.
+     *
+     * Soft delete goes through an UPDATE, and running it via update() fired
+     * onupdate()/onupdated() with ['deleted_at' => ...] - a hook rewriting
+     * sets (timestamps, hashing) ran on a delete. delete() fires its own
+     * ondelete()/ondeleted() pair and writes through this.
+     *
+     * @param array $sets
+     * @return int
+     */
+    private function writeSets(array $sets): int
+    {
+        $this->buildQuery['sets'] = " SET ";
 
         foreach ($sets as $key => $value) {
             $hashed_key = $this->hashedKey($key);
@@ -1361,10 +1383,7 @@ class DB
         }
 
         $this->buildQuery['sets'] = rtrim($this->buildQuery['sets'], ', ');
-        $update = $this->run(__FUNCTION__)->rowCount();
-        if ($update) $this->trigger('updated');
-
-        return $update;
+        return $this->run('update')->rowCount();
     }
 
     /**
@@ -1376,7 +1395,7 @@ class DB
         $this->trigger('delete');
 
         if (!isset($this->softDelete)) $delete = $this->run(__FUNCTION__)->rowCount();
-        else $delete = $this->update([$this->deleted_at => [
+        else $delete = $this->writeSets([$this->deleted_at => [
             'date' => Date::timestamp(),
             'bool' => 0
         ][$this->deleted_at_type]]);
