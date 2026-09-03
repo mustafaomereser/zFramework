@@ -26,6 +26,12 @@ class SendMail
         foreach ($payload['cc']  ?? [] as $mail) Mail::cc($mail);
         foreach ($payload['bcc'] ?? [] as $mail) Mail::bcc($mail);
 
-        Mail::sendNow($payload['data'] ?? []);
+        # PHPMailer is built without exceptions, so a refused connection or a
+        # rejected recipient comes back as false rather than a throw. Swallowed,
+        # the worker printed 'done', nothing was retried and nothing was reported -
+        # a queued mail that failed delivery was simply gone. A throw is what the
+        # worker retries and, after --tries, hands to the error handler.
+        if (!Mail::sendNow($payload['data'] ?? []))
+            throw new \RuntimeException('Mail was not delivered' . (Mail::$mail?->ErrorInfo ? ': ' . Mail::$mail->ErrorInfo : '') . ' (to ' . implode(', ', $payload['to'] ?? []) . ')');
     }
 }
