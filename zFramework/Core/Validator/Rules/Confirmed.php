@@ -18,7 +18,11 @@ class Confirmed extends Rule
     {
         $other = $data['equivalent'] ?: $data['key'] . '_confirmation';
 
-        if ((string) $data['value'] === (string) ($data['data'][$other] ?? null)) return true;
+        $mine   = $data['value'];
+        $theirs = $data['data'][$other] ?? null;
+
+        # Two arrays both cast to "Array" and matched; compared as arrays now.
+        if ($this->text($mine) && $this->text($theirs) ? (string) $mine === (string) $theirs : $mine === $theirs) return true;
 
         $this->errors = ['other' => $other];
         return false;

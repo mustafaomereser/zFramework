@@ -15,7 +15,8 @@ class Date extends Rule
 {
     public function handle(array $data): bool
     {
-        if (!@strlen($data['value'])) return true;
+        if ($this->blank($data['value'])) return true;
+        if (!$this->text($data['value'])) return false;
 
         $value  = (string) $data['value'];
         $format = $data['equivalent'] ?? null;

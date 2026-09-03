@@ -15,7 +15,8 @@ class Regex extends Rule
 {
     public function handle(array $data): bool
     {
-        if (!@strlen($data['value'])) return true;
+        if ($this->blank($data['value'])) return true;
+        if (!$this->text($data['value'])) return false;
 
         $pattern = (string) $data['equivalent'];
         $result  = @preg_match('/' . str_replace('/', '\/', $pattern) . '/u', (string) $data['value']);

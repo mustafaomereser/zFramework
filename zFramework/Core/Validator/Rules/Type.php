@@ -20,7 +20,7 @@ class Type extends Rule
      */
     public function handle(array $data): bool
     {
-        if (!@strlen($data['value'])) return true;
+        if ($this->blank($data['value'])) return true;
 
         $declared = $data['type'];
         $detected = $data['detectedType'] ?? $declared;
