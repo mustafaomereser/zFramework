@@ -129,20 +129,19 @@ class mysql
      */
     private function getWhereOrHaving($checkSoftDelete = true, string $gettype = 'where'): null|string
     {
-        if ($checkSoftDelete && isset($this->parent->softDelete)) $this->parent->buildQuery[$gettype][] = [
-            'type'     => 'row',
-            'queries'  => [
-                [
-                    'key'      => $this->parent->table . '.' . $this->parent->deleted_at,
-                    'prev'     => "AND"
-                ] + [
-                    'date' => ['operator' => 'IS NULL', 'value' => null],
-                    'bool' => ['operator' => '=', 'value' => 1]
-                ][$this->parent->deleted_at_type]
-            ]
-        ];
+        # The soft-delete condition is its own clause, AND-ed around whatever the
+        # caller built. It used to be appended as one more row with a bare AND, so
+        # `where(a)->whereOr(b)` came out as `a OR b AND deleted_at IS NULL` - AND
+        # binds tighter, the OR side never saw the condition, and a deleted row
+        # came back through it. On an UPDATE or DELETE the same clause decided
+        # which rows were written.
+        $soft = null;
+        if ($checkSoftDelete && isset($this->parent->softDelete)) {
+            $column = $this->parent->table . '.' . $this->parent->deleted_at;
+            $soft   = $this->parent->deleted_at_type === 'bool' ? "$column = 1" : "$column IS NULL";
+        }
 
-        if (!count($this->parent->buildQuery[$gettype])) return null;
+        if (!count($this->parent->buildQuery[$gettype])) return $soft ? " " . strtoupper($gettype) . " $soft " : null;
 
         $output = "";
         foreach ($this->parent->buildQuery[$gettype] as $where_key => $where) {
@@ -174,6 +173,8 @@ class mysql
             if ($where['type'] == 'group') $response = (!empty($output) ? $where['queries'][0]['prev'] . " " : null) . "(" . rtrim($response) . ") ";
             $output .= $response;
         }
+
+        if ($soft) $output = "(" . trim($output) . ") AND $soft";
 
         return " " . strtoupper($gettype) . " $output ";
     }
