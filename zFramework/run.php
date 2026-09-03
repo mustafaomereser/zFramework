@@ -304,6 +304,11 @@ class Run
 
             # The table as booted. handle() restores it before each request, so
             # route/dynamic definitions do not pile up across requests.
+            #
+            # The index is built here when no cache supplied one: it is derived
+            # lazily by the first match(), which is after this snapshot - so an
+            # uncached worker snapshotted null and rebuilt the index per request.
+            \zFramework\Core\Route::warmIndex();
             self::$bootRoutes   = \zFramework\Core\Route::$routes;
             self::$bootIndex    = \zFramework\Core\Route::currentIndex();
             self::$bootIncluded = count(self::$included);

@@ -385,8 +385,10 @@ zFramework\Kernel\Helpers\Module::getModules()
 zFramework\Kernel\Helpers\Module::classMethods($class, $flags = ReflectionMethod::IS_PUBLIC)
 zFramework\Kernel\Helpers\MySQLBackup::__construct($db, $config = []) ->backup()
 zFramework\Kernel\Terminal::begin(array|string $args)  // run a command from PHP; --web for html output
-    // an array is $argv (script name first); a string is one line, split like a shell would:
-    // Terminal::begin('db migrate --module=blog --web')
+    // an array is $argv (script name first); a string is one line, split like a shell would
+    // (quotes group, \" escapes inside them). Only --flag=value tokens become parameters;
+    // a positional argument may hold '=' and the value keeps everything past the first '=':
+    // Terminal::begin('push-notification send --url=/orders?id=5 --title="two words"')
 ```
 
 ### Seeder — `database/seeders/`

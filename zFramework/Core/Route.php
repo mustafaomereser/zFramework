@@ -255,6 +255,17 @@ class Route
     }
 
     /**
+     * Build the lookup index now instead of at the first match(), so a boot
+     * snapshot taken before any request holds it.
+     *
+     * @return void
+     */
+    public static function warmIndex(): void
+    {
+        if (count(self::$routes)) self::index();
+    }
+
+    /**
      * Drop the match and the group stack, keep the table.
      *
      * $routes and $index are what a long-running worker registers once at boot and
@@ -432,7 +443,12 @@ class Route
 
         foreach ($included as $file) {
             $file = str_replace('\\', '/', $file);
-            if (!strstr($file, '/route/') || strstr($file, $dynamic)) continue;
+
+            # A module's info.php decides whether its routes exist at all -
+            # `status => false` empties them. Unwatched, disabling a module left
+            # its routes being served from the cache with auto-check on.
+            $watched = strstr($file, '/route/') || str_ends_with($file, '/info.php');
+            if (!$watched || strstr($file, $dynamic)) continue;
 
             if (is_file($file)) $sources[$file] = filemtime($file);
             if (is_dir($dir = dirname($file))) $sources[$dir] = filemtime($dir);
@@ -663,7 +679,12 @@ class Route
         $path   = implode('/', $URI);
         $index  = self::index();
 
-        $static = $index['static'][$method][$path] ?? $index['static'][''][$path] ?? null;
+        # Both buckets can hold the path - Route::any() lands in '' and a later
+        # Route::get() in GET. First definition wins, as it does everywhere else;
+        # preferring the method bucket let a later get() shadow an earlier any().
+        $byMethod = $index['static'][$method][$path] ?? null;
+        $byAny    = $index['static'][''][$path] ?? null;
+        $static   = $byMethod === null ? $byAny : ($byAny === null || $byMethod['position'] <= $byAny['position'] ? $byMethod : $byAny);
         $found  = null;
 
         # A parameterised route defined before the static hit still wins, because

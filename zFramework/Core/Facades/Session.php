@@ -8,6 +8,14 @@ class Session
     private static bool $dirty   = false;
 
     /**
+     * Whether the shutdown flush is already registered. PHP keeps every
+     * registration, and load() runs once per request: under a worker that was
+     * one retained callback per request, ~115 bytes each, for the life of the
+     * process. Once per process is enough - flush() is a no-op when clean.
+     */
+    private static bool $flushRegistered = false;
+
+    /**
      * Load session into memory once, release the lock immediately.
      * Registers a shutdown flush so the lock is never held during request execution.
      */
@@ -26,7 +34,11 @@ class Session
         }
         self::$cache = $_SESSION ?? [];
         session_write_close();
-        register_shutdown_function([self::class, 'flush']);
+
+        if (!self::$flushRegistered) {
+            self::$flushRegistered = true;
+            register_shutdown_function([self::class, 'flush']);
+        }
     }
 
     /**
@@ -92,8 +104,16 @@ class Session
         self::load();
         $_SESSION    = self::$cache;
         $result      = $callback();
-        self::$cache = $_SESSION;
-        self::$dirty = true;
+
+        # Dirty only when the closure changed something. Marked unconditionally,
+        # a read - JustOneTime::get() with nothing stored, the error page reading
+        # the session - forced a session_start() and a write at shutdown, handing
+        # an anonymous visitor a session file and a cookie for looking.
+        if ($_SESSION !== self::$cache) {
+            self::$cache = $_SESSION;
+            self::$dirty = true;
+        }
+
         return $result;
     }
 

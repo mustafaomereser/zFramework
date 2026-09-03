@@ -32,6 +32,7 @@ class State
         'zFramework\Core\Route::$routes'               => 'the route table - the reason to boot once',
         'zFramework\Core\Route::$caching'              => 'read from config/route.php at boot',
         'zFramework\Core\Route::$index'                => 'derived from $routes, rebuilt with it',
+        'zFramework\Core\Facades\Session::$flushRegistered' => 'the shutdown flush is registered once per process',
         'zFramework\Core\View::$binds'                 => 'registered by providers at boot',
         'zFramework\Core\View::$config'                => 'view settings, set at boot',
         'zFramework\Core\View::$directives'            => 'registered by middleware, re-registered per request',
@@ -83,7 +84,8 @@ class State
      * Namespaces to walk. Kernel/ is CLI-only and never serves a request.
      */
     private const SCAN = [
-        'Core' => 'zFramework\Core',
+        'Core'    => 'zFramework\Core',
+        'run.php' => 'zFramework\Run',
     ];
 
     public static function begin($methods)

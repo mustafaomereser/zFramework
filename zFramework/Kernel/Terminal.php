@@ -62,7 +62,9 @@ class Terminal
         foreach ($matches as $match) {
             [$whole, $offset] = $match[0];
 
-            $piece = ($match[3][0] ?? '') !== '' ? $match[3][0] : (($match[1][0] ?? '') !== '' ? $match[1][0] : ($match[2][0] ?? ''));
+            # Quoted pieces resolve their escapes, as a shell would: `-m "say \"hi\""`
+            # hands the command say "hi", not say \"hi\".
+            $piece = ($match[3][0] ?? '') !== '' ? $match[3][0] : stripslashes(($match[1][0] ?? '') !== '' ? $match[1][0] : ($match[2][0] ?? ''));
 
             # --key="a b": the bare `--key=` and the quoted value are two matches that
             # were one argument, so they are glued back when nothing separated them.
@@ -96,9 +98,12 @@ class Terminal
 
         // parse it
         foreach ($commands as $key => $command) {
-            if (!strstr($command, '=')) continue;
+            # Only flags are parameters: a positional argument holding '=' - a url
+            # with a query string, a config value - was swallowed into the map.
+            # And only the first '=' splits, so --url=/x?id=5 keeps its tail.
+            if (!str_starts_with($command, '--') || !strstr($command, '=')) continue;
             unset($commands[$key]);
-            $command = explode('=', $command);
+            $command = explode('=', $command, 2);
             $parameters[$command[0]] = $command[1];
         }
 

@@ -144,14 +144,30 @@ class Update
                 return Terminal::text("[color=red]Backup of $item failed - nothing was changed.[/color]");
         }
 
-        # 5. replace, core only
+        # 5. replace, core only. Each copy is checked: the target was just
+        # deleted, so a copy that fails half-way - permissions, a full disk -
+        # leaves a partial core. On failure the backup taken above goes straight
+        # back and the command says so instead of printing "Updated".
         Terminal::text('[color=yellow]replacing the core...[/color]');
         foreach (self::CORE as $item) {
             $target = FRAMEWORK_PATH . "/$item";
+            if (!file_exists("$source/$item")) continue;
             if (is_dir($target)) rrmdir($target);
             elseif (is_file($target)) @unlink($target);
 
-            self::copy("$source/$item", $target);
+            if (!self::copy("$source/$item", $target)) {
+                Terminal::text("[color=red]Copying $item failed - restoring the backup.[/color]");
+                foreach (self::CORE as $restore) {
+                    if (!file_exists("$backup/$restore")) continue;
+                    $t = FRAMEWORK_PATH . "/$restore";
+                    if (is_dir($t)) rrmdir($t);
+                    elseif (is_file($t)) @unlink($t);
+                    self::copy("$backup/$restore", $t);
+                }
+                rrmdir($work . "/$root");
+                @unlink($zip);
+                return Terminal::text('[color=red]Update aborted; the previous core is back in place.[/color]');
+            }
         }
 
         # 6. config
@@ -292,7 +308,9 @@ class Update
         $backups = (array) glob("$storage_path/update-backup/*", GLOB_ONLYDIR);
         if (!$backups) return Terminal::text('[color=red]No backup to restore.[/color]');
 
-        rsort($backups);
+        # By the date suffix, not the name: the name starts with the version and
+        # rsort() on strings put 3.9.0 above 3.10.0, restoring the wrong core.
+        usort($backups, fn($a, $b) => strcmp(substr($b, -15), substr($a, -15)));
         $backup = $backups[0];
 
         foreach (self::CORE as $item) {
