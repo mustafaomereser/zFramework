@@ -182,6 +182,25 @@ class Make
     }
 
     /**
+     * Description: Create a MongoDB model (extends Abstracts\MongoModel)
+     * Usage: php terminal make mongomodel Log [--table=logs] [--module=blog]
+     * @param {name}           (third argument)
+     * @param --table={name}   (optional) collection name; defaults to snake_case of the class
+     * @param --module={name}  (optional)
+     */
+    public static function mongomodel($make)
+    {
+        return self::save(
+            self::$save . '\Models',
+            str_replace(
+                ['{table}'],
+                [(Terminal::$parameters['--table'] ?? Terminal::$parameters['table'] ?? self::parseName()['table_name'])],
+                $make
+            )
+        );
+    }
+
+    /**
      * Description: Create a Seeder class
      * Usage: php terminal make seeder UserSeeder
      * @param {name}  (third argument)

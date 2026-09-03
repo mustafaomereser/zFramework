@@ -1,0 +1,25 @@
+<?php
+
+namespace {namespace};
+
+use zFramework\Core\Abstracts\MongoModel;
+
+#[\AllowDynamicProperties]
+class {name} extends MongoModel
+{
+    public $collection = "{table}";
+
+    // public $guard   = ['secret'];        // fields left out of get()/first()
+    // public $observe = {name}Observer::class;
+
+    /**
+     * php terminal mongo indexes
+     */
+    public function indexes(): array
+    {
+        return [
+            // ['key' => ['created_at' => -1]],
+            // ['key' => ['email' => 1], 'unique' => true],
+        ];
+    }
+}

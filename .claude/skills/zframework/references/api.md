@@ -171,6 +171,29 @@ toggleAttach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue
 `use zFramework\Core\Traits\DB\softDelete;` enables soft deletes. Behaviour comes from
 `config/model.php` (`deleted_at_type`: `'date'` or `'bool'`).
 
+### MongoDB — `Abstracts\MongoModel`, `Facades\Mongo`
+
+```php
+// model: App/Models, extends MongoModel; public $collection required
+// public $database, $guard = [], $observe (same hooks as SQL observers)
+where(string $key, $opOrValue, $value = null)   // = != <> > >= < <= LIKE IN 'NOT IN'
+whereOr(...)                    // OR over the whole chain, as on the SQL side
+whereIn / whereNotIn(string $column, array $in) // [] -> matches nothing / no-op
+whereBetween(string $column, $start, $stop)
+filter(array $match)            // raw match document, merged AND
+orderBy(array $data)  limit(int $start, ?int $count)  select(string|array $fields)
+get(): array   first(): ?array   find($id): ?array   count(): int
+insert(array $sets, bool $just_insert = false): array|int   // row back, _id filled, ONE round-trip
+update(array $sets): int        delete(): int               // real deletion, no softDelete
+aggregate(array $pipeline): array    indexes(): array        getPrimary(): string  // '_id'
+
+Mongo::available(): bool        Mongo::manager(): \MongoDB\Driver\Manager
+Mongo::database(): string       Mongo::command(array $cmd, ?string $db = null): array
+```
+
+Rows are arrays; `_id` is the 24-hex string both ways. No joins/whereRaw/migrations.
+Terminal: `mongo status`, `mongo indexes`, `make mongomodel Name [--table=collection]`.
+
 ## Facades
 
 Most of what follows is `zFramework\Core\Facades\<Name>`. Thirteen are not, and the

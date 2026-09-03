@@ -25,7 +25,11 @@ class Module
 
     public static function classMethods($class, $flags = ReflectionMethod::IS_PUBLIC)
     {
-        $methods = (new ReflectionClass((str_replace("/", "\\", str_replace([BASE_PATH, '.php'], '', $class)))))->getMethods($flags);
+        # Both separators normalised first: BASE_PATH may be spelled with / while
+        # the path arrives with \ (or the reverse, depending on who defined it),
+        # and an unreplaced prefix turned the class name into a filesystem path.
+        $class   = str_replace('\\', '/', $class);
+        $methods = (new ReflectionClass((str_replace("/", "\\", str_replace([str_replace('\\', '/', BASE_PATH), '.php'], '', $class)))))->getMethods($flags);
         return array_values(array_map(
             fn($m) => [
                 'name' => $m->name,

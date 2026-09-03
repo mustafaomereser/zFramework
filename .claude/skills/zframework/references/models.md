@@ -148,6 +148,17 @@ Migrations are **idempotent, not additive**: re-running adds the columns that ar
 removes it from the table on the next `db migrate`. `--fresh` rebuilds every table and loses
 all the data.
 
+## MongoDB models
+
+`App/Models`, `extends MongoModel` instead of `Model` - that is the whole difference in
+placement. `public $collection` required; rows are arrays, `_id` a 24-hex string both ways;
+`where/whereOr/whereIn/orderBy/limit/get/first/find/insert/update/delete/count` read as on the
+SQL side (whereOr ORs the whole chain; insert returns the row in one round-trip). No joins,
+no whereRaw, no softDelete, no migrations - `php terminal mongo indexes` creates what the
+model's `indexes()` declares, `make mongomodel Name` writes the skeleton. Observers use the
+same class and hooks as SQL models. Escape hatches: `filter([...])`, `aggregate([...])`.
+Full signatures in api.md.
+
 ## Observers
 
 ```bash

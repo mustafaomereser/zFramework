@@ -245,6 +245,17 @@ return [
      *           memory before redis is asked again. Higher is faster and means
      *           two servers can briefly disagree.
      */
+    /**
+     * MongoDB - models extending Abstracts\MongoModel and the Mongo facade.
+     * Needs the mongodb extension (php.ini: extension=mongodb). Off by default;
+     * nothing here is loaded until something actually asks for a collection.
+     */
+    'mongo' => [
+        'enabled'  => false,
+        'uri'      => 'mongodb://127.0.0.1:27017',
+        'database' => 'app',
+    ],
+
     'redis' => [
         'enabled'  => false,
         'host'     => '127.0.0.1',

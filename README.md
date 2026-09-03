@@ -91,6 +91,7 @@ replacement for it.
   - [2.6. Seeders](#26-seeders)
   - [2.7. Transactions](#27-transactions)
   - [2.8. PostgreSQL](#28-postgresql)
+  - [2.9. MongoDB](#29-mongodb)
 - [3. View](#3-view)
   - [3.1. Page Caching](#31-page-caching)
 - [4. Controller](#4-controller)
@@ -1005,6 +1006,59 @@ Name tables and columns in lower case (the convention throughout this
 document): identifiers go to the server unquoted and PostgreSQL folds them.
 `tests/pgsql.php` runs the whole surface against a live server —
 `php terminal tests run pgsql`.
+
+
+### 2.9. MongoDB
+
+Not a DB driver — DB's contract is building SQL, and none of it has a Mongo
+meaning. Instead: a `Mongo` facade owning the one connection, and models in
+`App/Models` that extend `MongoModel` rather than `Model`. Built straight on
+the `mongodb` extension (php.ini: `extension=mongodb`), no composer package —
+the driver already pools per process and hands documents back as arrays.
+
+```php
+// config/framework.php
+'mongo' => ['enabled' => true, 'uri' => 'mongodb://127.0.0.1:27017', 'database' => 'app'],
+```
+
+```php
+class Log extends MongoModel
+{
+    public $collection = 'logs';
+    // public $guard   = ['secret'];      // hidden from get()/first(), like the SQL guard
+    // public $observe = LogObserver::class;   // same hooks: oninsert(ed)/onupdate(d)/ondelete(d)
+
+    public function indexes(): array           // php terminal mongo indexes creates these
+    {
+        return [['key' => ['at' => -1]], ['key' => ['email' => 1], 'unique' => true]];
+    }
+}
+
+php terminal make mongomodel Log            // writes the skeleton above
+php terminal mongo status                   // ping + server version
+```
+
+The verbs read like the SQL side, rows are arrays, `_id` round-trips as its
+24-hex string:
+
+```php
+(new Log)->where('level', 'error')->whereOr('level', 'warn')   // OR, exactly as in SQL
+          ->orderBy(['at' => 'DESC'])->limit(20, 10)->get();   // limit(offset, count)
+(new Log)->whereIn('level', [...]);        // [] matches nothing, like whereIn on SQL
+(new Log)->insert(['level' => 'error']);   // the row back, _id filled in — one round-trip
+(new Log)->where('at', '<', $cutoff)->delete();     // real deletion; no softDelete here
+(new Log)->find($idFromUrl);               // the hex string finds the ObjectId row
+```
+
+`unique:`/`exists:` validation rules work against a MongoModel untouched —
+they call `where()`/`count()`/`getPrimary()` and never ask what is underneath.
+Escape hatches when the verbs stop: `filter([...])` merges a raw match
+document, `aggregate([...])` runs a pipeline and returns arrays. There are no
+joins, no `whereRaw`, no migrations (`mongo indexes` covers the one thing a
+deployment must create) — asking for them here would only pretend.
+
+`tests/mongo.php` runs all of it against a live server:
+`php terminal tests run mongo`.
 
 ## 3. View
 

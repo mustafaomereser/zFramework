@@ -13,7 +13,7 @@ class Exists extends Rule
         # no row, and the field could not be left empty however it was declared.
         if ($data['value'] === null || $data['value'] === '') return true;
 
-        $exists = (new $data['equivalent'])->whereRaw(($data['parameters']['key'] ?? $data['key']) . " = :value", ['value' => $data['value']]);
+        $exists = (new $data['equivalent'])->where($data['parameters']['key'] ?? $data['key'], $data['value']);
         if ($ex = @$data['parameters']['ex']) $exists->where($exists->getPrimary() ?? 'id', '!=', $ex);
         if ($exists->count()) return true;
         return false;
