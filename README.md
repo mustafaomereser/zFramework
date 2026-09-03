@@ -994,6 +994,7 @@ goes **inside** the section.
 @json($var)              — outputs json_encode($var)
 @dump($var)              — var_dump($var); does not die
 @dd($var)                — print_r($var); does not die either
+@@if                     — a literal `@if` in the output; `@@` is the escape
 {{ $var }}               — escaped echo (compiles to <?= e($var) ?>)
 {!! $var !!}             — raw echo, for markup
 {{-- comment --}}        — stripped before anything else parses

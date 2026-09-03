@@ -220,12 +220,33 @@ class View
         $manifest = ['files' => [], 'binds' => self::$usedBinds];
         foreach (self::$compiledFiles as $file) $manifest['files'][$file] = filemtime($file);
 
-        file_put_contents2(self::getManifestPath($view_name), json_encode($manifest));
-
+        # Compiled file first, then the manifest that vouches for it, each written
+        # to a temporary name and renamed into place: a request arriving mid-write
+        # sees either the old pair or the new, never a truncated file to include.
+        # file_put_contents() truncates before it writes, and a parallel request
+        # that passed tryCache() in that window included half a template.
         $cachePath = self::getCachePath($view_name);
-        file_put_contents2($cachePath, $compiled);
+        self::writeAtomic($cachePath, $compiled);
+        self::writeAtomic(self::getManifestPath($view_name), json_encode($manifest));
 
         return $cachePath;
+    }
+
+    /**
+     * Write through a temporary file and rename() over the target.
+     *
+     * @param string $path
+     * @param string $content
+     * @return void
+     */
+    private static function writeAtomic(string $path, string $content): void
+    {
+        @mkdir(dirname($path), 0755, true);
+        $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
+        if (file_put_contents($tmp, $content) === false || !@rename($tmp, $path)) {
+            @unlink($tmp);
+            file_put_contents2($path, $content);
+        }
     }
 
     /**
@@ -320,12 +341,10 @@ class View
             foreach ($result['binds'] as $bindKey) $data = self::applyBinds($bindKey, $data);
 
             $cache  = $result['path'];
-            $output = (function () use ($data, $cache) {
-                ob_start();
+            $output = self::capture(function () use ($data, $cache) {
                 extract($data);
                 include($cache);
-                return ob_get_clean();
-            })();
+            });
         } else {
             $result   = self::compile($view_name, $data);
             $compiled = $result['compiled'];
@@ -342,12 +361,10 @@ class View
             # standing for the error page to read, and the request state clears it.
             self::$evaluating[] = $compiled;
 
-            $output = (function () use ($data, $compiled) {
-                ob_start();
+            $output = self::capture(function () use ($data, $compiled) {
                 extract($data);
                 echo eval('?>' . $compiled);
-                return ob_get_clean();
-            })();
+            });
 
             array_pop(self::$evaluating);
         }
@@ -450,6 +467,7 @@ class View
     {
         self::parseComments();
         self::parseIncludes();
+        self::maskEscapedAt();
         self::maskCssAtRules();
         self::parsePHP();
         self::parseVariables();
@@ -472,7 +490,48 @@ class View
         # in the layout's <style> met the `page` directive ViewDirectives registers,
         # became an `if` with no `endif`, and the eval threw a ParseError. The child's
         # own <style> was never affected, only the layout's.
-        if (!$isExtend) self::unmaskCssAtRules();
+        if (!$isExtend) {
+            self::unmaskCssAtRules();
+            self::$view = str_replace(self::AT_PLACEHOLDER, '@', self::$view);
+        }
+    }
+
+    /**
+     * A literal `@` in front of a directive name: write `@@`.
+     *
+     * `@@if` prints `@if`. Masked before any directive looks at the text and
+     * restored by the outermost compilation, like the CSS at-rules.
+     */
+    private const AT_PLACEHOLDER = "\x02AT\x02";
+
+    private static function maskEscapedAt(): void
+    {
+        self::$view = str_replace('@@', self::AT_PLACEHOLDER, self::$view);
+    }
+
+    /**
+     * Run a template and return what it printed.
+     *
+     * On a throw - abort() or redirect() from inside the template, an exception
+     * in it - the buffer is discarded, not left open: it held the half of the
+     * page rendered so far, the signal's response was then echoed into that
+     * same buffer, and PHP flushed both at shutdown - a 404 body arriving
+     * after `<html><b>...` of the page that aborted.
+     *
+     * @param callable $template
+     * @return string
+     */
+    private static function capture(callable $template): string
+    {
+        $level = ob_get_level();
+        ob_start();
+        try {
+            $template();
+            return (string) ob_get_clean();
+        } catch (\Throwable $e) {
+            while (ob_get_level() > $level) ob_end_clean();
+            throw $e;
+        }
     }
 
     /**
@@ -519,12 +578,18 @@ class View
                     $parts[$i]
                 );
 
-                $script = preg_replace('/\s+/', ' ', $script);
+                # A line break is kept as a line break. Folded to a space, `let a = 1`
+                # and `let b = 2` became one statement and the script died with a
+                # syntax error - in production only, since debug does not minify.
+                # Around punctuation the break goes, as the parser would read it;
+                # around an operator only blanks go, so `a` / `++b` stays two lines.
+                $script = preg_replace(['/[ \t]*\n\s*/', '/[ \t]+/'], ["\n", ' '], $script);
                 $script = preg_replace('/\s*([{}:;,])\s*/', '$1', $script);
                 $script = preg_replace('/\s*(\(|\)|\[|\])\s*/', '$1', $script);
-                $script = preg_replace('/([=+\-*\/<>])\s+/', '$1', $script);
-                $script = preg_replace('/\s+([=+\-*\/<>])/', '$1', $script);
+                $script = preg_replace('/([=+\-*\/<>])[ \t]+/', '$1', $script);
+                $script = preg_replace('/[ \t]+([=+\-*\/<>])/', '$1', $script);
 
+                $script    = preg_replace(['/(<script[^>]*>)\s+/i', '/\s+(<\/script>)/i'], '$1', $script);
                 $parts[$i] = trim(preg_replace_callback('/\x00(\d+)\x00/', fn($m) => $strings[(int) $m[1]], $script));
             }
         }
@@ -667,7 +732,7 @@ class View
     {
         $matches = self::matchBalancedParentheses('foreach', self::$view);
         foreach (array_reverse($matches) as $match) self::$view  = substr_replace(self::$view, '<?php foreach(' . $match['inner'] . '): ?>', $match['start'], $match['end'] - $match['start']);
-        self::$view = preg_replace('/@endforeach/', '<?php endforeach; ?>', self::$view);
+        self::$view = preg_replace('/(?<![A-Za-z0-9_])@endforeach(?![A-Za-z0-9_])/', '<?php endforeach; ?>', self::$view);
     }
 
     /**
@@ -966,7 +1031,10 @@ class View
     {
         foreach (self::$directives as $key => $callback) {
             self::$view = preg_replace_callback(
-                '/@' . $key . '(\(\'(.*?)\'\)|)/',
+                # (?!\w): `@pages` is not the start of `@pagesdev`; (?<!\w): the `@pages` in
+                # `x@pages.io` is an address, not a directive. Without the guards a
+                # word that merely contained a directive name became that directive.
+                '/(?<![A-Za-z0-9_])@' . $key . '(?![A-Za-z0-9_])(\(\'(.*?)\'\)|)/',
                 fn($expression) => call_user_func($callback, $expression[2] ?? null),
                 self::$view
             );
@@ -990,8 +1058,8 @@ class View
         $matches = self::matchBalancedParentheses('elseif', self::$view);
         foreach (array_reverse($matches) as $match) self::$view = substr_replace(self::$view, '<?php elseif (' . $match['inner'] . '): ?>', $match['start'], $match['end'] - $match['start']);
 
-        self::$view = preg_replace('/@else/', '<?php else: ?>', self::$view);
-        self::$view = preg_replace('/@endif/', '<?php endif; ?>', self::$view);
+        self::$view = preg_replace('/(?<![A-Za-z0-9_])@else(?![A-Za-z0-9_])/', '<?php else: ?>', self::$view);
+        self::$view = preg_replace('/(?<![A-Za-z0-9_])@endif(?![A-Za-z0-9_])/', '<?php endif; ?>', self::$view);
     }
 
     /**
@@ -1005,7 +1073,7 @@ class View
             fn($expression) => '<?php if (empty(' . $expression[1] . ')): ?>',
             self::$view
         );
-        self::$view = preg_replace('/@endempty/', '<?php endif; ?>', self::$view);
+        self::$view = preg_replace('/(?<![A-Za-z0-9_])@endempty(?![A-Za-z0-9_])/', '<?php endif; ?>', self::$view);
     }
 
     /**
@@ -1019,7 +1087,7 @@ class View
             fn($expression) => '<?php if (isset(' . $expression[1] . ')): ?>',
             self::$view
         );
-        self::$view = preg_replace('/@endisset/', '<?php endif; ?>', self::$view);
+        self::$view = preg_replace('/(?<![A-Za-z0-9_])@endisset(?![A-Za-z0-9_])/', '<?php endif; ?>', self::$view);
     }
 
     /**
@@ -1042,8 +1110,8 @@ class View
             self::$view  = substr_replace(self::$view, $replacement, $match['start'], $match['end'] - $match['start']);
         }
 
-        self::$view = preg_replace('/@empty/', '<?php endforeach; else: ?>', self::$view);
-        self::$view = preg_replace('/@endforelse/', '<?php endif; ?>', self::$view);
+        self::$view = preg_replace('/(?<![A-Za-z0-9_])@empty(?![A-Za-z0-9_])/', '<?php endforeach; else: ?>', self::$view);
+        self::$view = preg_replace('/(?<![A-Za-z0-9_])@endforelse(?![A-Za-z0-9_])/', '<?php endif; ?>', self::$view);
     }
 
     /**

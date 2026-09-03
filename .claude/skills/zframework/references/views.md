@@ -218,7 +218,11 @@ ban is only on directives the engine does not implement.
 
 The rest of what exists, for reading other people's templates: `@elseif`, `@else`,
 `@empty($x) … @endempty`, `@isset($x) … @endisset`, `@forelse … @empty … @endforelse`,
-`@php … @endphp`, `@json($x)`, `@dump($x)`, `@dd($x)`.
+`@php … @endphp`, `@json($x)`, `@dump($x)`, `@dd($x)`. `@@name` prints a literal `@name`.
+
+A directive is only recognised as a whole word: `support@elsewhere.com` and `admin@endif.io`
+are text, `@pagesdev` is not the `pages` directive. Only a name that is preceded and followed
+by a non-word character compiles.
 
 ### Engine behaviour worth knowing
 
@@ -266,7 +270,10 @@ The rest of what exists, for reading other people's templates: `@elseif`, `@else
   already exists under `zFramework/storage/` (`Cache.php:26`), so on a clean install
   `cache clear pages` reports a wrong option rather than doing nothing.
 - Caching and minify are both on by default (`config/framework.php:19-22`); turn caching off
-  while writing templates.
+  while writing templates. Minify keeps the line breaks inside `<script>` (it folds blanks),
+  so javascript that relies on automatic semicolon insertion survives production.
+- `abort()` / `redirect()` inside a template discard what the template had printed so far;
+  the response is the signal's alone.
 
 ## Errors point at the template
 
