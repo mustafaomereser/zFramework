@@ -332,18 +332,22 @@ class Run
             return;
         }
 
-        # Whatever happens inside - an early return on a cache hit, a signal, an
-        # exception - this buffer is closed on the way out and its contents handed
-        # up. Left open, a worker kept one level per request: ob_get_clean() closes
-        # the innermost buffer, and this was innermost, so the worker's own stayed
-        # open and the next request opened another on top - 16 KB a request, for
-        # as long as the worker lived. Under FPM shutdown closed it and nothing
-        # showed. Defer::flush() may already have flushed everything through
-        # fastcgi_finish_request(); then there is nothing left at this level.
+        # Under a worker this buffer is closed on the way out - whatever happened
+        # inside, an early return on a cache hit, a signal, an exception - and its
+        # contents handed up to the worker's own. Left open, the worker kept one
+        # level per request: ob_get_clean() closes the innermost buffer, and this
+        # was innermost, so the worker's stayed open and the next request opened
+        # another on top - 16 KB a request, for as long as the worker lived.
+        #
+        # Under FPM it is deliberately left open. Session writes at shutdown, and
+        # needs the headers still unsent to hand the browser its cookie; closing
+        # the buffer here sent the page first, session_start() then failed with
+        # "headers already sent", the csrf token was never stored and every form
+        # answered 406. PHP flushes the buffer itself after the shutdown functions.
         try {
             self::serveRequest();
         } finally {
-            while (ob_get_level() >= $level) ob_end_flush();
+            if (defined('ZF_WORKER')) while (ob_get_level() >= $level) ob_end_flush();
         }
     }
 
