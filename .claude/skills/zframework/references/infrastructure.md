@@ -20,7 +20,8 @@ $ssl = new AutoSSL(AutoSSL::PROD, null, $accountId);  // sign as a specific acco
 // (account.key + account.kid). The id is numeric, date-based, so listings sort by age.
 // With no id given the constructor takes the oldest account, or registers one if none.
 account(): string                // id this instance signs with
-accounts(): array                // [id => [id, kid, registered, created, current]], oldest first
+accounts(): array                // [id => [id, kid, registered, ca, usable, created, current]], oldest first;
+                                 // the constructor picks the oldest `usable` one - a staging account is never used against PROD
 createAccount(): string          // register a new account, switch to it, return its id
 useAccount(string $id): self     // switch to an existing one; unknown id throws
 ensureAccount(): string          // the kid; registers the current key if it never was
@@ -196,8 +197,10 @@ Schedule::monthly(1, '00:30', fn() => ..., 'name');   // the 1st
 Schedule::cron('*/5 9-17 * * 1-5', fn() => ..., 'name');
 ```
 
-The cron parser takes the five standard fields with `*`, `*/n`, `a,b` and `a-b`; day-of-week
-is 0-6 with 0 as Sunday, and 7 also accepted.
+The cron parser takes the five standard fields with `*`, `*/n`, `a,b`, `a-b` and names
+(`jan`-`dec`, `sun`-`sat`); day-of-week is 0-6 with 0 as Sunday, and 7 also accepted. Day-of-month
+and day-of-week are OR-ed when both are restricted, as crontab(5) does (`0 0 1 * 1` = the 1st and
+every Monday).
 
 ```bash
 php terminal schedule run     # everything due this minute - also how you test a task

@@ -133,10 +133,23 @@ class Schedule
         # so on day-of-month it means 1,3,5 - not the even days a plain modulo gives.
         $minimums = [0, 0, 1, 1, 0];
 
-        foreach ($fields as $index => $field)
-            if (!self::fieldMatches($field, $now[$index], $minimums[$index], $index === 4)) return false;
+        # Names as crontab writes them: jan-dec, sun-sat.
+        $fields[3] = strtr(strtolower($fields[3]), array_combine(['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], range(1, 12)));
+        $fields[4] = strtr(strtolower($fields[4]), array_combine(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], range(0, 6)));
 
-        return true;
+        foreach ([0, 1, 3] as $index)
+            if (!self::fieldMatches($fields[$index], $now[$index], $minimums[$index])) return false;
+
+        # Day-of-month and day-of-week as crontab(5) reads them: when both are
+        # restricted the task runs on EITHER, not on the rare day that is both.
+        # `0 0 1 * 1` is the first of the month and every Monday; AND-ed, it ran
+        # on the first only when that was a Monday.
+        $dom = self::fieldMatches($fields[2], $now[2], $minimums[2]);
+        $dow = self::fieldMatches($fields[4], $now[4], $minimums[4], true);
+
+        if ($fields[2][0] !== '*' && $fields[4][0] !== '*') return $dom || $dow;
+
+        return $dom && $dow;
     }
 
     /**

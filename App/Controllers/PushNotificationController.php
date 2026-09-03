@@ -29,7 +29,15 @@ class PushNotificationController extends Controller
         # it cannot re-register goes quiet without anything reporting it. Handed over
         # here instead: a same-origin GET with no CORS headers, so another site can
         # make the request but cannot read what comes back.
-        return Response::json(PushNotification::client(request('app') ?: null) + ['_token' => Csrf::get()]);
+        # `app` is the client's to send; one that is not configured is a 404, not
+        # a report in error_logs.
+        try {
+            $client = PushNotification::client(request('app') ?: null);
+        } catch (\InvalidArgumentException) {
+            abort(404, 'No such application.');
+        }
+
+        return Response::json($client + ['_token' => Csrf::get()]);
     }
 
     /**

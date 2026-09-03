@@ -43,6 +43,16 @@ class Queue
 
             if (!$entry) {
                 if ($once) return Terminal::text("[color=dark-gray]No job within {$sleep}s, exiting (--once).[/color]");
+
+                # An idle turn is where a lost server is noticed and retried. Nothing
+                # in this loop ends a request, so $failed - set by one refused
+                # connection - stayed set for the life of the worker, and it sat
+                # silent with a queue it could no longer see.
+                if (!Redis::available('queue')) {
+                    Terminal::text("[color=red]Redis unreachable, retrying in {$sleep}s[/color]", true);
+                    sleep($sleep);
+                }
+                Redis::flushRequestState();
                 continue;
             }
 

@@ -52,8 +52,11 @@ class AutoSSL
         $this->adoptLegacyAccount();
         $this->loadDirectory();
 
+        # The oldest account registered with THIS CA - not the oldest there is. A
+        # staging account picked up by a production instance signed every request
+        # with a kid Let's Encrypt's production directory has never heard of.
         if ($account !== null) $this->useAccount($account);
-        elseif ($accounts = $this->accounts()) $this->useAccount(array_key_first($accounts));
+        elseif ($usable = array_filter($this->accounts(), fn($a) => $a['usable'])) $this->useAccount(array_key_first($usable));
         else $this->createAccount();
     }
 
@@ -82,10 +85,16 @@ class AutoSSL
             $id  = basename($dir);
             $kid = is_file("$dir/account.kid") ? trim((string) file_get_contents("$dir/account.kid")) : null;
 
+            # The kid is a url on the CA that issued it; an account belongs to the
+            # directory whose host it names. Unregistered keys belong to nobody yet.
+            $ca = $kid ? (string) parse_url($kid, PHP_URL_HOST) : null;
+
             $accounts[$id] = [
                 'id'         => $id,
                 'kid'        => $kid ?: null,
                 'registered' => (bool) $kid,
+                'ca'         => $ca,
+                'usable'     => $ca === null || $ca === parse_url($this->directoryUrl, PHP_URL_HOST),
                 'created'    => date('Y-m-d H:i:s', (int) filemtime("$dir/account.key")),
                 'current'    => isset($this->account) && $this->account === $id,
             ];
@@ -139,6 +148,10 @@ class AutoSSL
         # A key that was generated but never registered - the registration call
         # failed, or the process died between the two - is registered now.
         if (is_file("$dir/account.kid")) $this->kid = trim((string) file_get_contents("$dir/account.kid")) ?: null;
+
+        if ($this->kid && parse_url($this->kid, PHP_URL_HOST) !== parse_url($this->directoryUrl, PHP_URL_HOST))
+            throw new \InvalidArgumentException("AutoSSL: account `$id` is registered with " . parse_url($this->kid, PHP_URL_HOST) . ", this instance talks to " . parse_url($this->directoryUrl, PHP_URL_HOST) . " - see accounts(), or createAccount().");
+
         if (!$this->kid) $this->ensureAccount();
 
         return $this;

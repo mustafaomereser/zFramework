@@ -222,6 +222,10 @@ class Redis
             $result = $redis->brPop([self::key($key)], $timeout);
             return $result ? unserialize($result[1]) : null;
         } catch (\Throwable) {
+            # The connection is what failed - a server restart, a dropped socket.
+            # Kept, it answered null on every later call for the life of the
+            # process; dropped, the next connection() opens a new one.
+            self::drop($for);
             return null;
         }
     }
@@ -242,6 +246,18 @@ class Redis
         } catch (\Throwable) {
             return 0;
         }
+    }
+
+    /**
+     * Forget a connection that stopped working.
+     *
+     * @param string $for
+     * @return void
+     */
+    public static function drop(string $for): void
+    {
+        $database = self::config()['database'][$for] ?? 0;
+        unset(self::$connections[$database]);
     }
 
     /**

@@ -84,7 +84,13 @@ class Config
         $config = $cache ? self::$caches[$cache_name] : include($data['path']);
         if (!$cache) self::$caches[$cache_name] = $config;
 
-        if (isset($data['args'])) foreach (explode('.', $data['args']) as $key) if (isset($config[$key])) $config = $config[$key];
+        # A key that is not there is null, not the array above it: walking on
+        # past a missing key handed back the parent, so config('x.apps.zzz')
+        # returned every app and "unknown app" checks never fired.
+        if (isset($data['args'])) foreach (explode('.', $data['args']) as $key) {
+            if (!is_array($config) || !array_key_exists($key, $config)) return null;
+            $config = $config[$key];
+        }
         return $config;
     }
 

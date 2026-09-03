@@ -94,10 +94,14 @@ class Mail
         self::$mail->CharSet  = "utf-8";
         self::$mail->Encoding = "base64";
 
+        # Verified unless the config says otherwise: with peer verification off
+        # every send trusted whoever answered on the port, credentials included.
+        # `'verify' => false` is for a mail server with a self-signed certificate.
+        $verify = $mailConfig['verify'] ?? true;
         self::$mail->SMTPOptions = [
             'ssl' => [
-                'verify_peer'       => false,
-                'verify_peer_name'  => false,
+                'verify_peer'       => $verify,
+                'verify_peer_name'  => $verify,
                 'allow_self_signed' => true
             ]
         ];

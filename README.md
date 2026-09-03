@@ -1993,8 +1993,9 @@ Schedule::monthly(1, '00:30', fn() => ..., 'invoice');
 Schedule::cron('*/5 9-17 * * 1-5', fn() => ..., 'business-hours');
 ```
 
-Five standard cron fields with `*`, `*/n`, `a,b` and `a-b`; day-of-week 0-6 with 0 as Sunday,
-and 7 also accepted.
+Five standard cron fields with `*`, `*/n`, `a,b`, `a-b` and names (`jan`-`dec`, `sun`-`sat`);
+day-of-week 0-6 with 0 as Sunday, and 7 also accepted. Day-of-month and day-of-week combine as
+in crontab(5): when both are restricted the task runs when **either** matches.
 
 ```bash
 php terminal schedule run     # everything due this minute - also how you test a task
@@ -2319,12 +2320,13 @@ holding `account.key` and `account.kid`. The id is a number — the date and tim
 created plus three random digits — so a listing sorts by age.
 
 ```php
-$ssl = new AutoSSL(AutoSSL::PROD);                       // the oldest account, or a new one if there is none
+$ssl = new AutoSSL(AutoSSL::PROD);                       // the oldest account registered with THIS CA, or a new one
 $ssl = new AutoSSL(AutoSSL::PROD, null, '20260902195802774');   // a specific one
 
 $ssl->account();          // id of the account this instance signs with
 $ssl->accounts();         // every account on disk, oldest first:
-                          //   [id => ['id', 'kid', 'registered', 'created', 'current']]
+                          //   [id => ['id', 'kid', 'registered', 'ca', 'usable', 'created', 'current']]
+                          //   ca = host of the kid; usable = registered with this instance's directory (or not yet registered)
 $id = $ssl->createAccount();   // registers a new account and switches to it; returns its id
 $ssl->useAccount($id);    // switch to an existing one
 $ssl->unlinkAccount();    // forget the current account (or unlinkAccount($id)) - local files only

@@ -191,7 +191,7 @@ class RateLimit
 
         ftruncate($handle, 0);
         rewind($handle);
-        fwrite($handle, "$start|$count|$until");
+        fwrite($handle, "$start|$count|$until|$window");
         fflush($handle);
         flock($handle, LOCK_UN);
         fclose($handle);
@@ -226,9 +226,22 @@ class RateLimit
      */
     private static function prune(int $window): void
     {
-        $cutoff = time() - max($window * 2, 3600);
+        $now = time();
 
-        foreach ((array) glob(self::$dir . '/*') as $file)
-            if (@filemtime($file) < $cutoff) @unlink($file);
+        # Each file by its own window and block, not the caller's: a login
+        # counter with a day-long block was swept by a ten-second api limiter
+        # that happened to draw the 1-in-200. Files from before the window was
+        # recorded fall back to the caller's.
+        foreach ((array) glob(self::$dir . '/*') as $file) {
+            $parts = explode('|', (string) @file_get_contents($file));
+            $start = (int) ($parts[0] ?? 0);
+            $until = (int) ($parts[2] ?? 0);
+            $own   = (int) ($parts[3] ?? 0) ?: $window;
+
+            if ($until > $now) continue;
+            if ($now - max($start, $until) < max($own * 2, 3600)) continue;
+
+            @unlink($file);
+        }
     }
 }

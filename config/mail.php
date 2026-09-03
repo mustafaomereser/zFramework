@@ -19,6 +19,7 @@ return [
     'SMTPAuth' => true,
 
     'security' => 'ssl',
+    'verify'   => true,      // check the mail server's certificate; false only for a self-signed one
     'mail'     => 'mail.server.com',
     'port'     => 443,
     'username' => 'test',
