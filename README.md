@@ -2683,9 +2683,10 @@ freely.
 
 A closure cannot be written to the cache — `var_export()` has no way to. It used
 to keep the whole table out; now it keeps only its own file live. The table is
-cached with a note in the closure's place (`['live' => file, 'nth' => n]`), and at
-boot that file alone is included again and its n-th closure put back where the
-note is — same position, same key, so route order is untouched. `route cache`
+cached with a note in the closure's place (`['live' => file, 'at' => 'line/n']`), and
+at boot that file alone is included again — after the providers and modules, as on
+an uncached boot — and the closure at that line put back where the note is; same
+position, same key, so route order is untouched. `route cache`
 lists the live files. With six closures in two files that is ~0.24 ms per
 request against ~0.95 ms for parsing every route file; move the closures to
 `[Controller::class, 'method']` and it is ~0.

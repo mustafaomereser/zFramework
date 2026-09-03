@@ -277,11 +277,11 @@ class Route
      *
      * var_export() cannot write a closure, and until now one closure anywhere
      * meant no cache at all - the whole table parsed on every request because of
-     * one route. Instead each closure becomes ['live' => file, 'nth' => n]: the
-     * n-th closure that file defines, counting in table order. At boot the cached
-     * table is loaded, only those files are included again, and their closures
-     * are put back where the notes are - same position, same key, so "first
-     * definition wins" is undisturbed. See revive().
+     * one route. Instead each closure becomes ['live' => file, 'at' => 'line/n']:
+     * the n-th closure on that line of that file. At boot the cached table is
+     * loaded, only those files are included again, and their closures are put
+     * back where the notes are - same position, same key, so "first definition
+     * wins" is undisturbed. See revive() and closures().
      *
      * @return array{routes: array, live: array} The table, and the files still included per request.
      */
@@ -293,8 +293,8 @@ class Route
         foreach (self::closures($routes) as $file => $entries) {
             $live[] = $file;
 
-            foreach ($entries as $nth => [$key, $slot]) {
-                $note = ['live' => $file, 'nth' => $nth];
+            foreach ($entries as [$key, $slot, , $at]) {
+                $note = ['live' => $file, 'at' => $at];
 
                 if ($slot === 'callback') $routes[$key]['callback'] = $note;
                 else $routes[$key]['groups']['middlewares'][1] = $note;
@@ -323,28 +323,42 @@ class Route
     }
 
     /**
-     * Every closure in a table, grouped by the file that defined it, in table order.
+     * Every closure in a table, grouped by the file that defined it.
      *
-     * The order is the contract: a file defines its closures in the same sequence
-     * every time it is included, so "the n-th closure from this file" names the
-     * same one at cache time and at boot.
+     * A closure is named by the line it starts on and its position among the
+     * closures on that line - "file:line/n". Counting position over the whole
+     * file was the contract before, and it broke the moment a later file reused
+     * a route name: the earlier closure dropped out of the merged table, every
+     * closure after it moved up one, and the cache revived the wrong handler.
+     * The line does not move when a sibling route is replaced.
      *
      * @param array $routes
-     * @return array<string, array<int, array{0: int|string, 1: string, 2: \Closure}>> file => [[key, slot, closure], ...]
+     * @return array<string, array<int, array{0: int|string, 1: string, 2: \Closure, 3: string}>> file => [[key, slot, closure, at], ...]
      */
     private static function closures(array $routes): array
     {
         $found = [];
+        $seen  = [];
         $base  = str_replace('\\', '/', BASE_PATH) . '/';
 
-        $file = function (\Closure $closure) use ($base): string {
-            $path = str_replace('\\', '/', (string) (new ReflectionFunction($closure))->getFileName());
-            return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
+        $place = function (\Closure $closure) use ($base, &$seen): array {
+            $ref  = new ReflectionFunction($closure);
+            $path = str_replace('\\', '/', (string) $ref->getFileName());
+            if (str_starts_with($path, $base)) $path = substr($path, strlen($base));
+            $line = $ref->getStartLine();
+            $n    = $seen["$path:$line"] = ($seen["$path:$line"] ?? -1) + 1;
+            return [$path, "$line/$n"];
         };
 
         foreach ($routes as $key => $route) {
-            if (($route['callback'] ?? null) instanceof \Closure) $found[$file($route['callback'])][] = [$key, 'callback', $route['callback']];
-            if (($route['groups']['middlewares'][1] ?? null) instanceof \Closure) $found[$file($route['groups']['middlewares'][1])][] = [$key, 'fallback', $route['groups']['middlewares'][1]];
+            if (($route['callback'] ?? null) instanceof \Closure) {
+                [$file, $at] = $place($route['callback']);
+                $found[$file][] = [$key, 'callback', $route['callback'], $at];
+            }
+            if (($route['groups']['middlewares'][1] ?? null) instanceof \Closure) {
+                [$file, $at] = $place($route['groups']['middlewares'][1]);
+                $found[$file][] = [$key, 'fallback', $route['groups']['middlewares'][1], $at];
+            }
         }
 
         return $found;
@@ -354,10 +368,14 @@ class Route
      * Put the closures back into a cached table.
      *
      * Each file named in the cache is included once more into a scratch table,
-     * its closures are collected in order, and every ['live' => file, 'nth' => n]
+     * its closures are collected by line, and every ['live' => file, 'at' => "line/n"]
      * note in the cached table is replaced by the matching one. A file that no
      * longer yields what the cache expects means the cache is stale - a route was
      * added or removed there - and that is reported rather than served as a 404.
+     *
+     * Called after the providers and modules, not before: an uncached boot runs
+     * the route files last, and a route file that reads what a provider set up
+     * has to see the same thing on a cached boot.
      *
      * @param array $live Files, relative to BASE_PATH, as written by compilable().
      * @return void
@@ -378,7 +396,7 @@ class Route
             \zFramework\Run::includer(BASE_PATH . '/' . $file);
 
             foreach (self::closures(self::$routes) as $from => $entries)
-                foreach ($entries as $nth => [, , $closure]) $donors[$from][$nth] = $closure;
+                foreach ($entries as [, , $closure, $at]) $donors[$from][$at] = $closure;
         }
 
         self::$routes = $table;
@@ -386,8 +404,8 @@ class Route
         self::$groups = self::$add_groups = [];
 
         $resolve = function (array $note) use ($donors): \Closure {
-            return $donors[$note['live']][$note['nth']]
-                ?? throw new \RuntimeException("Route cache is stale: `{$note['live']}` no longer defines closure #{$note['nth']}. Run `php terminal route cache`.");
+            return $donors[$note['live']][$note['at'] ?? '']
+                ?? throw new \RuntimeException("Route cache is stale: `{$note['live']}` no longer defines the closure at " . ($note['at'] ?? '#' . ($note['nth'] ?? '?')) . ". Run `php terminal route cache`.");
         };
 
         foreach (self::$routes as $key => $route) {
@@ -630,8 +648,18 @@ class Route
     {
         if (self::$calledRoute !== null || !count(self::$routes)) return;
 
+        # HEAD is answered by the GET route: the SAPI drops the body itself. Left
+        # as its own method it matched nothing and monitors saw a 404.
         $method = strtoupper(method());
-        $URI    = self::segments(strtok($_SERVER['REQUEST_URI'] ?? '/', '?'));
+        if ($method === 'HEAD') $method = 'GET';
+
+        # Without the directory the application lives in: route() builds urls
+        # as script_name() . url, so under /sub/ the links the framework itself
+        # produced arrived here as /sub/x and matched nothing.
+        $request = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
+        if (($prefix = script_name()) && str_starts_with($request, $prefix)) $request = substr($request, strlen($prefix)) ?: '/';
+
+        $URI    = self::segments($request);
         $path   = implode('/', $URI);
         $index  = self::index();
 

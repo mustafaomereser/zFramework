@@ -100,7 +100,9 @@ class Csrf
      */
     public static function check(bool $alwaysTrue = false): bool
     {
-        if ((method() != 'GET' && !self::compare(request('_token'))) && $alwaysTrue != true) return false;
+        # The safe methods carry no form and no token: HEAD is a GET without a
+        # body, OPTIONS a preflight. Checked as writes, both answered 406.
+        if (!in_array(method(), ['GET', 'HEAD', 'OPTIONS'], true) && !self::compare(request('_token')) && $alwaysTrue != true) return false;
         return true;
     }
 }

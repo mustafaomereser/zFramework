@@ -277,17 +277,17 @@ class Run
                 # The cache carries the lookup index alongside the table, so a
                 # cached boot skips building it too. Older cache files predate it
                 # and simply have none; the first lookup builds one as before.
-                if ($cached) {
-                    \zFramework\Core\Route::useCompiled($compiled['routes'] ?? $compiled, $compiled['index'] ?? null);
-
-                    # The files that define closures are the only ones parsed per
-                    # request; everything else is the table above.
-                    \zFramework\Core\Route::revive((array) ($compiled['live'] ?? []));
-                }
+                if ($cached) \zFramework\Core\Route::useCompiled($compiled['routes'] ?? $compiled, $compiled['index'] ?? null);
             }
 
             $before = self::$included;
             self::initProviders()::findModules(base_path('/modules'))::loadModules($cached);
+
+            # The files that define closures are the only ones parsed per request;
+            # everything else is the table above. After the providers and modules,
+            # where an uncached boot runs every route file - a live file that reads
+            # what a provider set up saw nothing when this ran before them.
+            if ($cached) \zFramework\Core\Route::revive((array) ($compiled['live'] ?? []));
 
             if (!$cached) {
                 # Cacheable routes first, on their own, so the table written below
@@ -365,6 +365,12 @@ class Run
         # directory does not exist, so a site that never declares a cacheable
         # page pays one stat and never loads Page.php. A hit ends the request
         # here - no middlewares, no route matching, no session.
+        # Auth::init() - the remember-me cookie, among other things - runs from the
+        # autoloader, once per process. Under FPM that is once per request; under
+        # a worker it was once per lifetime, so a visitor holding only auth-stay-in
+        # was never logged back in after the first request the worker served.
+        if (defined('ZF_WORKER') && class_exists(\zFramework\Core\Facades\Auth::class, false)) \zFramework\Core\Facades\Auth::init();
+
         global $storage_path;
         $pageCache = (bool) (\zFramework\Core\Facades\Config::framework('response.page-cache') ?? true);
         if ($pageCache && is_dir("$storage_path/pages") && \zFramework\Core\Facades\Page::serve()) return;
@@ -401,7 +407,15 @@ class Run
             \zFramework\Core\Facades\Alerts::unset();
             \zFramework\Core\Facades\JustOneTime::unset();
         } catch (\Throwable $errorHandle) {
-            errorHandler($errorHandle);
+            # With debug off the handler ends in abort(500), a ResponseSignal thrown
+            # from inside this catch. Under FPM the global exception handler sent
+            # it; under a worker it escaped handle() and RoadRunner answered with
+            # its own error page instead of the application's.
+            try {
+                errorHandler($errorHandle);
+            } catch (\zFramework\Core\ResponseSignal $signal) {
+                $signal->send();
+            }
         }
 
         # Release the response, then run whatever was handed to Defer::after().

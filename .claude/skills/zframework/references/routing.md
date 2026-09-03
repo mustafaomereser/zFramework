@@ -19,9 +19,10 @@ Route::name(string $name)                 // names the route defined immediately
 also works (resolved via `findFile()` through `App/Controllers/`).
 
 **Prefer `[Controller::class, 'method']` to a closure.** A closure cannot go into the route
-cache, so its file stays live: the table is cached with a `['live' => file, 'nth' => n]`
-note in the closure's place, and at boot that file alone is re-included and the closure put
-back (`Route::revive()`). Order and keys survive. It costs that file's parse per request -
+cache, so its file stays live: the table is cached with a `['live' => file, 'at' => 'line/n']`
+note in the closure's place, and at boot that file alone is re-included (after providers and
+modules, as on an uncached boot) and the closure put back (`Route::revive()`). Order and keys
+survive. It costs that file's parse per request -
 the shipped Hookshot module's five closures are ~0.16 ms because its file calls `glob()` -
 and `route cache` names the live files so you can see what is still being paid for.
 
