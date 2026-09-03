@@ -89,7 +89,8 @@ findings.
   (`DB/Drivers/mysql.php::getWhereOrHaving`). `unset($model->softDelete)` on an instance
   makes queries — `update()` included — see deleted rows; that is how a trash screen and
   a restore action are built without touching the framework. There is no `forceDelete`.
-- **Closure routes** block `php terminal route cache`. Use the controller-array form.
+- **Closure routes** keep their file live under `php terminal route cache` (parsed per request).
+  Use the controller-array form where the parse cost matters.
 - **Root and resource routes are written last, deliberately.** `Route::resource('/', …)`
   registers `/{id}`, which matches every one-segment url and lets `show()` claim it. That is
   the intended behaviour, not a bug — so the rule is ordering: every other route is defined

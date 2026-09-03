@@ -352,7 +352,7 @@ return [
 ```
 
 Disable a module with `'status' => false`.
-Module views: `view('shop.views.pages.index')`.
+Module views: `view('Shop.views.pages.index')` - the module segment is capitalised, as the directory is (Linux is case-sensitive).
 
 ---
 
@@ -431,8 +431,8 @@ A service worker only registers over **https** or on **localhost**. Details: REA
 ## 8. Localisation
 
 ```
-resource/lang/tr/lang.php   ['greeting' => 'Merhaba, :name!']
-resource/lang/en/lang.php   ['greeting' => 'Hello, :name!']
+resource/lang/tr/lang.php   ['greeting' => 'Merhaba, {name}!']
+resource/lang/en/lang.php   ['greeting' => 'Hello, {name}!']      // placeholders are {name}, not :name
 ```
 ```php
 _l('lang.greeting', ['name' => 'Ali']);
@@ -485,7 +485,7 @@ Attach it on the model: `public $observe = PostObserver::class;`
 ```bash
 php terminal security key --regen        # on a fresh install
 php terminal db migrate --seed
-php terminal route cache                 # does nothing while closure routes exist
+php terminal route cache                 # closure routes keep only their own file live
 php terminal cache clear views
 ```
 - `config/framework.php` → `'debug' => false`, `'force-https' => true`, `'x-powered-by' => false`

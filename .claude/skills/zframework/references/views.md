@@ -226,17 +226,17 @@ by a non-word character compiles.
 
 ### Engine behaviour worth knowing
 
-- **In a template that `@extends`, anything outside a `@section` is discarded.** Sections are
-  lifted into an array and the rest of the child is replaced wholesale by the compiled parent,
-  so a setup block above `@section('body')`:
+- **In a template that `@extends`, anything outside a `@section` comes out after the layout.**
+  Sections are lifted into an array, the `@extends` token becomes the compiled parent, and
+  whatever else the child holds is emitted after it - so a setup block above `@section('body')`:
 
   ```php
   @extends('app.main')
-  <?php $editing = isset($post['id']); ?>   {{-- never runs --}}
+  <?php $editing = isset($post['id']); ?>   {{-- runs after the layout has rendered --}}
   @section('body') … <?= $editing ?> …      {{-- Undefined variable $editing --}}
   ```
 
-  never executes. Put per-page setup **inside** the section. A layout may have a `<?php ?>`
+  runs too late, and stray markup lands after `</html>`. Put per-page setup **inside** the section. A layout may have a `<?php ?>`
   block at the top (`app/main.php` does) because a layout is the parent, not the child; a
   standalone partial rendered with `view()` may too, because it extends nothing.
 - **`@yield` is resolved at compile time, not at runtime** (`View.php:704-714`). Sections are

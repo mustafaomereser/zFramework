@@ -343,9 +343,10 @@ class Post extends Model
     public $db         = 'local';        // connection name from database/connections.php; defaults to first
     public $guard      = ['secret'];     // columns left out when the query names none itself
     public $primary    = 'id';           // auto-detected from schema if omitted
-    public $created_at = 'created_at';   // set to null to disable auto-timestamping
-    public $updated_at = 'updated_at';
     public $deleted_at = 'deleted_at';   // used by softDelete trait
+    // created_at / updated_at are not set by the model: the migration's `timestamps`
+    // gives them DEFAULT CURRENT_TIMESTAMP / ON UPDATE. Their names are global,
+    // in config/model.php (`consts`), not per model.
 }
 ```
 
@@ -818,6 +819,8 @@ php terminal make observer PostObserver
 
 ```php
 // database/migrations/Posts.php
+namespace Database\Migrations;
+
 class Posts
 {
     static $storageEngine = 'InnoDB';
@@ -864,7 +867,7 @@ class Posts
 | `date` / `datetime` / `time` | DATE / DATETIME / TIME |
 | `required` | NOT NULL |
 | `nullable` | NULL |
-| `default:VALUE` | DEFAULT VALUE — use `default:NULL` for null default |
+| `default:VALUE` | DEFAULT VALUE (quoted unless numeric or CURRENT_TIMESTAMP) — bare `default` is DEFAULT NULL; `default:NULL` would be the 4-letter string |
 | `default:(EXPRESSION)` | DEFAULT (EXPRESSION) verbatim — MySQL 8.0.13+ expression default, e.g. `default:(UUID())` |
 | `onupdate` | appends ON UPDATE CURRENT_TIMESTAMP — place it **after** a `default:` option, it extends that clause |
 | `unique` | UNIQUE KEY |
@@ -908,6 +911,8 @@ php terminal db migrate --all             # include all modules
 
 ```php
 // database/seeders/PostsSeeder.php
+namespace Database\Seeders;
+
 class PostsSeeder
 {
     public function destroy(): static
@@ -975,8 +980,11 @@ variable — a value set in the layout is visible inside the sections and the ot
 and a layout assignment overwrites what the controller passed under the same key. Name view
 data specifically (`$post`, not `$item`).
 
-Anything outside a `@section` in a template that `@extends` is discarded, so per-page setup
-goes **inside** the section.
+Anything outside a `@section` in a template that `@extends` is emitted **after** the layout's
+output - the `@extends` token is replaced by the compiled layout and the rest of the file
+follows it. A `<?php ?>` block above `@section('body')` therefore runs too late for the section
+to see its variables, and stray markup lands after `</html>`. Per-page setup goes **inside**
+the section.
 
 ### Directives
 
@@ -1305,7 +1313,7 @@ $r = Validator::validate(['age' => '150'], ['age' => ['required', 'max:100']], [
 | Rule | Description |
 |---|---|
 | `required` | Field must be present and non-empty |
-| `nullable` | Field may be empty or absent. Every rule but `required` passes on an empty value anyway |
+| `nullable` | Field may be empty or absent. Most rules pass on an empty value anyway; `same`, `confirmed` and `unique` still evaluate it |
 | `type:string` / `type:int` / `type:float` / `type:bool` / `type:array` | Declares the type, and asserts the value can be read as it |
 | `min:N` | Minimum value for a number, minimum length for a string/array |
 | `max:N` | Maximum value for a number, maximum length for a string/array |
@@ -1394,8 +1402,8 @@ Two things to know before relying on this:
 Group settings only apply through `->group()`, and they accumulate inward: a nested group
 inherits the outer prefix and middleware list, and the outer settings are restored afterwards.
 A `pre()` or `middleware()` written without a `->group()` stays pending and is picked up by the
-next group. Two `middleware()` calls chained at the same level keep only the second — put them
-in one array instead.
+next group. Two `middleware()` calls chained at the same level accumulate their class lists;
+only the last call's fallback closure is kept.
 
 ---
 
@@ -2246,7 +2254,7 @@ abort(403, 'Forbidden');        // abort with message (JSON on AJAX)
 // Request
 uri();                          // current URI path (strips script name)
 method();                       // HTTP method (reads _method override from POST)
-ip();                           // client IP (checks X-Forwarded-For, HTTP_CLIENT_IP)
+ip();                           // REMOTE_ADDR; forwarded headers only when it is in framework.trusted-proxies
 request('field');               // $_REQUEST['field'] ?? false
 request();                      // full $_REQUEST array
 request('field', 'value');      // set $_REQUEST['field'] = 'value'
@@ -2255,7 +2263,7 @@ getQuery(['page' => 2], ['sort']); // merge additions, remove 'sort' key
 getQuery([], [], false);        // returns array instead of string
 
 // Response
-Response::json(['key' => 'value']);   // sets Content-Type: application/json and echoes
+return Response::json(['key' => 'value']);   // sets Content-Type and RETURNS the encoded string; the route runner outputs it
 
 // View / Route shortcuts
 view('app.pages.posts.index', compact('posts'));
@@ -2278,7 +2286,7 @@ $b = getBrowser();
 
 // Date
 Date::now();                           // current datetime string
-Date::timestamp();                     // current unix timestamp
+Date::timestamp();                     // MySQL datetime string, now; Date::timestamp('-1 day') - use time() for a unix timestamp
 Date::format(time(), 'd.m.Y H:i');
 Date::setLocale('Europe/Istanbul');
 
@@ -2365,7 +2373,8 @@ $order   = $ssl->newOrder(['example.com', '*.example.com']);
 $records = $ssl->challenge($order['authorizations'], 'dns-01');
 
 // $records is an array of challenges to create in DNS:
-// [['domain' => '_acme-challenge.example.com', 'value' => '...'], ...]
+// [['domain' => '*.example.com', 'record' => '_acme-challenge.example.com', 'value' => '...', 'url', 'token', 'authUrl'], ...]
+// the TXT record goes under `record`; `domain` is the name on the order
 
 // 1. Add each record as a TXT entry in your DNS
 // 2. Wait for propagation
@@ -2547,7 +2556,8 @@ fonts or scripts fetched from anywhere.
 
 View, session, redis, route caching and profiling all live in this one file. There is no
 `config/view.php`, `config/session.php` or `config/redis.php` — a `Config::get('view.…')`
-returns null rather than failing, which is the quiet way to lose a setting.
+looks for that file, warns and returns `false`. Read them with `Config::framework('view.caching')`,
+which returns the value and `null` when unset.
 
 Compiled views live in `zFramework/storage/views`. The manifest tracks every
 file a template depends on — layouts and nested includes as well — so a changed

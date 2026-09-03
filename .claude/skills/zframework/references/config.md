@@ -93,8 +93,9 @@ commit it, never hand-write it.
 ],
 ```
 
-A closure route cannot be cached, and **one of them keeps the whole table out**.
-`php terminal route cache` names the offenders.
+A closure cannot be written into the cache, so **its file stays live** - included per request
+while the rest of the table comes from the cache (see routing.md). `php terminal route cache`
+lists the live files.
 
 The cache also stores urls as literal strings, so a prefix built from request state — a
 locale, a tenant — is frozen at build time. A few of those go in `route/dynamic/`; if most of

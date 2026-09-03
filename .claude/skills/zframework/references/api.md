@@ -53,7 +53,7 @@ Route::resource(string $url, string $controller)
 Route::redirect(string $url, string $to, int $status = 302)
 Route::name(string $name)                    // names the last route
 Route::find(string $name, array $data = [], bool $return_bool = false)   // = route()
-Route::has(string $keyword): bool
+Route::has(string $keyword): bool                 // current request URI contains $keyword (not a table lookup)
 Route::pre(string $prefix, ?string $namePrefix = null)          // url + name prefix
 Route::middleware(array $list, $callback = null)
 Route::noCSRF()
@@ -172,10 +172,10 @@ toggleAttach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue
 
 ## Facades
 
-Most of what follows is `zFramework\Core\Facades\<Name>`. Six are not, and the
+Most of what follows is `zFramework\Core\Facades\<Name>`. Thirteen are not, and the
 autoloader turns the namespace straight into a path, so the wrong one is a fatal:
-`Csrf`, `Crypter` and `GlobalCache` sit in `zFramework\Core\`, while `File`, `Folder`,
-`Assets`, `_Array`, `Http`, `Date` and `AutoSSL` are `zFramework\Core\Helpers\`.
+`Csrf`, `Crypter`, `GlobalCache`, `Cache`, `Validator` and `Middleware` sit in `zFramework\Core\`,
+while `File`, `Folder`, `Assets`, `_Array`, `Http`, `Date` and `AutoSSL` are `zFramework\Core\Helpers\`.
 
 ### Auth
 

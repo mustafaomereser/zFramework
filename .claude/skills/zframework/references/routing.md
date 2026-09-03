@@ -389,5 +389,5 @@ literal strings, so anything like that is frozen at build time. Those groups bel
 `route/dynamic/` — or, if there are many of them, leave `route.caching` off entirely rather
 than maintaining the split. See "Localised urls with a stable name" above.
 
-`Route::has('/admin')` tests whether a url substring is registered, which is how
-`ViewDirectives` decides it is in the admin layer.
+`Route::has('/admin')` is true when the **current request URI** contains the substring - it
+does not consult the route table. That is how `ViewDirectives` decides it is in the admin layer.
