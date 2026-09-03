@@ -18,7 +18,7 @@ namespace zFramework\Kernel\Helpers;
  *
  * Per container, four cases:
  *
- *   same shape             -> patch the leaf scalars. The new file's comments
+ *   same shape             -> patch the leaf scalars and lists. The new file's comments
  *                             for that section stay.
  *   the app added keys     -> take the app's container whole, or its additions
  *                             disappear. Its comments come with it; the shipped
@@ -33,18 +33,32 @@ namespace zFramework\Kernel\Helpers;
  *                             a merge that guesses here is worse than one that
  *                             says it cannot.
  *
- * What it cannot do is follow a setting that moved to another file - view.php
- * becoming framework.php['view']. Only whoever made that change knows where it
- * went, so it belongs in a per-version migration rather than here.
+ * A list - an array with no string keys, `['10.0.0.5', '10.0.0.6']` - is a value,
+ * not a section: it is compared and spliced as one piece, the way a scalar is.
+ * Located as a container it had no leaves, so a customised list was never
+ * patched and the shipped default was written over trusted-proxies, error.mask
+ * and mail's from without a word. An element that is itself a keyed array
+ * (`[['host' => ..], ['host' => ..]]`) stays inside the list: its keys are not
+ * paths, two elements would collide on the same one.
+ *
+ * A key that is a keyed array on one side and something else on the other has
+ * changed shape between the two files. When the application filled in a section
+ * the update ships empty its container is taken whole; the other direction is
+ * reported, since neither side can be written without losing the other.
+ *
+ * A setting that moved to another file is followed by Update::configs(), which
+ * sees every file at once; this class only ever sees two versions of one.
  */
 class ConfigMerge
 {
     /**
      * Map every `'key' => value` in a config file to its byte range.
      *
-     * Keys are dot paths. A nested array appears twice: once as the container
-     * (`redis.database`) and once per leaf inside it (`redis.database.cache`),
-     * so the caller can choose which to replace.
+     * Keys are dot paths. A keyed array appears twice: once as the container
+     * (`redis.database`, type array) and once per leaf inside it
+     * (`redis.database.cache`, type scalar), so the caller can choose which to
+     * replace. An array with no string keys is one entry of type list, covering
+     * the whole literal; nothing inside it is located.
      *
      * @param string $source
      * @return array<string, array{type: string, offset: int, length: int}>
@@ -86,8 +100,15 @@ class ConfigMerge
             if ($token === ']') {
                 if (isset($stack[$depth])) {
                     $start = $offsets[$opened[$depth]];
-                    $found[self::path($stack, $depth)] = [
-                        'type'   => 'array',
+                    $path  = self::path($stack, $depth);
+
+                    # No leaf was located inside: a list, or an empty array. Either
+                    # is one value to compare whole.
+                    $keyed = false;
+                    foreach ($found as $k => $_) if (str_starts_with($k, "$path.")) { $keyed = true; break; }
+
+                    $found[$path] = [
+                        'type'   => $keyed ? 'array' : 'list',
                         'offset' => $start,
                         'length' => $offsets[$i] + 1 - $start,
                     ];
@@ -98,6 +119,11 @@ class ConfigMerge
             }
 
             if (!is_array($token) || $token[0] !== T_CONSTANT_ENCAPSED_STRING) continue;
+
+            # Inside a positional element - an unkeyed `[` somewhere below the first
+            # keyed level. Its keys are not paths: the second element would land on
+            # the first one's. The enclosing list is located whole instead.
+            for ($d = 2; $d <= $depth; $d++) if (!isset($stack[$d])) continue 2;
 
             $arrow = $next($i);
             if ($arrow === null || !(is_array($tokens[$arrow]) && $tokens[$arrow][0] === T_DOUBLE_ARROW)) continue;
@@ -161,17 +187,36 @@ class ConfigMerge
         $patches = [];
         $changes = [];
 
-        # Leaves first: anything the application set to something else.
+        $manual = [];
+
+        # Values first - scalars and lists - anything the application set to
+        # something else. A key that is a keyed array on one side only has changed
+        # shape: the application filling in a section the update ships empty is
+        # taken whole, the other direction is reported.
         foreach ($new as $key => $entry) {
-            if ($entry['type'] !== 'scalar' || !isset($old[$key])) continue;
+            if (!isset($old[$key])) continue;
+            $mine = $old[$key];
+
+            if ($entry['type'] === 'array' && $mine['type'] === 'array') continue;
+
+            if ($entry['type'] === 'array' || $mine['type'] === 'array') {
+                if ($entry['type'] === 'array') {
+                    $manual[] = "$key is a keyed array in this version and a {$mine['type']} in yours - merge it by hand";
+                    continue;
+                }
+
+                $patches[$entry['offset']] = [$entry['length'], substr($current, $mine['offset'], $mine['length'])];
+                $changes[$entry['offset']] = "kept $key (yours has keys - taken whole)";
+                continue;
+            }
 
             $shippedValue = substr($shipped, $entry['offset'], $entry['length']);
-            $currentValue = substr($current, $old[$key]['offset'], $old[$key]['length']);
+            $currentValue = substr($current, $mine['offset'], $mine['length']);
 
             if ($shippedValue === $currentValue) continue;
 
             $patches[$entry['offset']] = [$entry['length'], $currentValue];
-            $changes[$entry['offset']] = "kept $key = $currentValue";
+            $changes[$entry['offset']] = "kept $key = " . self::brief($currentValue);
         }
 
         # Containers where the shape differs. Which way it differs decides what
@@ -186,8 +231,6 @@ class ConfigMerge
         #                                  losing the other. Keep the shipped
         #                                  one, patch the shared leaves, and name
         #                                  what has to be re-added by hand.
-        $manual = [];
-
         foreach ($new as $key => $entry) {
             if ($entry['type'] !== 'array' || !isset($old[$key])) continue;
 
@@ -206,7 +249,7 @@ class ConfigMerge
             if (!$appAdded && !$updateAdded) continue;
 
             if ($appAdded && $updateAdded) {
-                foreach ($appAdded as $lost) $manual[] = $lost;
+                foreach ($appAdded as $lost) $manual[] = "$lost must be added back by hand";
                 continue;
             }
 
@@ -246,13 +289,25 @@ class ConfigMerge
      */
     public static function keyDrift(string $shipped, string $current): array
     {
-        $new = array_keys(array_filter(self::locate($shipped), fn($e) => $e['type'] === 'scalar'));
-        $old = array_keys(array_filter(self::locate($current), fn($e) => $e['type'] === 'scalar'));
+        $new = array_keys(array_filter(self::locate($shipped), fn($e) => $e['type'] !== 'array'));
+        $old = array_keys(array_filter(self::locate($current), fn($e) => $e['type'] !== 'array'));
 
         return [
             'added'   => array_values(array_diff($new, $old)),
             'removed' => array_values(array_diff($old, $new)),
         ];
+    }
+
+    /**
+     * A value on one line for the report: a closure or a list spans many.
+     *
+     * @param string $value
+     * @return string
+     */
+    private static function brief(string $value): string
+    {
+        $value = preg_replace('/\s+/', ' ', trim($value));
+        return strlen($value) > 72 ? substr($value, 0, 69) . '...' : $value;
     }
 
     /**

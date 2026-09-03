@@ -324,17 +324,21 @@ the application changed are spliced, located with `token_get_all()`. Comments, i
 | | |
 |---|---|
 | a value was changed | the application's value is kept |
+| a list was changed (`trusted-proxies`, `error.mask`, mail's `from`) | kept whole, like a value - `locate()` types it `list` |
 | the update added a key | it arrives with its default |
 | the application added keys to a section | that whole section is taken from its file |
+| the application filled in a section the update ships empty | taken from its file |
 | both added keys to the same section | the update's version is kept, the application's extras are **reported** |
+| keyed section in the update, plain value in the application | the update's version is kept and it is **reported** |
 
-The last row cannot be resolved automatically, so it is reported rather than guessed. Nothing
-is written without `--config`; the replaced file is kept as `<name>.php.before-update`.
+The reported rows cannot be resolved automatically, so they are reported rather than guessed.
+Nothing is written without `--config`; the replaced file is kept as `<name>.php.before-update`.
 
-**What it cannot do** is follow a setting that moved between files - `config/view.php` becoming
-`framework.php['view']`. Only the change's author knows where it went. The framework covers
-that case with a runtime fallback in `Config::framework()`, which is why the old standalone
-config files still work.
+**A setting that moved between files follows** - `Update::configs()` sees every config file at
+once, so a key that stopped shipping in one and started in another (`error`, `debug` and the
+rest went from `app.php` to `framework.php` in 3.2) is written into its new place with the
+application's value. `Config::framework()` also falls back to the old standalone files at
+runtime, which is why they keep working unmerged.
 
 ### Writing a terminal command that replaces core files
 

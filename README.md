@@ -2122,11 +2122,14 @@ Per section:
 | | |
 |---|---|
 | you changed a value | your value is kept |
+| you changed a list (`trusted-proxies`, `error.mask`, mail's `from`) | kept whole, like a value |
 | the update added a key | it arrives with its default |
 | you added keys to a section | that whole section is taken from your file |
+| you filled in a section the update ships empty (`'redis' => []`) | taken from your file |
 | you both added keys to the same section | the update's version is kept and yours is **reported** to re-add by hand |
+| a key is a keyed section in the update and a value in your file | the update's version is kept and it is **reported** |
 
-The last row is the honest one: no merge can resolve it, so it says so rather than guessing.
+The reported rows are the honest ones: no merge can resolve them, so it says so rather than guessing.
 Nothing is written without `--config`, and the file it replaces is kept as
 `<name>.php.before-update`.
 

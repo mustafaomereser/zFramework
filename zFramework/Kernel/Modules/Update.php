@@ -348,7 +348,7 @@ class Update
         foreach ($files as $name => $each) {
             $located = ConfigMerge::locate($each['mine']);
             foreach (ConfigMerge::keyDrift($each['shipped'], $each['mine'])['removed'] as $key)
-                if (isset($located[$key]) && $located[$key]['type'] === 'scalar') $orphans[$key] = ['from' => $name, 'text' => substr($each['mine'], $located[$key]['offset'], $located[$key]['length'])];
+                if (isset($located[$key]) && $located[$key]['type'] !== 'array') $orphans[$key] = ['from' => $name, 'text' => substr($each['mine'], $located[$key]['offset'], $located[$key]['length'])];
         }
 
         foreach ($files as $name => $each) {
@@ -367,7 +367,7 @@ class Update
             if ($moved) {
                 $located = ConfigMerge::locate($merged['source']);
                 $patches = [];
-                foreach ($moved as $key => $orphan) if (isset($located[$key]) && $located[$key]['type'] === 'scalar') $patches[$located[$key]['offset']] = [$located[$key]['length'], $orphan['text'], $key, $orphan['from']];
+                foreach ($moved as $key => $orphan) if (isset($located[$key]) && $located[$key]['type'] !== 'array') $patches[$located[$key]['offset']] = [$located[$key]['length'], $orphan['text'], $key, $orphan['from']];
                 krsort($patches);
                 foreach ($patches as $offset => [$length, $text, $key, $from]) {
                     $merged['source']    = substr_replace($merged['source'], $text, $offset, $length);
@@ -384,7 +384,7 @@ class Update
             foreach ($drift['added'] as $key)   Terminal::text("  [color=green]+ {$key}[/color] [color=dark-gray]new in this version[/color]");
             foreach ($drift['removed'] as $key) Terminal::text(isset($orphans[$key]) && $orphans[$key]['from'] === $name && self::movedTo($key, $files, $name) ? "  [color=dark-gray]- {$key} moved to " . self::movedTo($key, $files, $name) . "[/color]" : "  [color=dark-gray]- {$key} no longer shipped[/color]");
             foreach ($merged['changes'] as $c)  Terminal::text("  [color=dark-gray]{$c}[/color]");
-            foreach ($merged['manual'] as $key) Terminal::text("  [color=red]! {$key} must be added back by hand[/color]");
+            foreach ($merged['manual'] as $m) Terminal::text("  [color=red]! {$m}[/color]");
 
             if (!$apply) continue;
 
