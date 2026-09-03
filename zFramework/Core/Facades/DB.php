@@ -1102,7 +1102,15 @@ class DB
         $primary = $this->getPrimary();
         $column  = $primary ? (!empty($this->buildQuery['join']) ? 'DISTINCT ' : '') . "{$this->table}.{$primary}" : '*';
 
-        return (int) ($this->select("COUNT({$column}) as count")->first()['count'] ?? 0);
+        # The count row is not a model row: get() would hand it to loadRelations(),
+        # which reads its primary key and passes null to the relation. The eager list
+        # is set aside for this one query and put back - paginate() needs it after.
+        $eager = $this->eagerLoad;
+        $this->eagerLoad = [];
+        $count = (int) ($this->select("COUNT({$column}) as count")->first()['count'] ?? 0);
+        $this->eagerLoad = $eager;
+
+        return $count;
     }
 
     /**
@@ -1201,7 +1209,11 @@ class DB
                 // Normal count
                 $this->buildQuery['orderBy'] = [];
                 $this->buildQuery['groupBy'] = [];
+                # See count(): the count row must not be eager loaded.
+                $eager = $this->eagerLoad;
+                $this->eagerLoad = [];
                 $row_count = $this->select("COUNT(" . (!empty($this->buildQuery['join']) ? 'DISTINCT ' : null) . "{$this->table}.{$this->getPrimary()}) as count")->first()['count'];
+                $this->eagerLoad = $eager;
             }
 
             $this->buildQuery = $snapshot;

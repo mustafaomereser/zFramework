@@ -173,7 +173,7 @@ trait RelationShips
         $relatedLocalKey = $relatedLocalKey ?? $instance->getPrimary();
 
         return $instance
-            ->join('INNER', $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$relatedLocalKey}")
+            ->join('INNER', $pivotTable, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$relatedLocalKey}")
             ->whereRaw("{$pivotTable}.{$foreignKey} = :value", compact('value'))
             ->get();
     }
@@ -218,7 +218,7 @@ trait RelationShips
 
         return $instance
             ->select("{$relatedTable}.*{$pivotSelect}")
-            ->join('INNER', $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$relatedLocalKey}")
+            ->join('INNER', $pivotTable, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$relatedLocalKey}")
             ->whereRaw("{$pivotTable}.{$foreignKey} = :value", compact('value'))
             ->get();
     }
@@ -264,7 +264,7 @@ trait RelationShips
         $secondLocalKey = $secondLocalKey ?? $through->getPrimary();
 
         return $instance
-            ->join('INNER', $model, "{$throughTable}.{$secondLocalKey} = {$finalTable}.{$secondKey}")
+            ->join('INNER', $throughTable, "{$throughTable}.{$secondLocalKey} = {$finalTable}.{$secondKey}")
             ->whereRaw("{$throughTable}.{$firstKey} = :value", compact('value'))
             ->get();
     }
@@ -305,7 +305,7 @@ trait RelationShips
         $secondLocalKey = $secondLocalKey ?? $through->getPrimary();
 
         return $instance
-            ->join('INNER', $model, "{$throughTable}.{$secondLocalKey} = {$finalTable}.{$secondKey}")
+            ->join('INNER', $throughTable, "{$throughTable}.{$secondLocalKey} = {$finalTable}.{$secondKey}")
             ->whereRaw("{$throughTable}.{$firstKey} = :value", compact('value'))
             ->first();
     }
@@ -415,7 +415,7 @@ trait RelationShips
         $relatedKey   = $relatedKey ?? substr($relatedTable, 0, -1) . '_id';
 
         return $instance
-            ->join('INNER', $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$instance->getPrimary()}")
+            ->join('INNER', $pivotTable, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$instance->getPrimary()}")
             ->whereRaw(
                 "{$pivotTable}.{$foreignKey} = :morph_id AND {$pivotTable}.{$morphName}_type = :morph_type",
                 ['morph_id' => $value, 'morph_type' => $type]
@@ -453,7 +453,7 @@ trait RelationShips
         $foreignKey   = $foreignKey ?? substr($this->table, 0, -1) . '_id';
 
         return $instance
-            ->join('INNER', $model, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$instance->getPrimary()}")
+            ->join('INNER', $pivotTable, "{$pivotTable}.{$relatedKey} = {$relatedTable}.{$instance->getPrimary()}")
             ->whereRaw(
                 "{$pivotTable}.{$foreignKey} = :fk_val AND {$pivotTable}.{$morphName}_type = :morph_type",
                 ['fk_val' => $value, 'morph_type' => $model]
