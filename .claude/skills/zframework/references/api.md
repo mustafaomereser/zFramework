@@ -14,7 +14,7 @@ path_fix(string $path)
 host()                             // scheme + host
 script_name(); uri();              // current URI (script name stripped)
 
-// Navigation (all of these die)
+// Navigation (all of these throw ResponseSignal - never swallow them with a blanket catch)
 redirect(string $url = "/");
 back(?string $add);                // back to REFERER, with an optional suffix
 refresh();
@@ -110,7 +110,7 @@ whereRaw(string $sql, array $data = [], string $prev = "AND")     // named bindi
 join(string $type, string $model, string $on = "")                // INNER/LEFT/RIGHT/FULL OUTER
 orderBy(array $data)     // ['created_at' => 'DESC']
 groupBy(array $data)
-limit(int $startPoint = 0, $getCount = null)
+limit(int $startPoint = 0, $getCount = null)      // MySQL semantics: limit(50) = 50 rows, limit(20, 10) = offset 20, 10 rows
 withRealOrder(string $as = 'real_order', string $direction = 'DESC')
 fetchType(?string $type)          // 'unique' | 'keypair'
 closureMode(bool $mode = true)    // false → do not bind relation closures to rows
@@ -199,7 +199,7 @@ Session::get(string $key): mixed        Session::delete(string $key): self
 Session::flush()                        Session::callback(\Closure $cb): mixed
 
 Alerts::success|danger|warning|info(string $text): self
-Alerts::name(string $name): self        // a separate channel
+Alerts::name(string $name): self        // key for the NEXT alert; the same name overwrites (dedup), all names render together
 Alerts::get(bool $unset_after_get = false): array    // [[$type, $message], ...]
 Alerts::unset()
 

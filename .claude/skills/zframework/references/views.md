@@ -211,7 +211,8 @@ anything that emits markup must use the raw form or it renders as visible text:
 
 Plain PHP stays the default here for style, not safety — `<?= e($x) ?>` and `<?= csrf() ?>`
 say exactly what they do without a regex in between, and the surrounding code is written that
-way. Both spellings accept single quotes only inside `{{ }}`.
+way. `@include`, `@section` and `@yield` accept single quotes only; `{{ }}` takes any
+expression, double quotes included.
 
 **If the user asks for `{{ }}` or `@foreach`, use them.** This is a default, not a ban. The
 ban is only on directives the engine does not implement.
@@ -248,8 +249,9 @@ by a non-word character compiles.
   (`View.php:677-696`, cached at `285`). Every request recompiles. Avoid unless the layout genuinely varies.
 - The `@extends` regex is `[^)]+`, so a parenthesised expression breaks it:
   `@extends(layoutFor($x))` does not work.
-- Inline section syntax is exact — `@section('title', 'Value')`, comma plus one space.
-- `{{ }}` and `@include` accept **single quotes only**.
+- Inline section syntax: `@section('title', 'Value')` — single quotes, any whitespace
+  around the comma.
+- `@include` accepts **single quotes only**; `{{ }}` takes any expression.
 - Comments come in two spellings, `{{-- comment --}}` and `{{/* comment */}}`, and behave
   identically. Both are stripped before anything else parses, so a comment may contain a
   `{{ }}` echo, an `@include`, or a half-written tag without any of it taking effect.

@@ -34,7 +34,7 @@ class Queue
         $tries = (int) (Terminal::$parameters['--tries'] ?? 3);
         $sleep = (int) (Terminal::$parameters['--sleep'] ?? 5);
 
-        if (!Redis::available('queue')) return Terminal::text("[color=red]Redis is not available - jobs run inline on push, there is nothing to process.\nEnable it in config/redis.php.[/color]");
+        if (!Redis::available('queue')) return Terminal::text("[color=red]Redis is not available - jobs run inline on push, there is nothing to process.\nEnable it in config/framework.php (redis.enabled).[/color]");
 
         Terminal::text("[color=green]Working queue `$queue`[/color] [color=dark-gray](ctrl+c to stop)[/color]");
 

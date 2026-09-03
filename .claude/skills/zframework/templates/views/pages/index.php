@@ -10,7 +10,7 @@
 @section('body')
 <div class="my-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
-        <h3><?= _l('lang.posts') ?></h3>
+        <h3>Posts</h3>
         <a href="<?= route('posts.create') ?>" class="btn btn-sm btn-outline-success">
             <i class="fa fa-plus"></i> Add
         </a>

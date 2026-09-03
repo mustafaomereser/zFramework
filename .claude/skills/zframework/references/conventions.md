@@ -102,8 +102,9 @@ findings.
   `: array` though, so a body that returns nothing at all is a TypeError. Both measured.
 - **`Auth::model()` is lazy.** Do not construct the model inside `Auth::init()` — the model
   constructor opens a DB connection and loads the schema, and every visitor pays for it including
-  those who are never asked for an identity. `special_columns` and `db` are read via
-  `ReflectionClass::getDefaultProperties()` without instantiating. Keep this arrangement.
+  those who are never asked for an identity. `db` is read via
+  `ReflectionClass::getDefaultProperties()` at init without instantiating; `special_columns`
+  comes off the lazily built model the first time something authenticates. Keep this arrangement.
 - **Writing to `$_SESSION` directly.** `Session` does one read and one write per request.
 - **The host in `database/connections.php`.** Write an IP, not a name. Against a dead MySQL,
   `127.0.0.1` costs 2 s, `localhost` 4 s (IPv6 then IPv4), an unreachable IP 21 s.

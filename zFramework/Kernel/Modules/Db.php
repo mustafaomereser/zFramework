@@ -502,11 +502,6 @@ class Db
     }
 
     /**
-     * Description: Restore a database backup (interactive)
-     * Usage: php terminal db restore [--db=default]
-     * @param --db={key}  (optional) db connection key, defaults to first
-     */
-    /**
      * Split a dump into statements the way the server would read it.
      *
      * explode(';') cut every INSERT whose text held a semicolon, and the halves came
@@ -595,6 +590,11 @@ class Db
         return array_values(array_filter(array_map('trim', $statements), fn($statement) => $statement !== ''));
     }
 
+    /**
+     * Description: Restore a database backup (interactive)
+     * Usage: php terminal db restore [--db=default]
+     * @param --db={key}  (optional) db connection key, defaults to first
+     */
     public static function restore()
     {
         $backups = glob(base_path('database/backups/' . self::$dbname . '/*'));

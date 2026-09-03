@@ -64,6 +64,13 @@ of you re-explaining it every session, or watching it hand-write a feature that 
   references/config.md           every key in every config file, and what each PDO option costs
   references/infrastructure.md   AutoSSL, cPanel, query analyzer, RoadRunner workers, backups, error handling
   references/conventions.md      settled decisions, known traps, performance notes
+  references/routing.md          groups, parameters, ordering, the route cache
+  references/models.md           models, migrations, observers, relations
+  references/views.md            template engine, directives, resolution, errors
+  references/validation.md       every rule, Request classes, custom rules
+  references/auth.md             login flows, middleware, api tokens, redis sessions
+  references/caching.md          Page/GlobalCache/Redis and what invalidates what
+  templates/                     copy-paste skeletons the recipes refer to
 ```
 
 It is written off the source, so treat it as a second index into this README rather than a
@@ -446,7 +453,7 @@ $p->join('LEFT', Comment::class, 'comments.post_id = posts.id')->get();
 $p->join('INNER', User::class, 'users.id = posts.user_id')->select('posts.*, users.name as author')->get();
 
 // Fetch type
-$p->fetchType('unique')->get();     // keyed by primary key (PDO::FETCH_UNIQUE)
+$p->fetchType('unique')->get();     // keyed by the FIRST selected column (PDO::FETCH_UNIQUE) - put the key first in select()
 $p->fetchType('keypair')->get();    // PDO::FETCH_KEY_PAIR (first col => second col)
 
 // Disable relation closures on result rows (performance)
@@ -900,7 +907,7 @@ Column names are compared case-insensitively, as MySQL does: renaming `email` to
 
 ```bash
 php terminal db migrate                   # apply pending migrations
-php terminal db migrate --fresh           # drop all tables and re-run
+php terminal db migrate --fresh           # drop every MIGRATED table and re-run (tables with no migration file stay)
 php terminal db migrate --fresh --seed    # drop + migrate + seed
 php terminal db migrate --module=blog     # only migrate the 'blog' module
 php terminal db migrate --all             # include all modules
@@ -1095,7 +1102,9 @@ class BlogController extends Controller
 }
 ```
 
-**What is never stored**, whatever the page declared — the headers still go out:
+**What is never stored**, whatever the page declared. For the first four rows the
+cache headers still go out; a non-200 and a body carrying a csrf token also have
+their headers reset to no-store, so the browser does not keep them either:
 
 | | Why |
 |---|---|
@@ -1127,7 +1136,7 @@ cookie is part of the cache key, so the old entry stops matching by itself.
 Page::forget('post-5');            // every url tagged 'post-5'; returns how many
 Page::forgetUrl('/blog/hello');    // by url, when it was never tagged
 Page::clear();                     // everything
-php terminal cache clear pages     // the same, from the CLI
+php terminal cache clear pages     // the same, from the CLI (views|sessions|pages|ratelimit|logs)
 ```
 
 The key is `method | url | language cookie | Accept-Language[0:2]` — the language is in there
@@ -1227,9 +1236,9 @@ class PostController extends Controller
 
 Two ways, both fine — pick per case rather than generating a Request class for every action.
 
-**A Request class** when the rules are endpoint-specific. Type-hint it and it is built,
-validated and injected; `validated()` returns only the listed keys, so passing it straight to
-`insert()` is safe from mass assignment.
+**A Request class** when the rules are endpoint-specific. Type-hint it and it is built and
+injected; calling `validated()` is what runs the rules, and it returns only the listed keys,
+so passing it straight to `insert()` is safe from mass assignment.
 
 ```php
 php terminal make request Post/StoreRequest
@@ -1434,7 +1443,8 @@ with a translated prefix is every request.
 **`block` is the answer to a flood.** Without it, passing the limit means "wait for the next
 window", so someone hammering an endpoint gets a fresh allowance every window forever. With
 it, passing the limit means refused for that long — answered on a single read, counter left
-alone, before any route is matched or session touched.
+alone, before the controller runs (throttle is a group middleware: the route is matched
+first, then the block answers).
 
 ```php
 // config/framework.php - only the fallback, for a group that names no number
@@ -1747,7 +1757,8 @@ path, so it is never loaded.
 
 ## 9. Alerts
 
-Flash messages stored in session. Displayed once and cleared on the next request.
+Flash messages stored in session. Cleared at the end of the request that consumed them —
+render or `Response::json()` — and they survive one redirect to be shown there.
 
 ```php
 Alerts::success('Record saved.');
@@ -1828,7 +1839,7 @@ rewrites in place:
 
 ```php
 // config/crypt.php
-return ['key' => 'your-key', 'salt' => 'your-salt'],
+return ['key' => 'your-key', 'salt' => 'your-salt'];
 ```
 
 Changing either invalidates every value already encoded with the old one — cookies
@@ -1858,7 +1869,6 @@ config('app.title');             // shortcut for Config::get()
 return [
     'lang'         => 'en',
     'public'       => '/public',
-    'pagination'   => ['default-view' => 'partials.pagination'],
 ];
 ```
 
@@ -1876,7 +1886,6 @@ return [
     'log'      => ['enabled' => true, 'level' => 'debug', 'days' => 14],
     'throttle' => ['enabled' => true, 'limit' => 60, 'window' => 60, 'by' => 'ip', 'block' => 0],
     'trusted-proxies' => [],   // addresses ip() may read a forwarded header from
-    'error'    => ['logging' => true, 'keep_days' => 14, 'stream' => false, 'mask' => [], 'previous' => 10, 'callback' => fn($path, $html) => null],
     'session'  => ['driver' => 'file', 'gc_probability' => 1],
     'response' => ['ajax' => ['include-alerts' => true], 'cache-ttl' => 600, 'page-cache' => true],
     'cache'    => ['apcu' => true],
@@ -1887,6 +1896,7 @@ return [
         'rate'         => 1,       // or a fraction: 0.05 records one request in twenty
         'keep'         => 200,     // stop writing once this many records exist
         'queryAnalyze' => false,   // EXPLAIN every SELECT (needs debug; re-runs the query)
+        'queryStore'   => 'file',  // analysis/queries/<id>.jsonl, one line per query
     ],
 ];
 ```
@@ -1984,7 +1994,7 @@ php terminal help
 One crontab line drives everything:
 
 ```
-* * * * * cd /path/to/app && php terminal schedule run >> /dev/null 2>&1
+* * * * * /usr/bin/php /path/to/app/terminal schedule run >> /dev/null 2>&1
 ```
 
 Tasks live under `schedule/` at the project root, in code you can read. Every `.php` file
@@ -2248,7 +2258,7 @@ asset('/assets/app.css');       // full URL with ?v= cache-busting (filemtime)
 redirect('/login');             // Location header, via ResponseSignal (no die)
 back();                         // redirect to HTTP_REFERER - only when it is on this host, else '/'
 back('?saved=1');               // redirect to REFERER with suffix
-refresh();                      // Refresh:0 header + die
+refresh();                      // Refresh:0 header, via ResponseSignal (no die)
 abort(404);                     // abort with HTTP status code
 abort(403, 'Forbidden');        // abort with message (JSON on AJAX)
 
@@ -2393,7 +2403,8 @@ $cert      = $ssl->getCertificate($order, $finalized['domainKey']);
 
 ## 18. cPanel
 
-Wraps the cPanel UAPI (port 2083, Bearer token auth).
+Wraps the cPanel UAPI (port 2083, `Authorization: cpanel user:token` — an API token, not
+Bearer). TLS verification is off in the client, so keep the hostname on a network you trust.
 
 ```php
 use zFramework\Core\Helpers\cPanel\{API, Domain, Cron, Database, DatabaseUser, Email, Fileman, SSL};
@@ -3051,7 +3062,7 @@ PushNotification.subscribe({ app: 'admin', topics: ['errors'] });
 ### Sending in the background
 
 A push is one HTTPS request per subscriber, 100–400 ms each — a broadcast to
-50.000 devices is not something a visitor waits for. With `push.queue` on and
+50.000 devices is not something a visitor waits for. With `push-notification.queue` on and
 Redis available, `send()` hands the work over in chunks and returns:
 
 ```bash
@@ -3066,7 +3077,7 @@ The return value says what happened either way:
 
 `removed` is subscriptions the push service reported as gone — an uninstalled
 browser, cleared site data — deleted on the spot. Ones that merely keep failing
-are dropped after `push.max_failures` attempts. Without that a subscriber table
+are dropped after `push-notification.max_failures` attempts. Without that a subscriber table
 is eventually mostly browsers that no longer exist.
 
 ### Terminal

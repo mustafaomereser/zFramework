@@ -268,7 +268,8 @@ class Posts
 
 Types: `primary int bigint smallint tinyint bool varchar:N char:N text longtext json uuid
 decimal float real date datetime time`.
-Flags: `required nullable unique[:index_name] index default:VAL charset:X onupdate:X`.
+Flags: `required nullable unique[:index_name] index[:name] primary[:noincrement] default:VAL charset:X onupdate`
+(`onupdate` takes no value — it appends ON UPDATE CURRENT_TIMESTAMP).
 Migrations are idempotent — they add and drop columns on an existing table.
 
 ### Controller + Request
@@ -310,7 +311,8 @@ class StorePostRequest extends Request
 Rules: `required nullable type:x min:N max:N same:field email unique:Model;key:col
 exists:Model;key:col`. On failure it adds `Alerts::danger` and redirects back; on AJAX it aborts
 with 400 + JSON. Need a new rule? Add a class under `zFramework/Core/Validator/Rules/` — one class
-per rule.
+per rule — **and register it in `Validator::$ruleMap`**; an unregistered name throws
+"Unknown validation rule".
 
 ### View — `resource/views/`
 

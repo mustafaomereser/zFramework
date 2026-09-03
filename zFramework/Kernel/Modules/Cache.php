@@ -14,8 +14,8 @@ class Cache
 
     /**
      * Description: Cache Clear
-     * Usage: php terminal cache clear {views|sessions}
-     * @param {views|sessions} (second argument)
+     * Usage: php terminal cache clear {views|sessions|pages|ratelimit}
+     * @param {views|sessions|pages|ratelimit} (second argument)
      */
     public static function clear()
     {
@@ -23,12 +23,16 @@ class Cache
 
         $option = @Terminal::$commands[2];
 
-        $list = scan_dir($storage_path);
-        if (!in_array($option, $list)) return Terminal::text("[color=red]Wrong Option!\nOptions: " . implode(', ', $list) . ".[/color]");
+        # A fixed list, not whatever directories happen to exist: on a clean
+        # install storage/pages is not there yet, and "clear pages" answered
+        # "Wrong Option!" instead of "nothing to clear". And scan_dir offered
+        # things that are not caches - routes.cache.php, AutoSSL - for deletion.
+        $list = ['views', 'sessions', 'pages', 'ratelimit', 'logs'];
+        if (!in_array($option, $list, true)) return Terminal::text("[color=red]Wrong Option!\nOptions: " . implode(', ', $list) . ".[/color]");
 
         Terminal::text("[color=yellow]Processing...[/color]");
 
-        $count = rrmdir($storage_path . "/$option");
+        $count = is_dir($storage_path . "/$option") ? rrmdir($storage_path . "/$option") : 0;
 
         Terminal::clear();
         Terminal::text("[color=green]$option ($count qty) caches cleared![/color]");
