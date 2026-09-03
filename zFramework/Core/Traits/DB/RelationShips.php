@@ -72,7 +72,7 @@ trait RelationShips
      * @param string|null $column Foreign key column. Defaults to {this_table}_id.
      * @return self
      */
-    public function findRelation(string $model, string $value, ?string $column = null): self
+    public function findRelation(string $model, string|int|null $value, ?string $column = null): self
     {
         if (!$column) $column = $this->table . "_id";
         return (new $model)->where($column, $value);
@@ -94,9 +94,10 @@ trait RelationShips
      *       return $this->hasMany(Post::class, $values['id'], 'user_id');
      *   }
      */
-    public function hasMany(string $model, string $value, ?string $column = null): array
+    public function hasMany(string $model, string|int|null $value, ?string $column = null): array
     {
         if ($this->eagerProbe !== null) $this->eagerCapture($model, $column ?: $this->table . "_id", $value, true);
+        if ($value === null) return [];
         return $this->findRelation($model, $value, $column)->get();
     }
 
@@ -112,9 +113,10 @@ trait RelationShips
      *       return $this->hasOne(Profile::class, $values['id'], 'user_id');
      *   }
      */
-    public function hasOne(string $model, string $value, ?string $column = null): ?array
+    public function hasOne(string $model, string|int|null $value, ?string $column = null): ?array
     {
         if ($this->eagerProbe !== null) $this->eagerCapture($model, $column ?: $this->table . "_id", $value, false);
+        if ($value === null) return null;
         return $this->findRelation($model, $value, $column)->first();
     }
 
@@ -122,7 +124,7 @@ trait RelationShips
      * Inverse of hasOne/hasMany. Returns the parent record.
      *
      * @param string      $model  Parent model class name.
-     * @param string      $value  Foreign key value on the current model.
+     * @param string|int|null $value Foreign key value on the current model. Null: no parent, returns null.
      * @param string|null $column Primary key column on the parent. Defaults to parent's getPrimary().
      * @return array|null
      *
@@ -130,11 +132,13 @@ trait RelationShips
      *       return $this->belongsTo(User::class, $values['user_id']);
      *   }
      */
-    public function belongsTo(string $model, string $value, ?string $column = null): ?array
+    public function belongsTo(string $model, string|int|null $value, ?string $column = null): ?array
     {
         $instance = new $model;
         if (!$column) $column = $instance->getPrimary();
         if ($this->eagerProbe !== null) $this->eagerCapture($model, $column, $value, false);
+        # A nullable foreign key with nothing in it has no parent - not a TypeError.
+        if ($value === null) return null;
         return $instance->where($column, $value)->first();
     }
 

@@ -102,8 +102,8 @@ public function beginQuery()        // prepended to every query
 select(string|array $select)
 where(...)          whereOr(...)      whereNot(...)     whereOrNot(...)
 having(...)         havingOr(...)     havingNot(...)    havingOrNot(...)
-whereIn(string $column, array $in, string $prev = "AND")
-whereNotIn(string $column, array $in, string $prev = "AND")
+whereIn(string $column, array $in, string $prev = "AND")     // [] -> `1 = 0`, matches nothing
+whereNotIn(string $column, array $in, string $prev = "AND")  // [] -> `1 = 1`, matches everything
 whereBetween(string $column, $start, $stop, string $prev = 'AND')
 whereNotBetween(string $column, $start, $stop, string $prev = 'AND')
 whereRaw(string $sql, array $data = [], string $prev = "AND")     // named bindings
@@ -149,8 +149,8 @@ beginTransaction()  commit()  rollback()          // requires InnoDB
 
 ```php
 with(string ...$relations)
-hasOne / hasMany (string $model, $value, ?string $column = null)
-belongsTo(string $model, $value, ?string $column = null)
+hasOne / hasMany (string $model, $value, ?string $column = null)   // $value null -> null / []
+belongsTo(string $model, $value, ?string $column = null)          // $value null (nullable FK) -> null
 belongsToMany(...)            belongsToManyWithPivot(...)
 hasManyThrough(...)           hasOneThrough(...)
 morphOne / morphMany (string $model, string $morphName, $value, ?string $type = null)

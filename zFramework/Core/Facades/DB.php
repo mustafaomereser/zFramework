@@ -600,9 +600,20 @@ class DB
      */
     public function hashedKey(string $key, null|int $level = null): string
     {
-        $key = str_replace([".", '(', ')', ',', '"', "'", '`', ' '], "_", $key) . ($level ?: null);
-        if (isset($this->buildQuery['data'][$key])) return $this->hashedKey($key, $level + 1);
-        return $key;
+        # A placeholder is [A-Za-z0-9_] and nothing else. Eight characters were
+        # swapped before; `COUNT(*)` kept its star and PDO answered "parameter
+        # was not defined" at execute. Everything else is folded to underscore.
+        $base = preg_replace('/[^A-Za-z0-9_]/', '_', $key);
+        if ($base === '' || ctype_digit($base[0])) $base = "k_$base";
+
+        $key = $base . ($level ?: '');
+        if (!isset($this->buildQuery['data'][$key])) return $key;
+
+        # A counter on the base, not recursion on the extended key: that gave
+        # id1, id12, id123 ... - names growing by one digit per value, 200 KB of
+        # SQL for a whereIn() of four hundred.
+        for ($n = max(1, (int) $level); isset($this->buildQuery['data'][$base . $n]); $n++);
+        return $base . $n;
     }
     #endregion
 
@@ -746,6 +757,12 @@ class DB
             case 'array':
                 $value = json_encode($value, JSON_UNESCAPED_UNICODE);
                 break;
+
+            # PDO binds false as '' - MariaDB coerces that to 0 with a warning,
+            # MySQL under STRICT_TRANS_TABLES refuses the row (1366).
+            case 'boolean':
+                $value = (int) $value;
+                break;
         }
 
         $this->buildQuery['data'][$key] = $value;
@@ -760,6 +777,9 @@ class DB
      */
     public function whereIn(string $column, array $in = [], string $prev = "AND"): self
     {
+        # `IN ()` is not SQL; an empty list means no row can match.
+        if (!$in) return $this->whereRawList('1 = 0', $prev);
+
         $hashed_keys = [];
         foreach ($in as $value) {
             $hashed_key    = $this->hashedKey($column);
@@ -792,6 +812,9 @@ class DB
      */
     public function whereNotIn(string $column, array $in = [], string $prev = "AND"): self
     {
+        # Nothing to exclude: every row matches.
+        if (!$in) return $this->whereRawList('1 = 1', $prev);
+
         $hashed_keys = [];
         foreach ($in as $value) {
             $hashed_key    = $this->hashedKey($column);
@@ -810,6 +833,24 @@ class DB
                     'prev'     => $prev
                 ]
             ]
+        ];
+
+        return $this;
+    }
+
+    /**
+     * A constant condition in place of an IN list that has no members.
+     *
+     * @param string $condition
+     * @param string $prev
+     * @return self
+     */
+    private function whereRawList(string $condition, string $prev): self
+    {
+        [$key, $value] = explode(' = ', $condition);
+        $this->buildQuery['where'][] = [
+            'type'    => 'row',
+            'queries' => [['raw' => true, 'key' => $key, 'operator' => '=', 'value' => $value, 'prev' => $prev]],
         ];
 
         return $this;
@@ -1288,8 +1329,15 @@ class DB
         $this->buildQuery['sets'] = " (" . implode(', ', array_keys($sets)) . ") VALUES (:" . implode(', :', $hashed_keys) . ") ";
         $insert = $this->run(__FUNCTION__)->rowCount();
         if (!$just_insert && $insert && $primary = $this->getPrimary()) {
-            $inserted_row = $this->resetBuild()->where($primary, $this->connection()->lastInsertId())->first() ?? [];
-            $this->trigger('inserted', $inserted_row);
+            # lastInsertId() is "0" on a table whose key is not AUTO_INCREMENT
+            # (`primary:noincrement`, uuid): the key is whatever the caller set.
+            $id = $this->connection()->lastInsertId();
+            if (!$id || $id === '0') $id = $sets[$primary] ?? null;
+
+            if ($id !== null) {
+                $inserted_row = $this->resetBuild()->where($primary, $id)->first() ?? [];
+                $this->trigger('inserted', $inserted_row);
+            }
         }
 
         return isset($inserted_row) ? $inserted_row : $insert;

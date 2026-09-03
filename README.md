@@ -398,6 +398,7 @@ $p->whereOrNot('status', 'hidden')->get();      // OR status != 'hidden'
 $p->whereIn('id', [1, 2, 3])->get();
 $p->whereNotIn('id', [1, 2, 3])->get();
 $p->whereIn('id', [1, 2, 3], 'OR')->get();   // OR id IN (...)
+$p->whereIn('id', [])->get();               // empty list: matches nothing (whereNotIn([]): everything)
 
 // BETWEEN / NOT BETWEEN
 $p->whereBetween('views', 10, 100)->get();
@@ -887,7 +888,11 @@ class Posts
 `AUTO_INCREMENT` only applies to integer columns, so a bare `primary` on a
 `uuid` / `char` / `varchar` column drops the increment automatically instead of
 failing the migration with error 1063. Writing `primary:noincrement` is still
-preferred — it states the intent.
+preferred — it states the intent. `insert()` on such a table returns the row by
+the key you supplied, since there is no `lastInsertId()` to read.
+
+Column names are compared case-insensitively, as MySQL does: renaming `email` to
+`Email` in `columns()` modifies the column, it does not drop and re-add it.
 
 ```bash
 php terminal db migrate                   # apply pending migrations

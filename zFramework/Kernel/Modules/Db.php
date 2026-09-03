@@ -209,8 +209,12 @@ class Db
             Terminal::text("\n[color=green]`" . self::$dbname . ".$table` migrating:[/color]");
 
             # detect dropped columns
+            # Case-insensitively, as MySQL names columns: `email` renamed to `Email`
+            # in the migration is the same column, and comparing bytes put it on the
+            # drop list - ADD failed (exists), MODIFY passed, DROP took the data.
             $tableColumns = self::$db->prepare("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN);
-            foreach ($tableColumns as $column) if (!isset($columns[$column])) $drop_columns[] = $column;
+            $declared     = array_change_key_case($columns, CASE_LOWER);
+            foreach ($tableColumns as $column) if (!isset($declared[strtolower($column)])) $drop_columns[] = $column;
             #
 
             $queue_index_list = [];
@@ -363,7 +367,16 @@ class Db
                                     $result['status'] = 2;
                                     break;
 
+                                # "Multiple primary key defined": MODIFY re-declared PRIMARY KEY
+                                # on the column that already is one. Once more without it -
+                                # the rest of the definition still has to be applied. Mapped
+                                # straight to "not changed" before, so a type change on the
+                                # key column was never made and recorded as if it had been.
                                 case '1068':
+                                    if (str_contains($buildSQL, 'PRIMARY KEY')) {
+                                        $buildSQL = str_replace(' PRIMARY KEY ', ' ', $buildSQL);
+                                        break;
+                                    }
                                     $result['status'] = 3;
                                     $result['loop']   = false;
                                     break;
