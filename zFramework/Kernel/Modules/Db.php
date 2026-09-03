@@ -25,13 +25,25 @@ class Db
         self::{Terminal::$commands[1]}();
     }
 
+    /**
+     * PDO driver name of the current connection - the migration speaks two
+     * dialects, and this is how it picks (see pg()).
+     */
+    private static ?string $driver = null;
+
+    private static function pg(): bool
+    {
+        return self::$driver === 'pgsql';
+    }
+
     private static function connectDB($db)
     {
         self::$db                = new FacadesDB($db);
         self::$db->ignoreAnalyze = true;
+        self::$driver            = self::$db->connection()->getAttribute(\PDO::ATTR_DRIVER_NAME);
 
         $previous     = self::$dbname;
-        self::$dbname = self::$db->prepare('SELECT database() AS dbname')->fetch(\PDO::FETCH_ASSOC)['dbname'];
+        self::$dbname = self::$db->prepare(self::pg() ? 'SELECT current_database() AS dbname' : 'SELECT database() AS dbname')->fetch(\PDO::FETCH_ASSOC)['dbname'];
 
         # $tables lists what exists in the database we are connected to, so it stops
         # being an answer the moment that changes. migrate() reconnects per migration
@@ -41,12 +53,41 @@ class Db
         if ($previous !== self::$dbname) self::$tables = null;
     }
 
+    /**
+     * A column definition as ALTER COLUMN statements - PostgreSQL has no
+     * MODIFY; type, nullability and default each travel alone. USING makes
+     * the type change explicit, so int-to-text and back both work.
+     *
+     * @param string $table
+     * @param string $column
+     * @param array  $data The definition the switch above built.
+     * @return array
+     */
+    private static function pgModify(string $table, string $column, array $data): array
+    {
+        $statements = [];
+
+        if ($type = trim((string) @$data['type'])) $statements[] = "ALTER TABLE $table ALTER COLUMN $column TYPE $type USING $column::$type";
+
+        if (isset($data['nullstatus'])) $statements[] = "ALTER TABLE $table ALTER COLUMN $column " . (str_contains($data['nullstatus'], 'NOT') ? 'SET NOT NULL' : 'DROP NOT NULL');
+
+        if (isset($data['default'])) {
+            $default = trim(preg_replace('/^\s*DEFAULT\s*/i', '', $data['default']));
+            $statements[] = "ALTER TABLE $table ALTER COLUMN $column " . ($default === '' || strtoupper($default) === 'NULL' ? 'DROP DEFAULT' : "SET DEFAULT $default");
+        }
+
+        return $statements;
+    }
+
     private static function table_exists($table = null)
     {
         if (!empty($table)) Terminal::$parameters['table'] = $table;
 
         if (!self::$tables) {
-            $tables = self::$db->prepare("SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema = :dbname", ['dbname' => self::$dbname])->fetchAll(\PDO::FETCH_ASSOC);
+            # PostgreSQL scopes information_schema by SCHEMA, not database name.
+            $tables = self::pg()
+                ? self::$db->prepare('SELECT table_name AS "TABLE_NAME" FROM information_schema.tables WHERE table_schema = current_schema()')->fetchAll(\PDO::FETCH_ASSOC)
+                : self::$db->prepare("SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema = :dbname", ['dbname' => self::$dbname])->fetchAll(\PDO::FETCH_ASSOC);
             foreach ($tables as $key => $table) $tables[$key] = $table['TABLE_NAME'];
             self::$tables = $tables;
         }
@@ -126,6 +167,7 @@ class Db
         foreach ($migrations as $migration) {
             $last_modify     = filemtime($migration);
             $drop_columns    = [];
+            $touch_columns   = [];
             $cleared_indexes = [];
             $class           = str_replace(['.php', BASE_PATH, '/'], ['', '', '\\'], $migration);
 
@@ -159,7 +201,7 @@ class Db
             if ($fresh) {
                 Terminal::text('[color=blue]Info: Migrate forcing.[/color]');
                 self::$db->prepare("DROP TABLE IF EXISTS $table");
-                self::$db->prepare("CREATE TABLE $table ($init_column_name int DEFAULT 1 NOT NULL)" . ($charset ? " CHARACTER SET " . strtok($charset, '_') . " COLLATE $charset" : null));
+                self::$db->prepare("CREATE TABLE $table ($init_column_name int DEFAULT 1 NOT NULL)" . ($charset && !self::pg() ? " CHARACTER SET " . strtok($charset, '_') . " COLLATE $charset" : null));
                 $drop_columns[] = $init_column_name;
             }
             #endregion
@@ -172,7 +214,9 @@ class Db
             #region: detect indexes
             $indexes = [];
             try {
-                foreach (self::$db->prepare("SHOW INDEX FROM $table")->fetchAll(\PDO::FETCH_ASSOC) as $index) if ($index['Key_name'] != 'PRIMARY') $indexes[$index['Key_name']] = $index['Key_name'];
+                if (self::pg()) foreach (self::$db->prepare("SELECT indexname FROM pg_indexes WHERE schemaname = current_schema() AND tablename = :t", ['t' => $table])->fetchAll(\PDO::FETCH_COLUMN) as $index) {
+                    if (!str_ends_with($index, '_pkey')) $indexes[$index] = $index;
+                } else foreach (self::$db->prepare("SHOW INDEX FROM $table")->fetchAll(\PDO::FETCH_ASSOC) as $index) if ($index['Key_name'] != 'PRIMARY') $indexes[$index['Key_name']] = $index['Key_name'];
             } catch (\PDOException $e) {
                 Terminal::text("\n[color=yellow]`" . self::$dbname . ".$table` cannot access indexes.[/color]");
             }
@@ -212,7 +256,9 @@ class Db
             # Case-insensitively, as MySQL names columns: `email` renamed to `Email`
             # in the migration is the same column, and comparing bytes put it on the
             # drop list - ADD failed (exists), MODIFY passed, DROP took the data.
-            $tableColumns = self::$db->prepare("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN);
+            $tableColumns = self::pg()
+                ? self::$db->prepare('SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = :t', ['t' => $table])->fetchAll(\PDO::FETCH_COLUMN)
+                : self::$db->prepare("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN);
             $declared     = array_change_key_case($columns, CASE_LOWER);
             foreach ($tableColumns as $column) if (!isset($declared[strtolower($column)])) $drop_columns[] = $column;
             #
@@ -338,21 +384,45 @@ class Db
                             break;
 
                         case 'onupdate':
-                            $data['default'] = $data['default'] . " ON UPDATE CURRENT_TIMESTAMP";
+                            # No ON UPDATE clause in PostgreSQL; a trigger written
+                            # after the columns does the same job - see below.
+                            if (self::pg()) $touch_columns[] = $column;
+                            else $data['default'] = $data['default'] . " ON UPDATE CURRENT_TIMESTAMP";
                             break;
                     }
                 }
 
+                # One dialect in the migration files, two on the wire. The switch
+                # above speaks MySQL; for PostgreSQL the finished definition is
+                # translated in one place rather than forked case by case.
+                if (self::pg()) {
+                    $data['type'] = ' ' . strtr(trim((string) @$data['type']), [
+                        'LONGTEXT'   => 'TEXT',
+                        'TINYINT(1)' => 'SMALLINT',
+                        'TINYINT'    => 'SMALLINT',
+                        'DATETIME'   => 'TIMESTAMP',
+                        # JSONB, not JSON: it is the indexed, binary form - the one
+                        # anyone means when they ask PostgreSQL for json.
+                        'JSON'       => 'JSONB',
+                        'FLOAT'      => 'DOUBLE PRECISION',
+                    ]) . ' ';
+                    if (isset($data['index'])) $data['index'] = str_replace('AUTO_INCREMENT', 'GENERATED BY DEFAULT AS IDENTITY', $data['index']);
+                    unset($data['charset']); # per-column charsets are a MySQL concept
+                }
+
                 # AUTO_INCREMENT is integer-only. A `primary` on a uuid/char/date column
                 # would fail with 1063; drop the increment instead of breaking the migration.
-                if (isset($data['index']) && str_contains($data['index'], 'AUTO_INCREMENT') && !preg_match('/\b(TINYINT|SMALLINT|MEDIUMINT|INT|BIGINT)\b/i', $data['type'])) $data['index'] = " PRIMARY KEY ";
+                if (isset($data['index']) && (str_contains($data['index'], 'AUTO_INCREMENT') || str_contains($data['index'], 'IDENTITY')) && !preg_match('/\b(TINYINT|SMALLINT|MEDIUMINT|INT|BIGINT)\b/i', $data['type'])) $data['index'] = " PRIMARY KEY ";
 
                 if ($fresh || $migrate_force) $column_need_update = true;
                 else $column_need_update = !isset($last_migrate['tables'][$table]['columns'][$column]['data']) || $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
 
                 $result = ['loop' => true, 'status' => 0];
                 if ($column_need_update) {
-                    $buildSQL = str_replace(['  ', ' ;'], [' ', ';'], ("ALTER TABLE $table ADD $column " . (@$data['type'] . @$data['charset'] . @$data['nullstatus'] . @$data['default'] . @$data['index']) . ($last_column ? " AFTER $last_column " : ' FIRST ') . (isset($data['extras']) ? ", " . implode(', ', $data['extras']) : null) . ";"));
+                    # Column position (AFTER/FIRST) is MySQL-only; PostgreSQL
+                    # appends, and the order of columns() is cosmetic anyway.
+                    $position = self::pg() ? ' ' : ($last_column ? " AFTER $last_column " : ' FIRST ');
+                    $buildSQL = str_replace(['  ', ' ;'], [' ', ';'], ("ALTER TABLE $table ADD $column " . (@$data['type'] . @$data['charset'] . @$data['nullstatus'] . @$data['default'] . @$data['index']) . $position . (isset($data['extras']) ? ", " . implode(', ', $data['extras']) : null) . ";"));
                     while ($result['loop'] == true) {
                         try {
                             self::$db->prepare($buildSQL);
@@ -361,7 +431,20 @@ class Db
                             #
                             $result['loop'] = false;
                         } catch (\PDOException $e) {
-                            switch ((string) $e->errorInfo['1']) {
+                            # MySQL speaks in errno (errorInfo[1]), PostgreSQL in
+                            # SQLSTATE (errorInfo[0]) - its errno slot holds a 7.
+                            switch (self::pg() ? (string) $e->errorInfo[0] : (string) $e->errorInfo['1']) {
+                                # Duplicate column: the column exists, apply the
+                                # definition to it instead.
+                                case '42701':
+                                    # No MODIFY here: type, nullability and default are
+                                    # their own ALTER COLUMN statements. The identity/
+                                    # primary part is left alone - it already is one.
+                                    foreach (self::pgModify($table, $column, $data) as $statement) self::$db->prepare($statement);
+                                    $result['status'] = 2;
+                                    $result['loop']   = false;
+                                    break;
+
                                 case '1060':
                                     $buildSQL = str_replace("$table ADD", "$table MODIFY", $buildSQL);
                                     $result['status'] = 2;
@@ -372,6 +455,7 @@ class Db
                                 # the rest of the definition still has to be applied. Mapped
                                 # straight to "not changed" before, so a type change on the
                                 # key column was never made and recorded as if it had been.
+                                case '42P16': # multiple primary keys - PostgreSQL's 1068
                                 case '1068':
                                     if (str_contains($buildSQL, 'PRIMARY KEY')) {
                                         $buildSQL = str_replace(' PRIMARY KEY ', ' ', $buildSQL);
@@ -409,7 +493,7 @@ class Db
 
             #region: index management
             foreach ($indexes as $index) try {
-                self::$db->prepare("ALTER TABLE $table DROP INDEX $index");
+                self::$db->prepare(self::pg() ? "DROP INDEX $index" : "ALTER TABLE $table DROP INDEX $index");
                 $cleared_indexes[] = $index;
             } catch (\Throwable $e) {
                 Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
@@ -422,7 +506,8 @@ class Db
             }
 
             foreach ($queue_index_list as $index_key => $index_columns) try {
-                self::$db->prepare("CREATE " . (str_starts_with($index_key, 'unique_') ? 'UNIQUE' : '') . " INDEX `" . substr($index_key, 0, 60) . "` ON `$table`(`" . implode('`, `', $index_columns) . "`);");
+                $q = self::pg() ? '"' : '`'; # identifier quote: backtick is MySQL-only
+                self::$db->prepare("CREATE " . (str_starts_with($index_key, 'unique_') ? 'UNIQUE' : '') . " INDEX $q" . substr($index_key, 0, 60) . "$q ON $q$table$q($q" . implode("$q, $q", $index_columns) . "$q);");
                 Terminal::text("[color=green]-> added index key `$index_key`[/color][color=dark-gray](" . implode(', ', $index_columns) . ")[/color]");
             } catch (\Throwable $e) {
                 Terminal::text('[color=red]ERR: ' . $e->getMessage() . '[/color]');
@@ -439,8 +524,24 @@ class Db
             #endregion
 
             #region: update storage engine.
-            self::$db->prepare("ALTER TABLE $table ENGINE = '$storageEngine'");
-            Terminal::text("[color=yellow]`" . self::$dbname . ".$table` storage engine is[/color] [color=blue]`$storageEngine`[/color]");
+            if (!self::pg()) {
+                self::$db->prepare("ALTER TABLE $table ENGINE = '$storageEngine'");
+                Terminal::text("[color=yellow]`" . self::$dbname . ".$table` storage engine is[/color] [color=blue]`$storageEngine`[/color]");
+            }
+            #endregion
+
+            #region: onupdate triggers (PostgreSQL)
+            # MySQL writes ON UPDATE CURRENT_TIMESTAMP into the column;
+            # PostgreSQL has no such clause, so each onupdate column gets a
+            # BEFORE UPDATE trigger doing the same thing. Re-runnable: the
+            # function is CREATE OR REPLACE, the trigger dropped first.
+            foreach ($touch_columns ?? [] as $touch) {
+                $fn = "zf_touch_{$table}_{$touch}";
+                self::$db->prepare("CREATE OR REPLACE FUNCTION $fn() RETURNS trigger AS \$zf\$ BEGIN NEW.$touch := CURRENT_TIMESTAMP; RETURN NEW; END \$zf\$ LANGUAGE plpgsql");
+                self::$db->prepare("DROP TRIGGER IF EXISTS $fn ON $table");
+                self::$db->prepare("CREATE TRIGGER $fn BEFORE UPDATE ON $table FOR EACH ROW EXECUTE FUNCTION $fn()");
+                Terminal::text("[color=green]-> trigger `$fn`[/color] [color=dark-gray]keeps $touch current on update[/color]");
+            }
             #endregion
 
             Terminal::text("[color=green]`" . self::$dbname . ".$table` migrate complete.[/color]");
@@ -491,6 +592,11 @@ class Db
      */
     public static function backup()
     {
+        # The dumper speaks MySQL (SHOW CREATE, quoting, the works). PostgreSQL
+        # ships its own excellent tool; pointing this one at it would produce a
+        # file that restores nowhere.
+        if (self::pg()) return Terminal::text('[color=red]`db backup` is MySQL-only - use pg_dump for a PostgreSQL connection.[/color]');
+
         $title = date('Y-m-d~H-i-s');
         (new MySQLBackup(self::$db, [
             'dir'      => base_path('/database/backups'),

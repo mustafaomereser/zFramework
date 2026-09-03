@@ -1330,16 +1330,37 @@ class DB
         }
 
         $this->buildQuery['sets'] = " (" . implode(', ', array_keys($sets)) . ") VALUES (:" . implode(', :', $hashed_keys) . ") ";
-        $insert = $this->run(__FUNCTION__)->rowCount();
+        $statement = $this->run(__FUNCTION__);
+        $insert    = $statement->rowCount();
         if (!$just_insert && $insert && $primary = $this->getPrimary()) {
-            # lastInsertId() is "0" on a table whose key is not AUTO_INCREMENT
-            # (`primary:noincrement`, uuid): the key is whatever the caller set.
-            $id = $this->connection()->lastInsertId();
-            if (!$id || $id === '0') $id = $sets[$primary] ?? null;
+            # A driver whose INSERT carries the row back (PostgreSQL's RETURNING *,
+            # appended in its build()) answers here in the same round-trip. MySQL's
+            # statement has nothing to fetch and quietly hands back false.
+            try {
+                $returned = $statement->fetch(\PDO::FETCH_ASSOC);
+            } catch (\Throwable) {
+                $returned = false;
+            }
 
-            if ($id !== null) {
-                $inserted_row = $this->resetBuild()->where($primary, $id)->first() ?? [];
+            if (is_array($returned)) {
+                $inserted_row = $returned;
+                $this->resetBuild();
                 $this->trigger('inserted', $inserted_row);
+            } else {
+                # lastInsertId() is "0" on a table whose key is not AUTO_INCREMENT
+                # (`primary:noincrement`, uuid) - and throws on a driver with no
+                # session sequence to read: the key is whatever the caller set.
+                try {
+                    $id = $this->connection()->lastInsertId();
+                } catch (\Throwable) {
+                    $id = null;
+                }
+                if (!$id || $id === '0') $id = $sets[$primary] ?? null;
+
+                if ($id !== null) {
+                    $inserted_row = $this->resetBuild()->where($primary, $id)->first() ?? [];
+                    $this->trigger('inserted', $inserted_row);
+                }
             }
         }
 

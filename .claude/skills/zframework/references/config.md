@@ -202,4 +202,7 @@ The first entry is the default; a model picks another with `public $db = 'name'`
   which doubles the wait. Measured against a dead server: `127.0.0.1` 2 s, `localhost` 4 s,
   unreachable IP 21 s.
 
-Drivers: `mysql` and `sqlsrv` (`zFramework/Core/Facades/DB/Drivers/`).
+Drivers: `mysql`, `pgsql` and `sqlsrv` (`zFramework/Core/Facades/DB/Drivers/`), picked from the
+DSN automatically. A pgsql connection: `['pgsql:host=127.0.0.1;port=5432;dbname=app', 'user', 'pass']`
+(needs `extension=pdo_pgsql`); skip `ATTR_EMULATE_PREPARES` there - it exists for MySQL's
+lastInsertId, and pgsql inserts come back via RETURNING instead.

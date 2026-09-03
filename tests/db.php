@@ -20,6 +20,13 @@ try {
     return;
 }
 
+// This file speaks MySQL DDL. Pointed at another driver (--db=, or a non-MySQL
+// first connection) it skips; tests/pgsql.php covers the same ground there.
+if ($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) !== 'mysql') {
+    test('database connection', fn() => skip('`' . Test::db() . '` is ' . $pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) . ', this file tests MySQL - see tests/pgsql.php'));
+    return;
+}
+
 $users = Test::table('users');
 $items = Test::table('items');
 $uuid  = Test::table('uuid');

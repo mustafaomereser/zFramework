@@ -42,6 +42,12 @@ $report = function () use (&$file) {
 register_shutdown_function(function () use ($report, &$reported) {
     if ($reported) return;
 
+    # die()/exit from inside the framework (an error handler, an abort) ends
+    # the file mid-setup with no PHP fatal to point at - say so rather than
+    # reporting an empty green run.
+    if (!\zFramework\Kernel\Helpers\TestKit::$results && !\zFramework\Kernel\Helpers\TestKit::$filtered)
+        \zFramework\Kernel\Helpers\TestKit::$results[] = ['name' => '(setup)', 'status' => 'fail', 'message' => 'the file exited before any test ran - its own output above says why', 'at' => '', 'output' => '', 'ms' => 0];
+
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_COMPILE_ERROR, E_CORE_ERROR], true))
         \zFramework\Kernel\Helpers\TestKit::$results[] = ['name' => '(fatal)', 'status' => 'fail', 'message' => trim($error['message']), 'at' => str_replace(BASE_PATH . '/', '', str_replace('\\', '/', $error['file'])) . ':' . $error['line'], 'output' => '', 'ms' => 0];
@@ -60,6 +66,7 @@ if (!$file || !is_file(BASE_PATH . '/' . $file)) {
 $cron_mode = true;
 require BASE_PATH . '/zFramework/bootstrap.php';
 zFramework\Run::includer(FRAMEWORK_PATH . '/modules', false);
+zFramework\Run::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php'); # errorHandler() - DB::connection() calls it on failure
 require FRAMEWORK_PATH . '/Kernel/Helpers/TestKit.php';
 
 use zFramework\Kernel\Helpers\TestKit;
@@ -70,7 +77,13 @@ class_alias(TestKit::class, 'Test');
 TestKit::$db     = $db;
 TestKit::$filter = $filter !== null && $filter !== '' ? $filter : null;
 
-include BASE_PATH . '/' . $file;
+try {
+    include BASE_PATH . '/' . $file;
+} catch (\Throwable $e) {
+    # An exception outside any test() - the file's own setup. Reported as a
+    # failing pseudo-test; the alternative was a blank 0/0 that read as green.
+    \zFramework\Kernel\Helpers\TestKit::$results[] = ['name' => '(setup)', 'status' => 'fail', 'message' => get_class($e) . ': ' . $e->getMessage(), 'at' => str_replace(BASE_PATH . '/', '', str_replace('\\', '/', $e->getFile())) . ':' . $e->getLine(), 'output' => '', 'ms' => 0];
+}
 
 # The session writes at shutdown and needs the headers unsent; the report
 # below is output, so flush it first - quietly, a test that used the session

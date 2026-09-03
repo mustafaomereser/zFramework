@@ -138,6 +138,11 @@ in the shipped `Users` migration.
 php terminal db migrate [--fresh] [--seed] [--module=blog]
 ```
 
+Migrations run on MySQL and PostgreSQL alike (the connection's driver decides the dialect):
+on pgsql, `json`->JSONB, `datetime`->TIMESTAMP, `tinyint`/`bool`->SMALLINT, `primary`->IDENTITY,
+`onupdate`-> a BEFORE UPDATE trigger; `charset:` and `$storageEngine` are ignored; `db backup`
+is MySQL-only (pg_dump). A `default:(EXPR)` is verbatim - write it in the target's SQL.
+
 Migrations are **idempotent, not additive**: re-running adds the columns that are missing and
 **drops the ones no longer in `columns()`**, data included - removing a column from a migration
 removes it from the table on the next `db migrate`. `--fresh` rebuilds every table and loses
