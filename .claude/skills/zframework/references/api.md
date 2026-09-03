@@ -159,7 +159,7 @@ morphTo(array $values, string $morphName)
 morphToMany(...)              morphedByMany(...)
 hasManyCount(string $model, $value, ?string $column = null): int
 hasRelation(string $model, $value, ?string $column = null): bool
-findRelation(string $model, string $value, ?string $column = null)
+findRelation(string $model, $value, ?string $column = null)
 
 // Pivot
 attach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue, array $extra = [])

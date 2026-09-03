@@ -94,8 +94,11 @@ class Log
             self::prune($config['days']);
         }
 
-        $line = '[' . date('Y-m-d H:i:s') . '] ' . strtoupper($level) . ': ' . $message
-            . ($context ? ' ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '')
+        # One line per entry is the format parsers rely on, so a message with a
+        # newline is folded. INVALID_UTF8_SUBSTITUTE: json_encode() returns false
+        # on a single binary byte, and the whole context used to vanish with it.
+        $line = '[' . date('Y-m-d H:i:s') . '] ' . strtoupper($level) . ': ' . str_replace(["\r\n", "\n", "\r"], ' ', $message)
+            . ($context ? ' ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR) : '')
             . PHP_EOL;
 
         @file_put_contents(self::$dir . '/' . date('Y-m-d') . '.log', $line, FILE_APPEND | LOCK_EX);

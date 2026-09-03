@@ -296,7 +296,9 @@ class File
      */
     public static function humanFileSize(float $bytes, int $decimals = 2): string
     {
-        $factor = floor((strlen((string) $bytes) - 1) / 3);
+        # By powers of 1024, not decimal digit count: 1023 showed as "1.00KB",
+        # 1000 as "0.98KB", and a float in e-notation broke the digit trick.
+        $factor = $bytes >= 1 ? floor(log($bytes, 1024)) : 0;
         return sprintf("%.{$decimals}f", $bytes / pow(1024, $factor)) . (['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'][$factor] ?? '');
     }
 

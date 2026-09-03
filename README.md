@@ -3096,6 +3096,10 @@ decrypt.
   nothing.
 - **The endpoint is a credential.** Anyone holding it can push to that device
   through your key. It is stored, never rendered.
+- **The endpoint's host must be a DNS name or a canonical IP that resolves to a
+  public address.** Numeric spellings (`2130706433`, `0x7f000001`, `127.1`), NAT64
+  wrappers and names that resolve nowhere are refused - the server POSTs to that
+  url, so the guard is what keeps a subscription from becoming an SSRF probe.
 
 ### Another channel
 

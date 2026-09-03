@@ -119,23 +119,30 @@ class Config
      *
      * @return bool
      */
+    /**
+     * Class properties, not function statics: those were invisible to
+     * clearCache() and to `state check`, so Config::set('framework', ...) - or
+     * a worker outliving an edit - kept answering the old value forever.
+     */
+    private static ?bool $debugCache = null;
+    private static ?array $frameworkCache = null;
+
     public static function debug(): bool
     {
-        static $debug = null;
-        if ($debug !== null) return $debug;
+        if (self::$debugCache !== null) return self::$debugCache;
 
         $value = self::framework('debug');
         if ($value === null) $value = self::get('app.debug');
 
-        return $debug = is_scalar($value) && (bool) $value;
+        return self::$debugCache = is_scalar($value) && (bool) $value;
     }
 
     public static function framework(string $key): mixed
     {
-        static $framework = null;
         # bootstrap.php already read config/framework.php and left it here, so
         # the same file is not read and parsed twice.
-        $framework ??= $GLOBALS['framework_config'] ?? (self::exists('framework') ? (array) self::get('framework') : []);
+        self::$frameworkCache ??= $GLOBALS['framework_config'] ?? (self::exists('framework') ? (array) self::get('framework') : []);
+        $framework = self::$frameworkCache;
 
         $parts   = explode('.', $key);
         $subject = $parts[0];
@@ -162,8 +169,10 @@ class Config
      */
     public static function clearCache(): void
     {
-        self::$caches = [];
-        self::$paths  = [];
+        self::$caches         = [];
+        self::$paths          = [];
+        self::$debugCache     = null;
+        self::$frameworkCache = null;
     }
 
     /**

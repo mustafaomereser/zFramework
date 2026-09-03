@@ -150,14 +150,14 @@ class RateLimit
         $file = self::file($key);
         $dir  = dirname($file);
 
-        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return [1, $window, 0];
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return self::openFallback($window);
 
         $handle = @fopen($file, 'c+');
-        if (!$handle) return [1, $window, 0];
+        if (!$handle) return self::openFallback($window);
 
         if (!flock($handle, LOCK_EX)) {
             fclose($handle);
-            return [1, $window, 0];
+            return self::openFallback($window);
         }
 
         $now   = time();
@@ -201,6 +201,27 @@ class RateLimit
         if (rand(1, 200) === 1) self::prune($window);
 
         return [$count, max(1, $window - ($now - $start)), $blockedFor];
+    }
+
+    /**
+     * Storage is unwritable: allow the caller, but say so once per process.
+     *
+     * Failing open is deliberate - a full disk must not lock every visitor
+     * out - but silently it meant the login throttle simply vanished until
+     * somebody happened to look at the directory.
+     *
+     * @param int $window
+     * @return array{0: int, 1: int, 2: int}
+     */
+    private static function openFallback(int $window): array
+    {
+        static $warned = false;
+        if (!$warned) {
+            $warned = true;
+            error_log('[zFramework] RateLimit cannot write ' . self::$dir . ' - every limit is failing open.');
+        }
+
+        return [1, $window, 0];
     }
 
     /**

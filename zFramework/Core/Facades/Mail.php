@@ -207,11 +207,17 @@ class Mail
                 'data' => $data,
             ]);
 
-            self::clearTo();
-            self::clearCc();
-            self::clearBcc();
+            # Only once the queue actually took it. Cleared first, a push that
+            # failed (the connection dying between available() and here) fell
+            # through to sendNow() with no recipients left and threw - the mail
+            # was neither queued nor sent.
+            if ($queued) {
+                self::clearTo();
+                self::clearCc();
+                self::clearBcc();
 
-            if ($queued) return true;
+                return true;
+            }
         }
 
         return self::sendNow($data);

@@ -77,7 +77,9 @@ class Date
      */
     public static function timeago($date)
     {
-        $time = time() - strtotime($date); // to get the time since that moment
+        # A unix timestamp is already a moment; strtotime(90) read "90" as a
+        # time-of-day-ish string and answered in years.
+        $time = time() - (is_numeric($date) ? (int) $date : strtotime($date)); // to get the time since that moment
         $time = ($time < 1) ? 1 : $time;
         $tokens = [
             31536000 => 'year',

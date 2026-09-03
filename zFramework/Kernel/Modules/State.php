@@ -43,6 +43,8 @@ class State
         'zFramework\Core\Facades\Config::$path'        => 'the config directory',
         'zFramework\Core\Facades\Config::$caches'      => 'parsed config files - they do not change per request',
         'zFramework\Core\Facades\Config::$paths'       => 'resolved config lookups, same reasoning',
+        'zFramework\Core\Facades\Config::$debugCache'  => 'the debug flag does not change mid-process; clearCache() resets it',
+        'zFramework\Core\Facades\Config::$frameworkCache' => 'config/framework.php, read once; clearCache() resets it',
         'zFramework\Core\Facades\Cookie::$options'     => 'cookie defaults from config',
         'zFramework\Core\Facades\Redis::$connections'  => 'the connections themselves, kept on purpose',
         'zFramework\Core\Facades\Redis::$config'       => 'config/redis.php',

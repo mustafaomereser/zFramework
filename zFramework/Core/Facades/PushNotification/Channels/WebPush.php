@@ -154,6 +154,13 @@ class WebPush extends Channel
             if (!$allowed) throw new \InvalidArgumentException("Push: `$host` is not an allowed push service.");
         }
 
+        # A host is a DNS name or a canonical IP - nothing else. curl accepts
+        # the numeric spellings (2130706433, 0x7f000001, 127.1, 0177.0.0.1) and
+        # resolves them itself, but none of them validate as an IP and none
+        # resolve in DNS, so they sailed through this guard untested.
+        if (!filter_var($host, FILTER_VALIDATE_IP) && !preg_match('/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i', $host))
+            throw new \InvalidArgumentException("Push: `$host` is not a hostname or an IP address.");
+
         # Resolved once. Not proof against a name that answers differently a
         # second later, but it closes the case that costs nothing to try.
         $addresses = filter_var($host, FILTER_VALIDATE_IP)
@@ -163,9 +170,13 @@ class WebPush extends Channel
                 array_column(@dns_get_record($host, DNS_AAAA) ?: [], 'ipv6')
             );
 
-        # A name nothing answers for is left to curl: refusing here would turn a
-        # dns hiccup into a rejected subscription.
+        # A name nothing answers for is refused, not left to curl. Left to curl
+        # it was curl who resolved it - with its own parser, which accepts the
+        # numeric spellings the hostname check above lets through (127.1 is a
+        # valid-looking name that no DNS answers) - and the whole guard was a
+        # walk-around. A real DNS hiccup costs one retried subscription.
         if (!$addresses) $addresses = array_filter([gethostbyname($host)], fn($ip) => filter_var($ip, FILTER_VALIDATE_IP));
+        if (!$addresses) throw new \InvalidArgumentException("Push: `$host` does not resolve.");
 
         foreach ($addresses as $address) {
             if (!filter_var($address, FILTER_VALIDATE_IP)) continue;
@@ -175,6 +186,10 @@ class WebPush extends Channel
             # canonicalised on the way so the expanded spelling is caught as well.
             $packed = @inet_pton($address);
             if ($packed !== false && strlen($packed) === 16 && preg_match('/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i', (string) inet_ntop($packed), $mapped)) $address = $mapped[1];
+
+            # 64:ff9b::/96 is NAT64: the last four bytes are an IPv4 address, and
+            # 64:ff9b::7f00:1 is loopback in that coat.
+            if ($packed !== false && strlen($packed) === 16 && str_starts_with(bin2hex($packed), '0064ff9b')) $address = inet_ntop(substr($packed, 12));
 
             if (!filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) throw new \InvalidArgumentException("Push: `$host` resolves to a private address.");
         }

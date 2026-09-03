@@ -13,7 +13,9 @@ class Str
      */
     public static function limit(string $text, int $length = 50, string $continue = "..."): string
     {
-        if (strlen($text) > $length) $text = mb_substr($text, 0, $length) . $continue;
+        # Characters, not bytes: strlen('çç') is 4, so a two-letter string got
+        # the suffix without being shortened.
+        if (mb_strlen($text) > $length) $text = mb_substr($text, 0, $length) . $continue;
         return $text;
     }
 

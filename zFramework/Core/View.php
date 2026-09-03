@@ -541,12 +541,40 @@ class View
      * PHP tags are kept intact so they still work when included from cache.
      * Only the static HTML/whitespace portions are minified.
      */
+    /**
+     * Collapse whitespace in a plain-HTML part, quoted attribute values kept.
+     *
+     * The balanced-quote lookahead this replaces rescanned to the end of the
+     * part for every whitespace run - quadratic, 117 KB of HTML took over a
+     * second per compile. The values are masked out first, so both passes
+     * stay linear and nothing inside quotes is touched.
+     *
+     * @param string $html
+     * @return string
+     */
+    private static function squeezeHtml(string $html): string
+    {
+        $kept = [];
+        $html = preg_replace_callback(
+            '/"[^"]*"|\'[^\']*\'|`[^`]*`/',
+            function ($m) use (&$kept) {
+                $kept[] = $m[0];
+                return "\x00" . (count($kept) - 1) . "\x00";
+            },
+            $html
+        );
+
+        $html = preg_replace(['/\s+/', '/>\s+</'], [' ', '><'], $html);
+
+        return preg_replace_callback('/\x00(\d+)\x00/', fn($m) => $kept[(int) $m[1]], $html);
+    }
+
     private static function minifyTemplate(string $template): string
     {
         $parts = preg_split('/(<\?(?:php|=)[\s\S]*?\?>|<textarea.*?>.*?<\/textarea>|<pre.*?>.*?<\/pre>|<script.*?>.*?<\/script>|<input.*?>)/si', $template, -1, PREG_SPLIT_DELIM_CAPTURE);
 
         for ($i = 0; $i < count($parts); $i++) {
-            if ($i % 2 == 0) $parts[$i] = preg_replace(['/\s+(?=(?:[^"\'`]*["\'`][^"\'`]*["\'`])*[^"\'`]*$)/', '/>\s+</'], [' ', '><'], $parts[$i]);
+            if ($i % 2 == 0) $parts[$i] = self::squeezeHtml($parts[$i]);
             else if (strpos($parts[$i], '<script') !== false) {
                 # A script with a src has no body, so there was never anything here to
                 # minify - only its attributes to chew on, which is how src="//cdn..."

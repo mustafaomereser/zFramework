@@ -91,18 +91,24 @@ class GlobalCache
 
         # L2: Redis. Shared by every server, so this is where the truth lives and
         # where remove() actually reaches everyone.
+        #
+        # Stored wrapped, because Redis::get() answers null for a missing key and
+        # a callback may legitimately return null - unwrapped, that value was
+        # recomputed and re-written on every single call. An entry from before
+        # the wrapper unserializes to something else and reads as one miss,
+        # which only recomputes it.
         $redis = self::redisEnabled() && \zFramework\Core\Facades\Redis::available('cache');
         if ($redis) {
-            $data = \zFramework\Core\Facades\Redis::get($key, 'cache');
-            if ($data !== null) {
-                if ($useL1) apcu_store($key, $data, self::l1Ttl($timeout));
-                return $data;
+            $wrapped = \zFramework\Core\Facades\Redis::get($key, 'cache');
+            if (is_array($wrapped) && array_key_exists('v', $wrapped)) {
+                if ($useL1) apcu_store($key, $wrapped['v'], self::l1Ttl($timeout));
+                return $wrapped['v'];
             }
         }
 
         $data = $callback();
 
-        if ($redis) \zFramework\Core\Facades\Redis::set($key, $data, $timeout, 'cache');
+        if ($redis) \zFramework\Core\Facades\Redis::set($key, ['v' => $data], $timeout, 'cache');
         if ($useL1) apcu_store($key, $data, $redis ? self::l1Ttl($timeout) : ($timeout ?? 0));
 
         return $data;
