@@ -176,7 +176,7 @@ Measured behaviour:
   TypeError. Fill it in or drop the hook.
 - **Only three hooks are handed anything.** `oninsert` and `onupdate` get the sets,
   `oninserted` gets the written row. `onupdated`, `ondelete` and `ondeleted` are called
-  with no arguments (`DB.php:1266,1277,1285`), so their `array $args` is always `[]` -
+  with no arguments (see `DB::update()/delete()`), so their `array $args` is always `[]` -
   they can say that something happened, not what. To act on the row, read it in
   `onupdate`/`ondelete`, or do the work where the model is saved.
 - `oninserted` receives the row after it was written, which is why it can see the new id;

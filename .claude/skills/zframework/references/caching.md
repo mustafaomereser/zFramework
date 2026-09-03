@@ -107,7 +107,7 @@ php terminal cache clear pages           // the same, from the CLI
 ```
 
 Do it at the call site, not in an observer: `onupdated`, `ondelete` and `ondeleted` are
-invoked with no arguments at all (`DB.php:1266,1277,1285`), so a hook that reads `$row['id']`
+invoked with no arguments at all (see `DB::update()/delete()`), so a hook that reads `$row['id']`
 reads an empty array. Only `oninsert`, `oninserted` and `onupdate` receive data.
 
 **Prefer the tag.** Rebuilding the url — query string and all — at the point where a model is

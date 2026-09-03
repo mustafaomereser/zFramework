@@ -531,7 +531,7 @@ instead of `fastcgi_pass`.
   `header()` call works under FPM and silently disappears here.
 - **Routes are registered at boot** — `route/web.php`, `route/api.php` and the modules',
   once. `route/dynamic/` is the exception and is re-read on every request in a worker too:
-  `handle()` restores the booted table and includes it on top (`run.php:342-346`), so those
+  `handle()` restores the booted table and includes it on top (`Run::serveRequest()`), so those
   definitions see request state and never accumulate. That is the whole reason the directory
   exists, and why nothing in it can be cached.
 
