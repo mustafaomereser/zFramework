@@ -311,8 +311,13 @@ class Mongo
      */
     public function select(string|array $fields): static
     {
-        $fields = is_array($fields) ? $fields : array_map('trim', explode(',', $fields));
-        $this->projection = array_fill_keys(array_filter($fields), 1);
+        $fields = array_filter(is_array($fields) ? $fields : array_map('trim', explode(',', $fields)));
+
+        # Nothing named is not "everything": an empty select() used to replace the
+        # guard with an empty projection and hand the guarded fields back.
+        if (!$fields) return $this;
+
+        $this->projection = array_fill_keys($fields, 1);
         return $this;
     }
 
@@ -466,6 +471,10 @@ class Mongo
      */
     public function aggregate(array $pipeline): array
     {
+        # The where() chain travels as the first $match stage - it used to be
+        # reset() away silently, so a filtered-looking aggregate was not.
+        if ($filter = $this->buildFilter()) array_unshift($pipeline, ['$match' => $filter]);
+
         $command = ['aggregate' => $this->collection, 'pipeline' => $pipeline, 'cursor' => (object) []];
         $rows    = array_map(fn($row) => $this->stringifyId((array) $row), self::command($command, $this->databaseName(), $this->connection));
         $this->reset();

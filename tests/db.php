@@ -183,3 +183,19 @@ test('unique honours ex: by the primary key', function () {
     same('passed', $try(1), 'its own row');
     same('failed', $try(2), 'someone else already has it');
 });
+
+test('unique/exists pass on a blank and refuse an array', function () {
+    $try = function (array $data, array $rules) {
+        try {
+            \zFramework\Core\Validator::validate($data, $rules);
+            return 'passed';
+        } catch (\zFramework\Core\ResponseSignal) {
+            return 'failed';
+        }
+    };
+    same('passed', $try([], ['email' => ['nullable', 'unique:ZfTestUser;key:email']]), 'absent optional field must not reach the database');
+    same('passed', $try(['email' => ''], ['email' => ['nullable', 'unique:ZfTestUser;key:email']]));
+    same('failed', $try(['email' => ['a@x.y']], ['email' => ['unique:ZfTestUser;key:email']]), 'an array cannot be unique in a column');
+    same('passed', $try([], ['email' => ['nullable', 'exists:ZfTestUser;key:email']]));
+    same('failed', $try(['email' => ['a@x.y']], ['email' => ['exists:ZfTestUser;key:email']]));
+});

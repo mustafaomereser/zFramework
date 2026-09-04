@@ -117,9 +117,13 @@ trait RelationShips
      */
     private function loadRelations(array &$results): void
     {
-        if (!$this->eagerLoad || !$results) return;
+        # Taken and cleared first: an empty result set used to return early and
+        # leave the queue on the instance for the next query to inherit.
+        $queued          = $this->eagerLoad;
+        $this->eagerLoad = [];
+        if (!$queued || !$results) return;
 
-        foreach ($this->eagerLoad as $relation) {
+        foreach ($queued as $relation) {
             if (!method_exists($this, $relation)) throw new \Exception(static::class . "::$relation() is not a relation.");
 
             # Pass 1: probe each row for what the relation would query.
@@ -149,7 +153,17 @@ trait RelationShips
                 $wanted  = array_values(array_unique(array_filter($group['values'], fn($v) => $v !== null && $v !== '')));
                 $related = [];
 
-                if ($wanted) foreach ((new $group['model'])->whereIn($group['column'], $wanted)->get() as $row)
+                # The rows are grouped back to their parents by the FK, so the batch
+                # query must return it even when the related model guards it - the
+                # instance is this query's own, so lifting the guard on that one
+                # field costs nothing (SQL models project through select()).
+                $instance = new $group['model'];
+                if (in_array($group['column'], (array) ($instance->guard ?? []), true)) {
+                    if (method_exists($instance, 'columns')) $instance->select(implode(', ', array_merge($instance->columns(), [$group['column']])));
+                    else $instance->guard = array_values(array_diff($instance->guard, [$group['column']]));
+                }
+
+                if ($wanted) foreach ($instance->whereIn($group['column'], $wanted)->get() as $row)
                     $related[(string) $row[$group['column']]][] = $row;
 
                 foreach ($group['values'] as $index => $value) {
@@ -158,7 +172,5 @@ trait RelationShips
                 }
             }
         }
-
-        $this->eagerLoad = [];
     }
 }

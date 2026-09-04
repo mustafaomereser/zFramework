@@ -16,6 +16,11 @@
 
 define('BASE_PATH', str_replace('\\', '/', dirname(__DIR__, 2)));
 
+# Before the shutdown hook below is registered: the hook reports through
+# TestKit, and a process that ended earlier - no such file, a fatal inside
+# bootstrap - died in the hook itself with "class not found" instead.
+require BASE_PATH . '/zFramework/Kernel/Helpers/TestKit.php';
+
 $file   = null;
 $db     = null;
 $filter = null;
@@ -57,6 +62,7 @@ register_shutdown_function(function () use ($report, &$reported) {
 
 if (!$file || !is_file(BASE_PATH . '/' . $file)) {
     fwrite(STDERR, "test-runner: no such file `$file`" . PHP_EOL);
+    $reported = true; # nothing ran, nothing to report
     exit(2);
 }
 
@@ -67,7 +73,6 @@ $cron_mode = true;
 require BASE_PATH . '/zFramework/bootstrap.php';
 zFramework\Run::includer(FRAMEWORK_PATH . '/modules', false);
 zFramework\Run::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php'); # errorHandler() - DB::connection() calls it on failure
-require FRAMEWORK_PATH . '/Kernel/Helpers/TestKit.php';
 
 use zFramework\Kernel\Helpers\TestKit;
 

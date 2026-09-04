@@ -345,3 +345,46 @@ test('model-less: new Mongo()->collection() reads like new DB()->table()', funct
     same(4, (new Mongo)->collection(Test::table('posts'))->count());
     same('second', (new Mongo)->collection(Test::table('posts'))->where('views', 5)->first()['title'] ?? null);
 });
+
+class ZfMongoGuardedComment extends MongoModel
+{
+    public $guard = ['post_id'];
+    public function __construct()
+    {
+        $this->collection = Test::table('comments');
+        parent::__construct();
+    }
+}
+
+class ZfMongoPostGuardedRel extends MongoModel
+{
+    public function __construct()
+    {
+        $this->collection = Test::table('posts');
+        parent::__construct();
+    }
+    public function comments($row)
+    {
+        return $this->hasMany(ZfMongoGuardedComment::class, $row['_id'], 'post_id');
+    }
+}
+
+test('review fixes: guarded FK eager, empty select keeps the guard, aggregate honours where, no eager leak', function () {
+    $posts = (new ZfMongoPostGuardedRel)->orderBy(['title' => 'ASC'])->with('comments')->get();
+    $first = array_column($posts, null, 'title')['first'];
+    same(2, count($first['comments']), 'eager through a guarded FK');
+    truthy(array_key_exists('post_id', $first['comments'][0]), 'the FK is what groups the rows, so it is handed back - as the SQL trait does');
+
+    $row = (new ZfMongoGuardedComment)->select([])->first();
+    falsy(array_key_exists('post_id', $row), 'select([]) must not switch the guard off');
+    $row = (new ZfMongoGuardedComment)->select('')->first();
+    falsy(array_key_exists('post_id', $row), 'select(\'\') must not switch the guard off');
+
+    $grouped = (new ZfMongoPost)->where('title', 'first')->aggregate([['$group' => ['_id' => null, 'n' => ['$sum' => 1]]]]);
+    same(1, $grouped[0]['n'] ?? null, 'the where() chain became the first $match');
+
+    $model = new ZfMongoPost;
+    same([], $model->where('title', 'nothing-here')->with('comments')->get());
+    $rows = $model->where('title', 'first')->get();
+    falsy(array_key_exists('comments', $rows[0]), 'a relation queued for an empty result must not leak into the next query');
+});

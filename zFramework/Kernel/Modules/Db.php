@@ -123,7 +123,7 @@ class Db
         $migrate_fresh      = in_array('--fresh', Terminal::$parameters) ?? false;
         $migrate_force      = in_array('--force', Terminal::$parameters) ?? false;
         $init_column_name   = "table_initilazing";
-        $types              = [3 => ['not changed.', 'dark-gray'], 1 => ['added', 'green'], 2 => ['modified', 'yellow']];
+        $types              = [3 => ['not changed.', 'dark-gray'], 1 => ['added', 'green'], 2 => ['modified', 'yellow'], 0 => ['FAILED - see the error above', 'red']];
 
         $scans = [BASE_PATH . "/database/$migrations_path"];
 
@@ -168,6 +168,7 @@ class Db
             $last_modify     = filemtime($migration);
             $drop_columns    = [];
             $touch_columns   = [];
+            $table_failed    = false;
             $cleared_indexes = [];
             $class           = str_replace(['.php', BASE_PATH, '/'], ['', '', '\\'], $migration);
 
@@ -485,8 +486,11 @@ class Db
                         (count($migrate_diffs) ? " [color=dark-gray]diff:" . implode(",", $migrate_diffs) . "[/color]" : null)
                 );
 
-                $last_migrate['tables'][$table]['date']             = date('Y-m-d H:i:s');
-                $last_migrate['tables'][$table]['columns'][$column] = ['result' => ['status' => $result['status'], 'message' => $types[$result['status']][0]], 'data' => $data];
+                # A failed column pins the table's date to the epoch: the next run must
+                # not read it as up to date and skip the column that never landed.
+                if ($result['status'] === 0) $table_failed = true;
+                $last_migrate['tables'][$table]['date']             = $table_failed ? '1970-01-01 00:00:00' : date('Y-m-d H:i:s');
+                $last_migrate['tables'][$table]['columns'][$column] = ['result' => ['status' => $result['status'], 'message' => $types[$result['status']][0]], 'data' => $result['status'] === 0 ? null : $data];
                 $last_column = $column;
             }
             #endregion

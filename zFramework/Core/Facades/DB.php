@@ -1350,7 +1350,12 @@ class DB
             }
 
             if (is_array($returned)) {
-                $inserted_row = $returned;
+                # Shaped as first() would shape it: guarded columns out - the
+                # framework's own User guards password - and the per-row
+                # update()/delete() closures on, so the row reads the same on
+                # every driver.
+                foreach ((array) ($this->guard ?? []) as $hidden) unset($returned[$hidden]);
+                $inserted_row = $this->setClosures([$returned])[0];
                 $this->resetBuild();
                 $this->trigger('inserted', $inserted_row);
             } else {

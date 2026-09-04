@@ -11,7 +11,8 @@ class Exists extends Rule
         # Nothing to look up. Without this the rule defeated nullable on every
         # optional foreign key: the blank went to the database as `col = ''`, matched
         # no row, and the field could not be left empty however it was declared.
-        if ($data['value'] === null || $data['value'] === '') return true;
+        if ($this->blank($data['value'])) return true;
+        if (!$this->text($data['value'])) return false;
 
         $exists = (new $data['equivalent'])->where($data['parameters']['key'] ?? $data['key'], $data['value']);
         if ($ex = @$data['parameters']['ex']) $exists->where($exists->getPrimary() ?? 'id', '!=', $ex);

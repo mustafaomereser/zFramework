@@ -213,7 +213,10 @@ Mongo::database(?string $connection = null): string
 Mongo::command(array $cmd, ?string $db = null, ?string $connection = null): array
 ```
 
-Rows are arrays; `_id` is the 24-hex string both ways. No joins/whereRaw/migrations.
+Rows are arrays; `_id` is the 24-hex string both ways - only a 24-hex string is turned into an
+ObjectId, any other `_id` (an int, a slug) is sent as given, so `find(request('id'))` on an
+integer-keyed collection needs `(int)` first. `aggregate()` prepends the where() chain as a `$match`.
+No joins/whereRaw/migrations.
 Terminal: `mongo status`, `mongo indexes`, `make mongomodel Name [--table=collection]`.
 
 ## Facades

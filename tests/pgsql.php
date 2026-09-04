@@ -255,3 +255,22 @@ test('LIKE is case-insensitive here too (ILIKE)', function () {
     same(1, (new ZfPgUser)->where('name', 'LIKE', '%ALI%')->count(), 'MySQL collations ignore case; the driver keeps that promise');
     same(1, (new ZfPgUser)->where('name', 'NOT LIKE', '%ali%')->count());
 });
+
+class ZfPgGuarded extends Model
+{
+    public $guard = ['email'];
+    public function __construct()
+    {
+        $this->db    = $GLOBALS['zf_pg_key'];
+        $this->table = Test::table('users');
+        parent::__construct();
+    }
+}
+
+test('insert() returns the row shaped as first() shapes it (guard, closures)', function () {
+    $row = (new ZfPgGuarded)->insert(['name' => 'guarded', 'email' => 'secret@x.y']);
+    falsy(array_key_exists('email', $row), 'a guarded column leaked out of the RETURNING row');
+    truthy(($row['delete'] ?? null) instanceof \Closure, 'the per-row closures are on');
+    $row['delete']();
+    same(0, (new ZfPgGuarded)->where('name', 'guarded')->count());
+});

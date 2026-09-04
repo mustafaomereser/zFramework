@@ -530,8 +530,10 @@ trait RelationShips
                 $instance = new $group['model'];
                 # method_exists: the related model may be a MongoModel (relations cross
                 # stores), which projects its guard differently and has no columns().
-                if (in_array($group['column'], (array) ($instance->guard ?? []), true) && method_exists($instance, 'columns'))
-                    $instance->select(implode(', ', array_merge($instance->columns(), [$group['column']])));
+                if (in_array($group['column'], (array) ($instance->guard ?? []), true)) {
+                    if (method_exists($instance, 'columns')) $instance->select(implode(', ', array_merge($instance->columns(), [$group['column']])));
+                    else $instance->guard = array_values(array_diff($instance->guard, [$group['column']])); # a MongoModel projects its guard
+                }
 
                 if ($wanted) foreach ($instance->whereIn($group['column'], $wanted)->get() as $row)
                     $related[(string) $row[$group['column']]][] = $row;
