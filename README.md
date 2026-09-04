@@ -508,6 +508,7 @@ foreach ($result['items'] as $item) echo $item['real_order'];
 $p->withRealOrder();                  // 'real_order', newest row = 1 (id DESC)
 $p->withRealOrder('rank');            // custom column name
 $p->withRealOrder('rank', 'ASC');     // oldest row = 1
+// on a softDelete model the rank counts only the visible rows
 ```
 
 It compiles to an index-only correlated count over the primary key, so only
@@ -951,7 +952,9 @@ php terminal db seed
 
 ### 2.7. Transactions
 
-Requires InnoDB storage engine.
+On MySQL this requires InnoDB - MyISAM ignores a transaction silently, which is
+exactly what the guard catches. On PostgreSQL every table is transactional and
+the guard stays out of the way.
 
 ```php
 $user = new User;
@@ -998,7 +1001,7 @@ What the driver translates so your code does not have to:
 `db migrate` speaks both dialects — add, modify (as `ALTER COLUMN TYPE/SET NOT
 NULL/SET DEFAULT`), drop, indexes and `--fresh` all work; `charset:` flags and
 `$storageEngine` are MySQL concepts and are ignored. What stays MySQL-only:
-`db backup` (use `pg_dump` — the command says so), and a `default:(EXPRESSION)`
+`db backup` and `db restore` (use `pg_dump`/`psql` — both commands say so), and a `default:(EXPRESSION)`
 passes through verbatim, so write the expression in the target's own SQL
 (`(UUID())` is MySQL; PostgreSQL spells it `(gen_random_uuid())`).
 
@@ -2351,7 +2354,8 @@ class TPost extends Model
 ```
 
 The exit code is 1 when anything failed, so `php terminal tests` is a CI step
-as it stands. The shipped files (`db`, `validator`, `view`, `helpers`, `http`)
+as it stands. The shipped files (`db`, `validator`, `view`, `helpers`, `http`,
+`pgsql`, `mongo` — the last two skip cleanly when no server is configured)
 double as examples — `tests/http.php` boots `php -S` on a free port and
 drives the real sign-in flow, cookies and csrf included, through curl.
 

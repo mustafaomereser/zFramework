@@ -111,7 +111,7 @@ join(string $type, string $model, string $on = "")                // INNER/LEFT/
 orderBy(array $data)     // ['created_at' => 'DESC']
 groupBy(array $data)
 limit(int $startPoint = 0, $getCount = null)      // MySQL semantics: limit(50) = 50 rows, limit(20, 10) = offset 20, 10 rows
-withRealOrder(string $as = 'real_order', string $direction = 'DESC')
+withRealOrder(string $as = 'real_order', string $direction = 'DESC')   // softDelete: ranks visible rows only
 fetchType(?string $type)          // 'unique' | 'keypair'
 closureMode(bool $mode = true)    // false → do not bind relation closures to rows
 sqlDebug(bool $mode)
@@ -143,7 +143,7 @@ links` (`links` is a closure: `$r['links']()` or `$r['links']('partials.paginati
 table(string $table)     columns(): array        columnsLength(): array
 compareColumnsLength(array $data): array         forgetScheme()
 connection(): object|bool
-beginTransaction()  commit()  rollback()          // requires InnoDB
+beginTransaction()  commit()  rollback()          // MySQL: requires InnoDB; other drivers: always allowed
 ```
 
 ### Relations (`Traits\DB\RelationShips`)

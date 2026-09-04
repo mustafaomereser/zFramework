@@ -464,7 +464,8 @@ DbCollector::fingerprint(string $sql): string     // groups the same query shape
 ```
 
 Driven entirely by `config/framework.php` → `profiling.queryAnalyze` (`true` / `false` / a
-sampling fraction) and `profiling.queryStore`:
+sampling fraction) and `profiling.queryStore`. MySQL/MariaDB only - the EXPLAIN format and
+the plan walker are theirs; on another driver the analyzer skips instead of guessing:
 
 - `'file'` → `analysis/queries/<id>.jsonl`, one line per query, needs nothing to exist.
 - `'table'` → rows in `system_db_collector`; run `php terminal db migrate` first, and note that it
@@ -658,6 +659,10 @@ returns the caught throwable — `skip('reason')`. `Test::` is an alias of
 TestKit: `Test::db()` (the --db key), `Test::table('x')` → `zf_test_x`
 (THE naming contract — nothing else may be created), `Test::pdo()`,
 `Test::cleanup(fn)` (runs after failures and fatals too).
+
+Shipped files: `db` `validator` `view` `helpers` `http` `pgsql` `mongo` - the last two pick
+their server from connections.php/config or the `ZF_PGSQL_TEST` / `ZF_MONGO_TEST` env vars and
+skip cleanly when neither is there.
 
 Exit code 1 on any failure. Writing a DB-backed model for a test: set
 `$this->db = Test::db(); $this->table = Test::table('x');` in the constructor
