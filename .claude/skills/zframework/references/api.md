@@ -171,22 +171,38 @@ toggleAttach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue
 `use zFramework\Core\Traits\DB\softDelete;` enables soft deletes. Behaviour comes from
 `config/model.php` (`deleted_at_type`: `'date'` or `'bool'`).
 
-### MongoDB — `Abstracts\MongoModel`, `Facades\Mongo`
+### MongoDB — `Facades\Mongo`, `Abstracts\MongoModel`
+
+`Mongo` is shaped like `DB`: static = connections, instance = one query. `MongoModel extends Mongo`
+and adds only properties (`$collection` required, `$connection`, `$database`, `$guard`, `$observe`).
 
 ```php
-// model: App/Models, extends MongoModel; public $collection required
-// public $connection (entry in database/mongoconnections.php; default: first),
-// $database (overrides the entry's), $guard = [], $observe (same hooks as SQL observers)
+new Mongo(?string $connection = null)   ->collection(string $name)   // model-less, as new DB()->table()
+
 where(string $key, $opOrValue, $value = null)   // = != <> > >= < <= LIKE IN 'NOT IN'
 whereOr(...)                    // OR over the whole chain, as on the SQL side
 whereIn / whereNotIn(string $column, array $in) // [] -> matches nothing / no-op
 whereBetween(string $column, $start, $stop)
-filter(array $match)            // raw match document, merged AND
+filter(array $match)            // raw match document, AND-ed in
 orderBy(array $data)  limit(int $start, ?int $count)  select(string|array $fields)
-get(): array   first(): ?array   find($id): ?array   count(): int
+with(string ...$relations)      // eager: one $in query per relation
+
+get(): array   first(): ?array   find($id): ?array   count(): int   exists(): bool
+distinct(string $field): array
+paginate(int $per_page = 20, string $page_id = 'page'): array      // the SQL shape, links closure too
+aggregate(array $pipeline): array
+
 insert(array $sets, bool $just_insert = false): array|int   // row back, _id filled, ONE round-trip
-update(array $sets): int        delete(): int               // real deletion, no softDelete
-aggregate(array $pipeline): array    indexes(): array        getPrimary(): string  // '_id'
+update(array $sets): int        updateOrInsert(array $sets): int   // real upsert on the filter
+increment / decrement(string $field, int|float $by = 1): int       // atomic $inc
+push / pull(string $field, $value): int                             // array fields
+delete(): int                   // real deletion, no softDelete
+indexes(): array   getPrimary(): string  // '_id'
+
+// Traits\Mongo\RelationShips - same signatures as Traits\DB; the related class may be
+// a MongoModel OR an SQL Model (relations cross stores, lazily and via with())
+hasMany / hasOne (string $model, $value, ?string $column = null)   // column defaults to <collection>_id
+belongsTo(string $model, $value, ?string $column = null)          // column defaults to the parent's primary
 
 Mongo::available(?string $connection = null): bool
 Mongo::manager(?string $connection = null): \MongoDB\Driver\Manager

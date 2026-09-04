@@ -151,14 +151,20 @@ all the data.
 ## MongoDB models
 
 `App/Models`, `extends MongoModel` instead of `Model` - that is the whole difference in
-placement. `public $collection` required; rows are arrays, `_id` a 24-hex string both ways;
-`where/whereOr/whereIn/orderBy/limit/get/first/find/insert/update/delete/count` read as on the
-SQL side (whereOr ORs the whole chain; insert returns the row in one round-trip). No joins,
-no whereRaw, no softDelete, no migrations - `php terminal mongo indexes` creates what the
-model's `indexes()` declares, `make mongomodel Name` writes the skeleton. Observers use the
-same class and hooks as SQL models. Escape hatches: `filter([...])`, `aggregate([...])`.
-Full signatures in api.md.
+placement, and the class is as thin as Model: properties only, every verb lives in
+`Facades\Mongo` the way Model's live in `Facades\DB`. `public $collection` required; rows are
+arrays, `_id` a 24-hex string both ways. `where/whereOr/whereIn/orderBy/limit/get/first/find/
+count/paginate/insert/update/updateOrInsert/delete` read as on the SQL side (whereOr ORs the
+whole chain; insert returns the row in one round-trip; paginate returns the SQL array with its
+links closure). Mongo-only verbs: `increment/decrement`, `push/pull`, `distinct`, `exists`,
+`filter()` (raw match), `aggregate()`.
 
+**Relations**: `hasMany / hasOne / belongsTo` with the SQL signatures, plus `with()` eager
+loading - and the related class may be a MongoModel or an SQL Model in either direction
+(`Traits\Mongo\RelationShips`). No joins, no whereRaw, no softDelete, no migrations -
+`php terminal mongo indexes` creates what the model's `indexes()` declares, `make mongomodel
+Name` writes the skeleton. Observers use the same class and hooks as SQL models. Full
+signatures in api.md.
 ## Observers
 
 ```bash

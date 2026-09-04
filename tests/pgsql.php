@@ -250,3 +250,8 @@ test("transactions commit and roll back", function () {
     same(1, (new ZfPgItem)->where("title", "tx")->count(), "committed");
     (new ZfPgItem)->where("title", "tx")->delete();
 });
+
+test('LIKE is case-insensitive here too (ILIKE)', function () {
+    same(1, (new ZfPgUser)->where('name', 'LIKE', '%ALI%')->count(), 'MySQL collations ignore case; the driver keeps that promise');
+    same(1, (new ZfPgUser)->where('name', 'NOT LIKE', '%ali%')->count());
+});

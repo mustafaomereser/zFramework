@@ -165,7 +165,7 @@ class mysql
                 $response .= implode(" ", [
                     $prev,
                     $query['key'],
-                    $query['operator'],
+                    $this->operator($query['operator']),
                     (isset($query['raw']) ? $query['value'] . " " : ($query['value'] !== null ? ":$hashed_key " : null))
                 ]);
             }
@@ -177,6 +177,19 @@ class mysql
         if ($soft) $output = "(" . trim($output) . ") AND $soft";
 
         return " " . strtoupper($gettype) . " $output ";
+    }
+
+    /**
+     * A comparison operator in this dialect. MySQL takes them as written; a
+     * driver whose LIKE is case-sensitive (PostgreSQL) maps it here so an
+     * application's `where('name', 'LIKE', ...)` means the same thing everywhere.
+     *
+     * @param string $operator
+     * @return string
+     */
+    protected function operator(string $operator): string
+    {
+        return $operator;
     }
 
     /**

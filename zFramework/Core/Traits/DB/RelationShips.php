@@ -72,7 +72,8 @@ trait RelationShips
      * @param string|null $column Foreign key column. Defaults to {this_table}_id.
      * @return self
      */
-    public function findRelation(string $model, string|int|null $value, ?string $column = null): self
+    # object, not self: the related model may be a MongoModel - relations cross stores.
+    public function findRelation(string $model, string|int|null $value, ?string $column = null): object
     {
         if (!$column) $column = $this->table . "_id";
         return (new $model)->where($column, $value);
@@ -527,7 +528,9 @@ trait RelationShips
                 # path (a plain where) still worked.
                 $related  = [];
                 $instance = new $group['model'];
-                if (in_array($group['column'], (array) ($instance->guard ?? []), true))
+                # method_exists: the related model may be a MongoModel (relations cross
+                # stores), which projects its guard differently and has no columns().
+                if (in_array($group['column'], (array) ($instance->guard ?? []), true) && method_exists($instance, 'columns'))
                     $instance->select(implode(', ', array_merge($instance->columns(), [$group['column']])));
 
                 if ($wanted) foreach ($instance->whereIn($group['column'], $wanted)->get() as $row)

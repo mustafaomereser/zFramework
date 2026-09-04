@@ -123,7 +123,7 @@ README.md       107 KB full reference; section numbers below
 | Application log | `Log::` | §8.3 |
 | Rate limiting | `RateLimit::` + `Throttle` middleware | §6.1 |
 | Tests (no PHPUnit) | `tests/*.php` + `php terminal tests` | §14.4 |
-| MongoDB (collections, no SQL) | `MongoModel` + `Mongo::` + `mongo` terminal | §2.9 |
+| MongoDB (collections, relations that cross into SQL, no joins) | `MongoModel` + `Mongo::` + `mongo` terminal | §2.9 |
 | Scheduled tasks, one crontab line | `Schedule::` + `schedule/` | §14.1 |
 | A cron job in its own process | `cron/` + `cron/cron.php` | §14.2 |
 | Updating the framework core | `php terminal update` — **only when asked** | §14.3 |

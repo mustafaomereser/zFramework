@@ -4,7 +4,7 @@
     // Redis.php touches the real class - the code is correct, the editor just
     // does not know the class exists unless the extension is installed locally.
     //
-    // "redis" and "apcu" are the two the framework guards behind availability
+    // "redis", "apcu" and "mongodb" are the ones the framework guards behind availability
     // checks; the rest are intelephense's own defaults, which get replaced
     // rather than extended when this key is set.
     "intelephense.stubs": [
@@ -17,7 +17,7 @@
         "SimpleXML", "snmp", "soap", "sockets", "sodium", "SPL", "sqlite3", "standard",
         "superglobals", "sysvmsg", "sysvsem", "sysvshm", "tidy", "tokenizer", "xml",
         "xmlreader", "xmlrpc", "xmlwriter", "xsl", "zip", "zlib",
-        "redis", "apcu",
+        "redis", "apcu", "mongodb",
         // mt_rand(), mt_getrandmax(), random_int() and friends live in ext-random
         // since PHP 8.2; without its stub every one of them is "undefined".
         "random"

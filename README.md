@@ -992,6 +992,7 @@ What the driver translates so your code does not have to:
 | you write | PostgreSQL gets |
 |---|---|
 | `limit(20, 10)` | `LIMIT 10 OFFSET 20` |
+| `where('name', 'LIKE', '%ali%')` | `ILIKE` — case-insensitive, as MySQL's collations make LIKE |
 | `insert([...])` | `INSERT ... RETURNING *` — the row comes back in **one** round-trip, serial key or not |
 | migration `json` | `JSONB` (the indexed form) |
 | migration `datetime` / `longtext` / `tinyint` / `bool` / `float` | `TIMESTAMP` / `TEXT` / `SMALLINT` / `SMALLINT` / `DOUBLE PRECISION` |
@@ -1014,8 +1015,9 @@ document): identifiers go to the server unquoted and PostgreSQL folds them.
 ### 2.9. MongoDB
 
 Not a DB driver — DB's contract is building SQL, and none of it has a Mongo
-meaning. Instead: a `Mongo` facade owning the connections, and models in
-`App/Models` that extend `MongoModel` rather than `Model`. Built straight on
+meaning. Instead the same *shape*: `Mongo` is to collections what `DB` is to
+tables — static side owns the connections, instance side is one query — and
+`MongoModel extends Mongo` is as thin as `Model extends DB`. Built straight on
 the `mongodb` extension (php.ini: `extension=mongodb`), no composer package —
 the driver already pools per process and hands documents back as arrays.
 
@@ -1029,19 +1031,22 @@ return [
 ```
 
 ```php
-class Log extends MongoModel
+class Post extends MongoModel
 {
-    public $collection = 'logs';
-    // public $guard   = ['secret'];      // hidden from get()/first(), like the SQL guard
-    // public $observe = LogObserver::class;   // same hooks: oninsert(ed)/onupdate(d)/ondelete(d)
+    public $collection = 'posts';
+    // public $guard   = ['secret'];          // hidden from get()/first(), like the SQL guard
+    // public $observe = PostObserver::class;  // same hooks: oninsert(ed)/onupdate(d)/ondelete(d)
 
-    public function indexes(): array           // php terminal mongo indexes creates these
+    public function comments($row) { return $this->hasMany(Comment::class, $row['_id'], 'post_id'); }
+    public function author($row)   { return $this->belongsTo(User::class, $row['user_id']); }  // User may be a MySQL model
+
+    public function indexes(): array            // php terminal mongo indexes creates these
     {
         return [['key' => ['at' => -1]], ['key' => ['email' => 1], 'unique' => true]];
     }
 }
 
-php terminal make mongomodel Log            // writes the skeleton above
+php terminal make mongomodel Post           // writes the skeleton
 php terminal mongo status                   // ping + server version
 ```
 
@@ -1049,19 +1054,28 @@ The verbs read like the SQL side, rows are arrays, `_id` round-trips as its
 24-hex string:
 
 ```php
-(new Log)->where('level', 'error')->whereOr('level', 'warn')   // OR, exactly as in SQL
+(new Post)->where('level', 'error')->whereOr('level', 'warn')   // OR over the chain, as in SQL
           ->orderBy(['at' => 'DESC'])->limit(20, 10)->get();   // limit(offset, count)
-(new Log)->whereIn('level', [...]);        // [] matches nothing, like whereIn on SQL
-(new Log)->insert(['level' => 'error']);   // the row back, _id filled in — one round-trip
-(new Log)->where('at', '<', $cutoff)->delete();     // real deletion; no softDelete here
-(new Log)->find($idFromUrl);               // the hex string finds the ObjectId row
+(new Post)->with('comments', 'author')->get();  // eager: one $in query per relation
+(new Post)->orderBy(['at' => 'DESC'])->paginate(20);   // the SQL paginate() array, links closure included
+(new Post)->insert(['title' => 'x']);          // the row back, _id filled in — one round-trip
+(new Post)->where('_id', $id)->updateOrInsert(['title' => 'y']);   // a real upsert, one round-trip
+(new Post)->where('_id', $id)->increment('views');                 // atomic; push()/pull() for arrays
+(new Post)->distinct('level');   (new Post)->where(...)->exists();
+(new Post)->where('at', '<', $cutoff)->delete();     // real deletion; no softDelete here
+(new Mongo)->collection('posts')->where(...)->get();  // model-less, like new DB()->table()
 ```
 
-`unique:`/`exists:` validation rules work against a MongoModel untouched —
-they call `where()`/`count()`/`getPrimary()` and never ask what is underneath.
-Escape hatches when the verbs stop: `filter([...])` merges a raw match
-document, `aggregate([...])` runs a pipeline and returns arrays. There are no
-joins, no `whereRaw`, no migrations (`mongo indexes` covers the one thing a
+**Relations cross the store.** `hasMany` / `hasOne` / `belongsTo` take the
+same arguments as on `Model`, and the related class may be a `MongoModel` or
+an SQL `Model`: a Mongo post can own comments in MySQL and a MySQL user can
+own posts in Mongo, lazily or through `with()`, because every relation only
+ever calls `where()`/`whereIn()`/`get()` — and both sides answer.
+
+`unique:`/`exists:` validation rules work against a MongoModel untouched for
+the same reason. Escape hatches when the verbs stop: `filter([...])` merges a
+raw match document, `aggregate([...])` runs a pipeline. There are no joins,
+no `whereRaw`, no migrations (`mongo indexes` covers the one thing a
 deployment must create) — asking for them here would only pretend.
 
 `tests/mongo.php` runs all of it against a live server:

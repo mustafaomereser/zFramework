@@ -107,6 +107,23 @@ class pgsql extends mysql
     }
 
     /**
+     * LIKE is case-sensitive in PostgreSQL and (with the usual collations)
+     * not in MySQL, so the same where() found different rows. ILIKE is the
+     * PostgreSQL spelling of what the application meant.
+     *
+     * @param string $operator
+     * @return string
+     */
+    protected function operator(string $operator): string
+    {
+        return match (strtoupper(trim($operator))) {
+            'LIKE'     => 'ILIKE',
+            'NOT LIKE' => 'NOT ILIKE',
+            default    => $operator,
+        };
+    }
+
+    /**
      * INSERT carries its answer back: RETURNING * hands DB::insert() the full
      * row on the same round-trip, where MySQL needs lastInsertId() plus a
      * SELECT - and it works for any key, serial or not.

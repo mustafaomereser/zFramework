@@ -189,3 +189,159 @@ test('mongo indexes creates what the model declares', function () {
     contains('level_1_at_-1', $names);
     contains('email_1', $names);
 });
+
+# ─────────────────────────────────────────────
+# Relations, cross-store, paginate, the Mongo-only verbs, model-less use
+# ─────────────────────────────────────────────
+
+class ZfMongoPost extends MongoModel
+{
+    public function __construct()
+    {
+        $this->collection = Test::table('posts');
+        parent::__construct();
+    }
+    public function comments($row)
+    {
+        return $this->hasMany(ZfMongoComment::class, $row['_id'], 'post_id');
+    }
+    public function firstComment($row)
+    {
+        return $this->hasOne(ZfMongoComment::class, $row['_id'], 'post_id');
+    }
+    public function author($row)
+    {
+        # crosses the store: the author lives in MySQL
+        return $this->belongsTo(ZfMongoSqlUser::class, $row['user_id']);
+    }
+}
+
+class ZfMongoComment extends MongoModel
+{
+    public function __construct()
+    {
+        $this->collection = Test::table('comments');
+        parent::__construct();
+    }
+    public function post($row)
+    {
+        return $this->belongsTo(ZfMongoPost::class, $row['post_id']);
+    }
+}
+
+# An SQL model (MySQL) whose relation points INTO Mongo.
+class ZfMongoSqlUser extends \zFramework\Core\Abstracts\Model
+{
+    public function __construct()
+    {
+        $this->db    = Test::db();
+        $this->table = Test::table('mongo_users');
+        parent::__construct();
+    }
+    public function posts($row)
+    {
+        return $this->hasMany(ZfMongoPost::class, $row['id'], 'user_id');
+    }
+}
+
+Test::cleanup(function () {
+    foreach (['posts', 'comments'] as $c) {
+        try {
+            Mongo::command(['drop' => Test::table($c)]);
+        } catch (\Throwable) {
+        }
+    }
+    try {
+        Test::pdo()->exec('DROP TABLE IF EXISTS ' . Test::table('mongo_users'));
+    } catch (\Throwable) {
+    }
+});
+
+$post1 = (new ZfMongoPost)->insert(['title' => 'first', 'user_id' => 1, 'views' => 0, 'tags' => ['a']]);
+$post2 = (new ZfMongoPost)->insert(['title' => 'second', 'user_id' => 2, 'views' => 5, 'tags' => []]);
+(new ZfMongoPost)->insert(['title' => 'orphan', 'user_id' => null, 'views' => 1, 'tags' => []]);
+(new ZfMongoComment)->insert(['post_id' => $post1['_id'], 'text' => 'c1']);
+(new ZfMongoComment)->insert(['post_id' => $post1['_id'], 'text' => 'c2']);
+(new ZfMongoComment)->insert(['post_id' => $post2['_id'], 'text' => 'c3']);
+
+test('hasMany / hasOne / belongsTo between collections', function () use ($post1) {
+    same(['c1', 'c2'], array_column((new ZfMongoPost)->comments($post1), 'text'));
+    same('c1', (new ZfMongoPost)->firstComment($post1)['text'] ?? null);
+
+    $comment = (new ZfMongoComment)->where('text', 'c3')->first();
+    same('second', (new ZfMongoComment)->post($comment)['title'] ?? null, 'belongsTo through the hex _id');
+});
+
+test('with() eager-loads in one query per relation', function () {
+    $posts   = (new ZfMongoPost)->orderBy(['title' => 'ASC'])->with('comments', 'firstComment')->get();
+    $byTitle = array_column($posts, null, 'title');
+    same(2, count($byTitle['first']['comments']));
+    same(1, count($byTitle['second']['comments']));
+    same([], $byTitle['orphan']['comments']);
+    same('c1', $byTitle['first']['firstComment']['text'] ?? null);
+    same(null, $byTitle['orphan']['firstComment']);
+});
+
+test('relations cross the store: Mongo post -> MySQL author, MySQL user -> Mongo posts', function () {
+    $pdo = Test::pdo();
+    if ($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) !== 'mysql') skip('needs the MySQL connection for the SQL half');
+
+    $t = Test::table('mongo_users');
+    $pdo->exec("DROP TABLE IF EXISTS $t");
+    $pdo->exec("CREATE TABLE $t (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20))");
+    $pdo->exec("INSERT INTO $t (name) VALUES ('ali'), ('veli')");
+    (new \zFramework\Core\Facades\DB(Test::db()))->forgetScheme();
+
+    $post = (new ZfMongoPost)->where('title', 'first')->first();
+    same('ali', (new ZfMongoPost)->author($post)['name'] ?? null, 'Mongo -> MySQL lazily');
+
+    $posts = (new ZfMongoPost)->orderBy(['title' => 'ASC'])->with('author')->get();
+    same(['ali', null, 'veli'], array_map(fn($p) => $p['author']['name'] ?? null, $posts), 'Mongo -> MySQL eagerly');
+
+    $ali = (new ZfMongoSqlUser)->find(1);
+    same(['first'], array_column((new ZfMongoSqlUser)->posts($ali), 'title'), 'MySQL -> Mongo lazily');
+
+    $users = (new ZfMongoSqlUser)->with('posts')->get();
+    same([1, 1], array_map(fn($u) => count($u['posts']), $users), 'MySQL -> Mongo eagerly, one $in query');
+});
+
+test('paginate answers in the SQL shape', function () {
+    $_REQUEST['page'] = '2';
+    $page = (new ZfMongoPost)->orderBy(['title' => 'ASC'])->paginate(2);
+    unset($_REQUEST['page']);
+
+    same(3, $page['item_count']);
+    same(2, $page['page_count']);
+    same(2, $page['current_page']);
+    same(1, count($page['items']), 'page 2 of 3 items at 2 per page');
+    same('second', $page['items'][0]['title']);
+    truthy($page['links'] instanceof \Closure);
+});
+
+test('increment, push, pull, updateOrInsert, distinct, exists', function () {
+    same(1, (new ZfMongoPost)->where('title', 'first')->increment('views', 3));
+    same(3, (new ZfMongoPost)->where('title', 'first')->first()['views']);
+    same(1, (new ZfMongoPost)->where('title', 'first')->decrement('views'));
+    same(2, (new ZfMongoPost)->where('title', 'first')->first()['views']);
+
+    (new ZfMongoPost)->where('title', 'first')->push('tags', 'b');
+    same(['a', 'b'], (new ZfMongoPost)->where('title', 'first')->first()['tags']);
+    (new ZfMongoPost)->where('title', 'first')->pull('tags', 'a');
+    same(['b'], (new ZfMongoPost)->where('title', 'first')->first()['tags']);
+
+    same(1, (new ZfMongoPost)->where('title', 'upserted')->updateOrInsert(['views' => 9]), 'inserted when missing');
+    same(9, (new ZfMongoPost)->where('title', 'upserted')->first()['views'], 'the filter equality became a field');
+    same(1, (new ZfMongoPost)->where('title', 'upserted')->updateOrInsert(['views' => 10]), 'updated when present');
+    same(4, (new ZfMongoPost)->count());
+
+    $titles = (new ZfMongoPost)->distinct('title');
+    sort($titles);
+    same(['first', 'orphan', 'second', 'upserted'], $titles);
+    truthy((new ZfMongoPost)->where('title', 'orphan')->exists());
+    falsy((new ZfMongoPost)->where('title', 'ghost')->exists());
+});
+
+test('model-less: new Mongo()->collection() reads like new DB()->table()', function () {
+    same(4, (new Mongo)->collection(Test::table('posts'))->count());
+    same('second', (new Mongo)->collection(Test::table('posts'))->where('views', 5)->first()['title'] ?? null);
+});
