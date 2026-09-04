@@ -174,26 +174,29 @@ toggleAttach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue
 ### MongoDB — `Facades\Mongo`, `Abstracts\MongoModel`
 
 `Mongo` is shaped like `DB`: static = connections, instance = one query. `MongoModel extends Mongo`
-and adds only properties (`$collection` required, `$connection`, `$database`, `$guard`, `$observe`).
+and adds only properties (`$collection` required, `$connection`, `$database`, `$guard`, `$observe`)
+plus a no-argument constructor that hands `$connection` up - `new Post()` only; the connection is
+the property, not a constructor argument (that form is `new Mongo('name')` for model-less use).
 
 ```php
 new Mongo(?string $connection = null)   ->collection(string $name)   // model-less, as new DB()->table()
 
-where(string $key, $opOrValue, $value = null)   // = != <> > >= < <= LIKE IN 'NOT IN'
-whereOr(...)                    // OR over the whole chain, as on the SQL side
+where(string $key, $a = null, $b = null)         // 2 args = equals; 3 = operator: = != <> > >= < <= LIKE IN 'NOT IN'
+whereOr(string $key, $a = null, $b = null)       // OR over the whole chain, as on the SQL side
 whereIn / whereNotIn(string $column, array $in) // [] -> matches nothing / no-op
 whereBetween(string $column, $start, $stop)
 filter(array $match)            // raw match document, AND-ed in
-orderBy(array $data)  limit(int $start, ?int $count)  select(string|array $fields)
-with(string ...$relations)      // eager: one $in query per relation
+orderBy(array $data)  limit(int $startPoint = 0, ?int $getCount = null)  select(string|array $fields)
+with(string ...$relations)      // eager: one $in query per relation; public array $eagerLoad holds the queue
+namespace(): string             // 'db.collection' this query targets
 
 get(): array   first(): ?array   find($id): ?array   count(): int   exists(): bool
 distinct(string $field): array
 paginate(int $per_page = 20, string $page_id = 'page'): array      // the SQL shape, links closure too
 aggregate(array $pipeline): array
 
-insert(array $sets, bool $just_insert = false): array|int   // row back, _id filled, ONE round-trip
-update(array $sets): int        updateOrInsert(array $sets): int   // real upsert on the filter
+insert(array $sets = [], bool $just_insert = false): array|int   // row back, _id filled, ONE round-trip
+update(array $sets = []): int   updateOrInsert(array $sets = []): int   // real upsert on the filter
 increment / decrement(string $field, int|float $by = 1): int       // atomic $inc
 push / pull(string $field, $value): int                             // array fields
 delete(): int                   // real deletion, no softDelete
@@ -490,7 +493,7 @@ look obvious (`@for`, `@csrf`, `@push`) do not exist here.
 
 ```bash
 # Scaffolding
-php terminal make model|controller|request|middleware|migration|seeder|observer {Name}
+php terminal make model|mongomodel|controller|request|middleware|migration|seeder|observer {Name}
        [--resource] [--module=blog] [--table=x] [--dbname=x]
 
 # Database
@@ -498,6 +501,14 @@ php terminal db migrate [--fresh] [--force] [--seed] [--all] [--module=blog] [--
 php terminal db seed [--db=x]
 php terminal db backup [--compress] [--separate]
 php terminal db restore [--db=x]
+
+# MongoDB
+php terminal mongo status                 # ping + version of the first entry in database/mongoconnections.php
+php terminal mongo indexes                # createIndexes for every App/Models MongoModel's indexes()
+
+# Tests
+php terminal tests [run [file]] [--db=x] [--filter=name-part]   # bare `tests` = run all; exit 1 on failure
+php terminal tests list | make {name}
 
 # Modules
 php terminal module create {name}

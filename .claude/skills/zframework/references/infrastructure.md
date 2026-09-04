@@ -643,7 +643,8 @@ php terminal bench run                              # boot + request cost on thi
 The framework's own harness, no PHPUnit. `tests/*.php` at the project root,
 one process per file (`Kernel/test-runner.php`) so a file may define
 `ZF_WORKER`, break a static or die fatally without touching the next.
-Underscore-prefixed files (`tests/_helpers.php`) are never run directly.
+Underscore-prefixed files (`tests/_helpers.php`) are left out of a bare `tests` run - shared
+setup goes there; `tests run _helpers` would still run one by name.
 
 ```bash
 php terminal tests                        # run all (bare `tests` = `tests run`)
@@ -663,6 +664,12 @@ TestKit: `Test::db()` (the --db key), `Test::table('x')` → `zf_test_x`
 Shipped files: `db` `validator` `view` `helpers` `http` `pgsql` `mongo` - the last two pick
 their server from connections.php/config or the `ZF_PGSQL_TEST` / `ZF_MONGO_TEST` env vars and
 skip cleanly when neither is there.
+
+Only `--db` and `--filter` are forwarded to the per-file process; any other flag is dropped.
+One file can be run by hand - `php zFramework/Kernel/test-runner.php tests/db.php [--db=x]` - and
+prints the same `#ZFTESTS#{json}` report line the `tests` command parses. `throws()` re-throws
+`TestFailure`/`TestSkipped` on purpose, so an assertion inside the closure still counts.
+`TestKit::$results` / `$filter` / `$db` / `$filtered` are the runner's own plumbing, not test-file API.
 
 Exit code 1 on any failure. Writing a DB-backed model for a test: set
 `$this->db = Test::db(); $this->table = Test::table('x');` in the constructor

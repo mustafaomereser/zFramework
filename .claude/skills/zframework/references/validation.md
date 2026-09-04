@@ -142,6 +142,9 @@ Note the callback argument changes the control flow — see "What happens on fai
 | `unique:Model;key:col;ex:5` | not already in the table, optionally excluding one row (`ex` compares the model's primary key). Runs through the model, so soft-deleted rows are invisible to it |
 | `exists:Model;key:col` | present in the table |
 
+`Model` in `unique:`/`exists:` may be a `MongoModel` as well - the rules only call
+`where()`/`count()`/`getPrimary()`, which both kinds answer.
+
 One class per rule under `zFramework/Core/Validator/Rules/`, registered in `Validator::$ruleMap`.
 Adding a rule means adding a class — there is no closure form. A kebab-case name works
 (`not-in`); the parser accepts `-` in a rule name.

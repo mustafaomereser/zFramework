@@ -143,7 +143,10 @@ and invites "is this still true for 3.2?", which is never the right question her
 | Changed | Update |
 |---|---|
 | A method on a facade, helper, or the DB layer | `references/api.md` |
-| A terminal command or its flags | `references/api.md` (Terminal section) |
+| A terminal command or its flags | `references/api.md` (Terminal section); `tests` commands also in `infrastructure.md` (Tests) |
+| The Mongo facade, MongoModel, Traits\Mongo relations | `references/api.md` (MongoDB block) and `references/models.md` (MongoDB models) |
+| A DB driver (pgsql/sqlsrv) or a migrate dialect difference | `references/models.md` (migrations) and `references/config.md` (connections) |
+| The test harness: TestKit vocabulary, runner, `tests/` conventions | `references/infrastructure.md` (Tests) |
 | A config key, or a `connections.php` option | `references/config.md` |
 | AutoSSL, cPanel, analyzer, worker runtime | `references/infrastructure.md` |
 | Route registration, group/prefix/middleware behaviour, the middleware contract | `references/routing.md` |

@@ -507,3 +507,48 @@ php terminal state check     # statics that would leak across requests in a work
 `$model->sqlDebug(true)` dumps the executed SQL plus `EXPLAIN ANALYZE`.
 `@dump($x)` / `@dd($x)` in views; `dump()` in PHP.
 The Profiling module records real requests (`modules/Profiling`).
+
+## 13. PostgreSQL instead of MySQL
+
+Change the DSN, nothing else: `'local' => ['pgsql:host=127.0.0.1;port=5432;dbname=app', 'user', 'pass', 'options' => [...]]`
+(no `ATTR_EMULATE_PREPARES` - inserts come back via RETURNING). `php terminal db migrate --fresh --seed`
+writes the same migrations in PostgreSQL's dialect (JSONB, IDENTITY, TIMESTAMP, an `onupdate` trigger).
+`db backup`/`db restore` stay MySQL-only: use `pg_dump`/`psql`. Run `php terminal tests run pgsql`
+against the connection to see the whole query surface pass.
+
+## 14. A collection beside the tables (MongoDB)
+
+```php
+// database/mongoconnections.php
+return ['mongo' => ['uri' => 'mongodb://127.0.0.1:27017', 'database' => 'app']];
+```
+
+```bash
+php terminal make mongomodel Log --table=logs
+```
+
+```php
+class Log extends MongoModel
+{
+    public $collection = 'logs';
+    public function user($row) { return $this->belongsTo(User::class, $row['user_id']); }   // User is the MySQL model
+    public function indexes(): array { return [['key' => ['user_id' => 1, 'at' => -1]]]; }
+}
+
+(new Log)->insert(['user_id' => Auth::id(), 'at' => time(), 'text' => '...']);
+(new Log)->where('user_id', Auth::id())->orderBy(['at' => 'DESC'])->with('user')->paginate(20);
+```
+
+`php terminal mongo indexes` after deploy. The other direction works too - `User::logs()` as
+`hasMany(Log::class, $row['id'], 'user_id')` - relations cross the store.
+
+## 15. Writing a test for the feature you just built
+
+```bash
+php terminal tests make posts        # tests/posts.php skeleton
+php terminal tests run posts
+```
+
+Plain PHP: `test('name', fn)` with `same()/truthy()/contains()/throws()`; DB work on `Test::db()`
+with `Test::table('x')` (= `zf_test_x`) tables dropped in `Test::cleanup()`. See `tests/db.php`
+and `tests/http.php` (a real `php -S` + curl round-trip) for the two shapes.
