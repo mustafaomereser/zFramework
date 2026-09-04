@@ -25,8 +25,10 @@ Test::cleanup(function () use ($srv) {
     else proc_terminate($srv);
 });
 
-# The throttle counts per ip: a run right after another must not inherit its hits.
-Test::cleanup(fn() => rrmdir(FRAMEWORK_PATH . '/storage/ratelimit'));
+# The throttle counts per ip: a run right after another must not inherit its
+# hits - cleared before as well as after, or the sign-in below meets a 429.
+@rrmdir(FRAMEWORK_PATH . '/storage/ratelimit');
+Test::cleanup(fn() => @rrmdir(FRAMEWORK_PATH . '/storage/ratelimit'));
 
 $jar = tempnam(sys_get_temp_dir(), 'zf_test_jar');
 Test::cleanup(fn() => @unlink($jar));
