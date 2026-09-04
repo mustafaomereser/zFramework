@@ -18,7 +18,7 @@ findings.
 | `@` operators | Deliberate. Do not clean them up. |
 | `checkSSL()` domain in AutoSSL | The domain does not come from outside; the SSRF risk is accepted. |
 | Validator `Unique`/`Exists` instantiation | `equivalent` is supplied by the developer. |
-| PHPUnit suite | None, and none planned. |
+| PHPUnit | None, and none planned - the framework ships its own harness (`php terminal tests`, plain-PHP files in `tests/`). |
 | `scheme.json` | Deleted by the Kernel after migrations — that is normal. |
 
 ## Known traps

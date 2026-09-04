@@ -77,6 +77,7 @@ public_html/    document root, assets/
 zFramework/     the framework core — touch ONLY to fix a framework bug
 cron/           standalone cron scripts; cron.php boots the framework for one job
 schedule/       scheduled tasks; read only by `php terminal schedule run`
+tests/          plain-PHP test files, run by `php terminal tests` (one process per file)
 terminal        CLI entry point: php terminal <module> <command>
 README.md       107 KB full reference; section numbers below
 ```
@@ -91,7 +92,7 @@ README.md       107 KB full reference; section numbers below
 | Relations (hasMany, belongsToMany, morph*, through) | `RelationShips` trait | §2.2 |
 | Pivot operations (attach/detach/sync/toggle) | same trait | §2.3 |
 | Model events (before/after insert/update/delete) | `Observer` | §2.4 |
-| Schema management | migration classes + `php terminal db migrate` | §2.5 |
+| Schema management (MySQL + PostgreSQL) | migration classes + `php terminal db migrate` | §2.5, §2.8 |
 | Transactions | `beginTransaction/commit/rollback` | §2.7 |
 | Template engine, directives, layouts | `view()` / `View::` | §3 |
 | Validation | a `Request` class, or `Validator::validate` | §5 |
@@ -121,6 +122,8 @@ README.md       107 KB full reference; section numbers below
 | Page caching, HTTP cache headers | `Page::` | §3.1 |
 | Application log | `Log::` | §8.3 |
 | Rate limiting | `RateLimit::` + `Throttle` middleware | §6.1 |
+| Tests (no PHPUnit) | `tests/*.php` + `php terminal tests` | §14.4 |
+| MongoDB (collections, no SQL) | `MongoModel` + `Mongo::` + `mongo` terminal | §2.9 |
 | Scheduled tasks, one crontab line | `Schedule::` + `schedule/` | §14.1 |
 | A cron job in its own process | `cron/` + `cron/cron.php` | §14.2 |
 | Updating the framework core | `php terminal update` — **only when asked** | §14.3 |
@@ -500,7 +503,9 @@ Still no answer: `README.md` (107 KB, numbered sections) and the source under `z
 
 ## What this framework does not do
 
-- **No PHPUnit suite, and none is planned.** If a test is needed, write an ad-hoc script.
+- **No PHPUnit, and none is planned.** The framework has its OWN harness: plain-PHP files in
+  `tests/`, run with `php terminal tests` (see `references/infrastructure.md`, "Tests"). Write
+  new tests there rather than as throwaway scripts.
 - **Adding Composer packages is not the default** — the core requires two, phpmailer and
   tedivm/jshrink, and everything else in `composer.json` is a `suggest`.
 - Do not modify `zFramework/` to serve an application need; application code goes in `App/` and
