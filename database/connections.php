@@ -10,9 +10,9 @@ return [
     //     [\PDO::ATTR_TIMEOUT, 2],
     // ]],
 
-    // MongoDB does NOT go here - it is not a PDO connection. Enable it in
-    // config/framework.php ('mongo' => ['enabled', 'uri', 'database']) and
-    // extend Abstracts\MongoModel; see README 2.9.
+    // MongoDB does NOT go here - it is not a PDO connection. Its entries live
+    // next door in database/mongoconnections.php (same idea: first entry is the
+    // default); models extend Abstracts\MongoModel. See README 2.9.
 
     'local' => ['mysql:host=127.0.0.1;port=3306;dbname=z_framework;charset=utf8mb4', 'root', '', 'options' => [
         [\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION],

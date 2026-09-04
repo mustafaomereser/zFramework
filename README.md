@@ -1014,14 +1014,18 @@ document): identifiers go to the server unquoted and PostgreSQL folds them.
 ### 2.9. MongoDB
 
 Not a DB driver — DB's contract is building SQL, and none of it has a Mongo
-meaning. Instead: a `Mongo` facade owning the one connection, and models in
+meaning. Instead: a `Mongo` facade owning the connections, and models in
 `App/Models` that extend `MongoModel` rather than `Model`. Built straight on
 the `mongodb` extension (php.ini: `extension=mongodb`), no composer package —
 the driver already pools per process and hands documents back as arrays.
 
 ```php
-// config/framework.php
-'mongo' => ['enabled' => true, 'uri' => 'mongodb://127.0.0.1:27017', 'database' => 'app'],
+// database/mongoconnections.php - the sibling of connections.php: first entry
+// is the default, a model picks another with `public $connection = 'name';`,
+// an empty array means Mongo is off.
+return [
+    'mongo' => ['uri' => 'mongodb://127.0.0.1:27017', 'database' => 'app'],
+];
 ```
 
 ```php

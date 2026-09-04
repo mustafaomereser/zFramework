@@ -37,7 +37,13 @@ abstract class MongoModel
     public $collection;
 
     /**
-     * Database name; empty means config's mongo.database.
+     * Connection name from database/mongoconnections.php; empty means the
+     * first entry, exactly as $db works on the SQL models.
+     */
+    public $connection;
+
+    /**
+     * Database name; empty means the connection entry's own.
      */
     public $database;
 
@@ -219,7 +225,7 @@ abstract class MongoModel
         $projection = $this->projection ?? (count($this->guard) ? array_fill_keys($this->guard, 0) : null);
         if ($projection) $options['projection'] = $projection;
 
-        $cursor = Mongo::manager()->executeQuery($this->namespace(), new \MongoDB\Driver\Query($this->buildFilter(), $options));
+        $cursor = Mongo::manager($this->connection)->executeQuery($this->namespace(), new \MongoDB\Driver\Query($this->buildFilter(), $options));
         $cursor->setTypeMap(['root' => 'array', 'document' => 'array', 'array' => 'array']);
 
         $rows = [];
@@ -257,7 +263,7 @@ abstract class MongoModel
         $command = ['count' => $this->collection];
         if ($filter = $this->buildFilter()) $command['query'] = (object) $filter;
 
-        $answer = Mongo::command($command, $this->databaseName());
+        $answer = Mongo::command($command, $this->databaseName(), $this->connection);
         $this->reset();
 
         return (int) ($answer[0]['n'] ?? 0);
@@ -279,7 +285,7 @@ abstract class MongoModel
 
         $bulk = new \MongoDB\Driver\BulkWrite();
         $bulk->insert($sets);
-        Mongo::manager()->executeBulkWrite($this->namespace(), $bulk);
+        Mongo::manager($this->connection)->executeBulkWrite($this->namespace(), $bulk);
 
         $row = $this->stringifyId($sets);
         $this->reset();
@@ -302,7 +308,7 @@ abstract class MongoModel
 
         $bulk = new \MongoDB\Driver\BulkWrite();
         $bulk->update($this->buildFilter(), ['$set' => $sets], ['multi' => true]);
-        $result = Mongo::manager()->executeBulkWrite($this->namespace(), $bulk);
+        $result = Mongo::manager($this->connection)->executeBulkWrite($this->namespace(), $bulk);
 
         $this->reset();
         $updated = (int) $result->getModifiedCount();
@@ -323,7 +329,7 @@ abstract class MongoModel
 
         $bulk = new \MongoDB\Driver\BulkWrite();
         $bulk->delete($this->buildFilter(), ['limit' => 0]);
-        $result = Mongo::manager()->executeBulkWrite($this->namespace(), $bulk);
+        $result = Mongo::manager($this->connection)->executeBulkWrite($this->namespace(), $bulk);
 
         $this->reset();
         $deleted = (int) $result->getDeletedCount();
@@ -345,7 +351,7 @@ abstract class MongoModel
 
         # executeCommand() walks a cursor-shaped answer itself: what comes back
         # IS the documents, not a wrapper with firstBatch inside.
-        return array_map(fn($row) => $this->stringifyId((array) $row), Mongo::command($command, $this->databaseName()));
+        return array_map(fn($row) => $this->stringifyId((array) $row), Mongo::command($command, $this->databaseName(), $this->connection));
     }
 
     /**
@@ -383,7 +389,7 @@ abstract class MongoModel
      */
     private function databaseName(): string
     {
-        return $this->database ?: Mongo::database();
+        return $this->database ?: Mongo::database($this->connection);
     }
 
     /**

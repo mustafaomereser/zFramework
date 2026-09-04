@@ -9,6 +9,7 @@ class {name} extends MongoModel
 {
     public $collection = "{table}";
 
+    // public $connection = 'mongo';       // entry in database/mongoconnections.php; default: the first
     // public $guard   = ['secret'];        // fields left out of get()/first()
     // public $observe = {name}Observer::class;
 

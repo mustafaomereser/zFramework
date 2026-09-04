@@ -4,7 +4,7 @@
  * php terminal tests run mongo
  *
  * MongoModel against a live server. Where it comes from, in order:
- *   1. config (framework.mongo.enabled with its uri)
+ *   1. an entry in database/mongoconnections.php
  *   2. the ZF_MONGO_TEST env var - "mongodb://127.0.0.1:27017|databasename"
  * Neither present (or ext-mongodb missing): one skip line.
  */
@@ -20,12 +20,11 @@ if (!extension_loaded('mongodb')) {
 
 if (!Mongo::available() && ($env = getenv('ZF_MONGO_TEST'))) {
     [$uri, $database] = array_pad(explode('|', $env, 2), 2, 'zf_test');
-    $GLOBALS['framework_config']['mongo'] = ['enabled' => true, 'uri' => $uri, 'database' => $database];
-    \zFramework\Core\Facades\Config::clearCache();
+    $GLOBALS['databases']['mongo'] = ['zf_test_mongo' => ['uri' => $uri, 'database' => $database]];
 }
 
 if (!Mongo::available()) {
-    test('mongodb', fn() => skip('mongo is not enabled and no ZF_MONGO_TEST'));
+    test('mongodb', fn() => skip('no entry in database/mongoconnections.php and no ZF_MONGO_TEST'));
     return;
 }
 

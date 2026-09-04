@@ -3,10 +3,19 @@
 namespace zFramework\Core\Facades;
 
 /**
- * The MongoDB connection - and only the connection. Documents are read and
+ * The MongoDB connections - and only the connections. Documents are read and
  * written through models extending Abstracts\MongoModel; this class owns the
- * one Manager the process keeps and the little that is global: the database
- * name, availability, raw commands.
+ * Managers the process keeps and the little that is global: database names,
+ * availability, raw commands.
+ *
+ * Connections live in database/mongoconnections.php, the sibling of
+ * connections.php and the same shape of thinking: the first entry is the
+ * default, a model picks another with `public $connection = 'name'`, and an
+ * empty file means Mongo is off.
+ *
+ *   return [
+ *       'mongo' => ['uri' => 'mongodb://127.0.0.1:27017', 'database' => 'app'],
+ *   ];
  *
  * Built on the mongodb extension directly (MongoDB\Driver\*), no library in
  * between: the driver already speaks wire protocol, pools connections per
@@ -17,69 +26,86 @@ namespace zFramework\Core\Facades;
  * whereRaw, joins, migrations), and none of that has a Mongo meaning.
  * MongoModel offers the same verbs where the meaning matches - where, get,
  * first, insert, update, delete, count - and nothing where it does not.
- *
- * Config, in config/framework.php (or a standalone config/mongo.php):
- *
- *   'mongo' => [
- *       'enabled'  => true,
- *       'uri'      => 'mongodb://127.0.0.1:27017',
- *       'database' => 'app',
- *   ],
  */
 class Mongo
 {
     /**
-     * One Manager per process - the extension multiplexes every request over
-     * it and reconnects by itself. Boot state: listed in State.php, never
-     * cleared between requests.
+     * One Manager per connection entry, per process - the extension
+     * multiplexes every request over it and reconnects by itself. Boot state:
+     * listed in State.php, never cleared between requests.
      */
-    private static ?\MongoDB\Driver\Manager $manager = null;
+    private static array $managers = [];
 
     /**
+     * The connection entries. Read once per process into $GLOBALS['databases'],
+     * where the SQL connections already live - and where a test can register
+     * one at runtime.
+     *
      * @return array
      */
-    private static function config(): array
+    private static function connections(): array
     {
-        # No cache of its own: Config::framework() already memoises, and a
-        # second layer here only meant a second thing clearCache() cannot reach.
-        return (array) (Config::framework('mongo') ?? []);
+        return $GLOBALS['databases']['mongo'] ??= (array) (@include(BASE_PATH . '/database/mongoconnections.php') ?: []);
     }
 
     /**
-     * Whether anything here can work: the extension is loaded and the config
-     * says enabled. Cheap on the request path - two array reads after the
-     * first call, and the extension check never autoloads anything.
+     * One entry, by name - or the first one when none is named.
      *
+     * @param string|null $connection
+     * @return array|null
+     */
+    private static function entry(?string $connection): ?array
+    {
+        $connections = self::connections();
+        if ($connection !== null) return $connections[$connection] ?? null;
+
+        $first = array_key_first($connections);
+        return $first === null ? null : $connections[$first];
+    }
+
+    /**
+     * Whether anything here can work: the extension is loaded and the entry
+     * exists. Cheap on the request path - the file is read once per process,
+     * and the extension check never autoloads anything.
+     *
+     * @param string|null $connection
      * @return bool
      */
-    public static function available(): bool
+    public static function available(?string $connection = null): bool
     {
-        return (self::config()['enabled'] ?? false) && extension_loaded('mongodb');
+        return extension_loaded('mongodb') && self::entry($connection) !== null;
     }
 
     /**
      * The Manager every model call goes through.
      *
+     * @param string|null $connection
      * @return \MongoDB\Driver\Manager
      */
-    public static function manager(): \MongoDB\Driver\Manager
+    public static function manager(?string $connection = null): \MongoDB\Driver\Manager
     {
-        if (self::$manager !== null) return self::$manager;
+        $key = $connection ?? (array_key_first(self::connections()) ?? '');
+        if (isset(self::$managers[$key])) return self::$managers[$key];
 
         if (!extension_loaded('mongodb')) throw new \RuntimeException('Mongo: the mongodb extension is not loaded (php.ini: extension=mongodb).');
-        if (!(self::config()['enabled'] ?? false)) throw new \RuntimeException('Mongo: not enabled - config/framework.php, mongo.enabled.');
 
-        return self::$manager = new \MongoDB\Driver\Manager(self::config()['uri'] ?? 'mongodb://127.0.0.1:27017');
+        $entry = self::entry($connection);
+        if ($entry === null) throw new \RuntimeException($connection === null
+            ? 'Mongo: no connection configured - database/mongoconnections.php.'
+            : "Mongo: no connection `$connection` in database/mongoconnections.php.");
+
+        return self::$managers[$key] = new \MongoDB\Driver\Manager($entry['uri'] ?? 'mongodb://127.0.0.1:27017');
     }
 
     /**
-     * The database models write into unless they name their own.
+     * The database a connection's models write into unless they name their own.
      *
+     * @param string|null $connection
      * @return string
      */
-    public static function database(): string
+    public static function database(?string $connection = null): string
     {
-        return (string) (self::config()['database'] ?? 'app');
+        return (string) (self::entry($connection)['database'] ?? 'app');
     }
 
     /**
@@ -87,12 +113,13 @@ class Mongo
      * ping, createIndexes, serverStatus, anything the wire accepts.
      *
      * @param array       $command
-     * @param string|null $database
+     * @param string|null $database   Defaults to the connection's own.
+     * @param string|null $connection
      * @return array
      */
-    public static function command(array $command, ?string $database = null): array
+    public static function command(array $command, ?string $database = null, ?string $connection = null): array
     {
-        $cursor = self::manager()->executeCommand($database ?? self::database(), new \MongoDB\Driver\Command($command));
+        $cursor = self::manager($connection)->executeCommand($database ?? self::database($connection), new \MongoDB\Driver\Command($command));
         $cursor->setTypeMap(['root' => 'array', 'document' => 'array', 'array' => 'array']);
 
         return $cursor->toArray();

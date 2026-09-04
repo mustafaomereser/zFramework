@@ -202,8 +202,9 @@ The first entry is the default; a model picks another with `public $db = 'name'`
   which doubles the wait. Measured against a dead server: `127.0.0.1` 2 s, `localhost` 4 s,
   unreachable IP 21 s.
 
-MongoDB is NOT a connection here - it is `framework.mongo` (`enabled`, `uri`, `database`;
-needs `extension=mongodb`) and models extending `Abstracts\MongoModel`. See api.md.
+MongoDB connections live in **`database/mongoconnections.php`** (sibling of connections.php,
+first entry default, empty = off; needs `extension=mongodb`); models extend
+`Abstracts\MongoModel` with `public $connection` picking an entry. See api.md.
 
 Drivers: `mysql`, `pgsql` and `sqlsrv` (`zFramework/Core/Facades/DB/Drivers/`), picked from the
 DSN automatically. A pgsql connection: `['pgsql:host=127.0.0.1;port=5432;dbname=app', 'user', 'pass']`

@@ -26,7 +26,7 @@ class Mongo
     public static function status()
     {
         if (!extension_loaded('mongodb')) return Terminal::text('[color=red]The mongodb extension is not loaded (php.ini: extension=mongodb).[/color]');
-        if (!MongoFacade::available()) return Terminal::text('[color=red]Not enabled - config/framework.php, mongo.enabled.[/color]');
+        if (!MongoFacade::available()) return Terminal::text('[color=red]No connection configured - database/mongoconnections.php.[/color]');
 
         try {
             $build = MongoFacade::command(['buildInfo' => 1], 'admin')[0] ?? [];
@@ -42,7 +42,7 @@ class Mongo
      */
     public static function indexes()
     {
-        if (!MongoFacade::available()) return Terminal::text('[color=red]Not enabled - config/framework.php, mongo.enabled (and extension=mongodb).[/color]');
+        if (!MongoFacade::available()) return Terminal::text('[color=red]No connection configured - database/mongoconnections.php (and extension=mongodb in php.ini).[/color]');
 
         $any = false;
 

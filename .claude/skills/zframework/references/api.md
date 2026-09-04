@@ -175,7 +175,8 @@ toggleAttach($pivotTable, $foreignKey, $foreignValue, $relatedKey, $relatedValue
 
 ```php
 // model: App/Models, extends MongoModel; public $collection required
-// public $database, $guard = [], $observe (same hooks as SQL observers)
+// public $connection (entry in database/mongoconnections.php; default: first),
+// $database (overrides the entry's), $guard = [], $observe (same hooks as SQL observers)
 where(string $key, $opOrValue, $value = null)   // = != <> > >= < <= LIKE IN 'NOT IN'
 whereOr(...)                    // OR over the whole chain, as on the SQL side
 whereIn / whereNotIn(string $column, array $in) // [] -> matches nothing / no-op
@@ -187,8 +188,10 @@ insert(array $sets, bool $just_insert = false): array|int   // row back, _id fil
 update(array $sets): int        delete(): int               // real deletion, no softDelete
 aggregate(array $pipeline): array    indexes(): array        getPrimary(): string  // '_id'
 
-Mongo::available(): bool        Mongo::manager(): \MongoDB\Driver\Manager
-Mongo::database(): string       Mongo::command(array $cmd, ?string $db = null): array
+Mongo::available(?string $connection = null): bool
+Mongo::manager(?string $connection = null): \MongoDB\Driver\Manager
+Mongo::database(?string $connection = null): string
+Mongo::command(array $cmd, ?string $db = null, ?string $connection = null): array
 ```
 
 Rows are arrays; `_id` is the 24-hex string both ways. No joins/whereRaw/migrations.
