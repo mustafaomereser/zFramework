@@ -172,3 +172,81 @@ test('unique/exists run through a pgsql model', function () {
     same('failed', $try('ali@x.y'));
     same('passed', $try('new@x.y'));
 });
+
+class ZfPgRole extends Model
+{
+    public function __construct()
+    {
+        $this->db    = $GLOBALS["zf_pg_key"];
+        $this->table = Test::table("roles");
+        parent::__construct();
+    }
+}
+
+class ZfPgUserRel extends Model
+{
+    public function __construct()
+    {
+        $this->db    = $GLOBALS["zf_pg_key"];
+        $this->table = Test::table("users");
+        parent::__construct();
+    }
+    public function roles($row)
+    {
+        return $this->belongsToMany(ZfPgRole::class, Test::table("user_roles"), $row["id"], "user_id", "role_id");
+    }
+}
+
+test("whereBetween, whereNot, fetchType behave", function () {
+    same(2, count((new ZfPgItem)->whereBetween("user_id", 1, 2)->get()));
+    truthy(count((new ZfPgItem)->whereNot("title", "a2")->get()) >= 2);
+
+    $unique = (new ZfPgItem)->select("title, id")->fetchType("unique")->get();
+    truthy(isset($unique["a2"]), "FETCH_UNIQUE keys by the first selected column");
+});
+
+test("withRealOrder ranks on PostgreSQL too", function () {
+    $rows = (new ZfPgItem)->orderBy(["id" => "ASC"])->withRealOrder()->get();
+    truthy(isset($rows[0]["real_order"]), "the ranking column came back");
+    same(count($rows), (int) $rows[0]["real_order"], "first by id = highest rank DESC");
+});
+
+test("updateOrInsert scoped by where()", function () {
+    (new ZfPgItem)->where("title", "uoi")->updateOrInsert(["title" => "uoi", "user_id" => 9]);
+    same(1, (new ZfPgItem)->where("title", "uoi")->count(), "inserted when missing");
+    (new ZfPgItem)->where("title", "uoi")->updateOrInsert(["user_id" => 10]);
+    same("10", (string) (new ZfPgItem)->where("title", "uoi")->first()["user_id"], "updated when found");
+    (new ZfPgItem)->where("title", "uoi")->delete();
+});
+
+test("pivot relation joins through the pivot table", function () use ($pdo) {
+    $roles = Test::table("roles");
+    $pivot = Test::table("user_roles");
+    foreach ([$pivot, $roles] as $t) $pdo->exec("DROP TABLE IF EXISTS $t");
+    $pdo->exec("CREATE TABLE $roles (id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, name VARCHAR(20))");
+    $pdo->exec("CREATE TABLE $pivot (user_id INT, role_id INT)");
+    Test::cleanup(function () use ($pdo, $pivot, $roles) {
+        foreach ([$pivot, $roles] as $t) $pdo->exec("DROP TABLE IF EXISTS $t");
+    });
+    $pdo->exec("INSERT INTO $roles (name) VALUES ('admin'), ('editor')");
+    $pdo->exec("INSERT INTO $pivot VALUES (1, 1), (1, 2), (2, 2)");
+    (new \zFramework\Core\Facades\DB($GLOBALS["zf_pg_key"]))->forgetScheme();
+
+    $ali = (new ZfPgUserRel)->find(1);
+    same(["admin", "editor"], array_column((new ZfPgUserRel)->roles($ali), "name"));
+});
+
+test("transactions commit and roll back", function () {
+    $m = new ZfPgItem;
+    $m->beginTransaction();
+    $m->insert(["title" => "tx", "user_id" => 1]);
+    $m->rollback();
+    same(0, (new ZfPgItem)->where("title", "tx")->count(), "rolled back");
+
+    $m = new ZfPgItem;
+    $m->beginTransaction();
+    $m->insert(["title" => "tx", "user_id" => 1]);
+    $m->commit();
+    same(1, (new ZfPgItem)->where("title", "tx")->count(), "committed");
+    (new ZfPgItem)->where("title", "tx")->delete();
+});

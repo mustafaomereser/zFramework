@@ -703,6 +703,10 @@ class Db
      */
     public static function restore()
     {
+        # The dumps this reads are MySQL dumps written by `db backup`; replaying
+        # one into PostgreSQL would fail statement by statement at best.
+        if (self::pg()) return Terminal::text('[color=red]`db restore` is MySQL-only - use psql/pg_restore for a PostgreSQL connection.[/color]');
+
         $backups = glob(base_path('database/backups/' . self::$dbname . '/*'));
 
         if (!count($backups)) return Terminal::text("[color=yellow](" . self::$dbname . ") " . self::$db->db . " haven't any backup.[/color]");

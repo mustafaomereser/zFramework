@@ -1074,7 +1074,14 @@ class DB
         if (!$primary = $this->getPrimary()) throw new \Exception("withRealOrder() needs a primary key on `{$this->table}`.");
 
         $comparison = strtoupper(trim($direction)) === 'ASC' ? '<=' : '>=';
-        $this->buildQuery['realOrder'] = "(SELECT COUNT(*) FROM {$this->table} zf_ro WHERE zf_ro.{$primary} {$comparison} {$this->table}.{$primary}) AS {$as}";
+
+        # Ranked among the rows the model can see: on a soft-delete model the
+        # subquery counted trashed rows too, so the visible list started at a
+        # rank above its own length.
+        $soft = '';
+        if (isset($this->softDelete)) $soft = $this->deleted_at_type === 'bool' ? " AND zf_ro.{$this->deleted_at} = 1" : " AND zf_ro.{$this->deleted_at} IS NULL";
+
+        $this->buildQuery['realOrder'] = "(SELECT COUNT(*) FROM {$this->table} zf_ro WHERE zf_ro.{$primary} {$comparison} {$this->table}.{$primary}{$soft}) AS {$as}";
 
         return $this;
     }
@@ -1525,6 +1532,13 @@ class DB
     private function checkisInnoDB(): bool
     {
         if (empty($this->table)) throw new \Exception('This table is not defined.');
+
+        # Storage engines are a MySQL concept: MyISAM silently ignores a
+        # transaction, which is what this guard exists to catch. PostgreSQL and
+        # the like are transactional whatever the table is - their engine slot
+        # holds null and the guard would have refused every one of them.
+        if ($this->driver !== 'mysql') return true;
+
         if ($GLOBALS["DB"][$this->dbname]["TABLE_ENGINES"][$this->table] == 'InnoDB') return true;
         throw new \Exception('This table is not InnoDB. If you want to use transaction system change store engine to InnoDB.');
     }

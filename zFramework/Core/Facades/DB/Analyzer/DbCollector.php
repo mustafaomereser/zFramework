@@ -20,6 +20,11 @@ class DbCollector
     {
         if (!self::isSelect($sql)) return;
 
+        # EXPLAIN FORMAT=JSON and the plan shape read below are MySQL/MariaDB's.
+        # On another driver the query itself would run (EXPLAIN costs a real
+        # plan) and the parser would shrug at the answer - skip honestly instead.
+        if ($db->connection()->getAttribute(\PDO::ATTR_DRIVER_NAME) !== 'mysql') return;
+
         try {
             $executed = $db->debugSQL($sql, $data);
             $pdo      = $db->connection();

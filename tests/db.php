@@ -166,6 +166,11 @@ test('soft-deleted rows are invisible, whereOr included', function () {
     same(0, count((new ZfTestItem)->where('title', 'c')->whereOr('title', 'c')->get()));
 });
 
+test('withRealOrder ranks only the visible rows', function () {
+    $rows = (new ZfTestItem)->orderBy(['id' => 'ASC'])->withRealOrder()->get();
+    same(count($rows), (int) $rows[0]['real_order'], 'soft-deleted rows must not inflate the rank');
+});
+
 test('unique honours ex: by the primary key', function () {
     $try = function (int $ex) {
         try {
