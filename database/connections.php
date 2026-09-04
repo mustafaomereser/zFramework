@@ -1,5 +1,19 @@
 <?php
 return [
+    // PostgreSQL: uncomment, adjust, done - the driver is picked from the DSN
+    // (Drivers/pgsql.php; needs extension=pdo_pgsql in php.ini). Same options
+    // apply; skip ATTR_EMULATE_PREPARES - it exists for MySQL's lastInsertId,
+    // and pgsql inserts come back via RETURNING instead.
+    // 'pgsql' => ['pgsql:host=127.0.0.1;port=5432;dbname=z_framework', 'postgres', '', 'options' => [
+    //     [\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION],
+    //     [\PDO::ATTR_PERSISTENT, true],
+    //     [\PDO::ATTR_TIMEOUT, 2],
+    // ]],
+
+    // MongoDB does NOT go here - it is not a PDO connection. Enable it in
+    // config/framework.php ('mongo' => ['enabled', 'uri', 'database']) and
+    // extend Abstracts\MongoModel; see README 2.9.
+
     'local' => ['mysql:host=127.0.0.1;port=3306;dbname=z_framework;charset=utf8mb4', 'root', '', 'options' => [
         [\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION],
         [\PDO::ATTR_EMULATE_PREPARES, true], # for PDO lastInsertId method.
