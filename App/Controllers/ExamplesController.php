@@ -2,9 +2,11 @@
 
 namespace App\Controllers;
 
+use App\Models\PushNotificationSubscriptions;
 use zFramework\Core\Abstracts\Controller;
 use zFramework\Core\Facades\Auth;
 use zFramework\Core\Facades\Pusher;
+use zFramework\Core\Facades\PushNotification\PushNotification;
 use zFramework\Core\Facades\Response;
 
 /**
@@ -37,6 +39,69 @@ class ExamplesController extends Controller
             'configured' => Pusher::available(),
             'client'     => Pusher::available() ? Pusher::client() : [],
         ]);
+    }
+
+    /**
+     * Push notifications: subscribe this browser, send to it, to a user, a
+     * topic or everyone. GET /demo/push-notification
+     *
+     * @return mixed
+     */
+    public function pushNotification()
+    {
+        $app  = (string) (config('push-notification.default') ?: 'app');
+        $keys = (array) (config("push-notification.apps.$app") ?: []);
+
+        $configured = ($keys['public_key'] ?? '') !== '' && ($keys['private_key'] ?? '') !== '';
+        $model      = new PushNotificationSubscriptions;
+
+        return view('app.pages.examples.push-notification', [
+            'configured' => $configured,
+            'app'        => $app,
+            'stored'     => $configured && $model->connection() ? $model->count() : 0,
+            'mine'       => $configured && Auth::check() ? $model->where('user_id', Auth::id())->count() : 0,
+        ]);
+    }
+
+    /**
+     * Send one notification the way the page asked: to this browser's own
+     * subscription, to the signed-in user's devices, to a topic, to everyone.
+     * POST /demo/push-notification/send
+     *
+     * @return mixed
+     */
+    public function pushNotificationSend()
+    {
+        $app  = (string) (config('push-notification.default') ?: 'app');
+        $keys = (array) (config("push-notification.apps.$app") ?: []);
+        if (($keys['public_key'] ?? '') === '' || ($keys['private_key'] ?? '') === '') return Response::json(['status' => 0, 'reason' => "config/push-notification.php apps.$app has no key pair - `php terminal push-notification keys $app`"]);
+
+        $payload = [
+            'title' => mb_substr(trim((string) request('title')) ?: 'Hello from zFramework', 0, 80),
+            'body'  => mb_substr(trim((string) request('body')), 0, 160),
+            'url'   => route('push-notification.examples'),
+            'tag'   => 'zf-demo',
+        ];
+
+        try {
+            $result = match ((string) request('to')) {
+                # The row this browser produced in step 1, found by its endpoint.
+                'browser' => (function () use ($payload) {
+                    $row = (new PushNotificationSubscriptions)->where('endpoint_hash', hash('sha256', (string) request('endpoint')))->first();
+                    if (!$row) return null;
+                    return PushNotification::toSubscription($row)->send($payload);
+                })(),
+                'user'  => Auth::check() ? PushNotification::toUser(Auth::id())->send($payload) : null,
+                'topic' => PushNotification::toTopic('demo')->send($payload),
+                'all'   => PushNotification::toAll()->send($payload),
+                default => null,
+            };
+        } catch (\Throwable $e) {
+            return Response::json(['status' => 0, 'reason' => get_class($e) . ': ' . $e->getMessage()]);
+        }
+
+        if ($result === null) return Response::json(['status' => 0, 'reason' => request('to') === 'user' ? 'sign in first' : 'no subscription matched - subscribe in step 1']);
+        return Response::json(['status' => 1, 'result' => $result]);
     }
 
     /**

@@ -3160,6 +3160,9 @@ PushNotification::toUser($user['id'])->send([
 ]);
 ```
 
+**See it running:** `/demo/push-notification` - subscribe the browser, then send to it, to
+yourself, to a topic or to everyone, and read the calls under each card.
+
 ### Setting it up
 
 **1. Generate a key pair** — once per application, and keep it out of the

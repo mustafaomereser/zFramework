@@ -56,7 +56,7 @@ if (!$up) {
 }
 
 test('pages answer without warnings', function () use ($request) {
-    foreach (['/' => 200, '/auth' => 200, '/demo' => 200, '/demo/pusher' => 200, '/no/such/page' => 404, '/language/tr' => 302] as $path => $expected) {
+    foreach (['/' => 200, '/auth' => 200, '/demo' => 200, '/demo/pusher' => 200, '/demo/push-notification' => 200, '/no/such/page' => 404, '/language/tr' => 302] as $path => $expected) {
         [$code, , $body] = $request($path);
         same($expected, $code, "GET $path");
         falsy(str_contains($body, 'Warning:'), "warning leaked into $path");

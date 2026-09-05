@@ -31,6 +31,8 @@ Route::middleware([App\Middlewares\Auth::class])->group(fn() => Route::post('/pu
 Route::get('/demo', [ExamplesController::class, 'index'])->name('examples');
 Route::get('/demo/pusher', [ExamplesController::class, 'pusher'])->name('pusher.examples');
 Route::post('/demo/pusher/send', [ExamplesController::class, 'pusherSend'])->name('pusher.examples.send');
+Route::get('/demo/push-notification', [ExamplesController::class, 'pushNotification'])->name('push-notification.examples');
+Route::post('/demo/push-notification/send', [ExamplesController::class, 'pushNotificationSend'])->name('push-notification.examples.send');
 
 # Five attempts per five minutes, per ip. A login form is the one place on a web
 # app worth limiting by default - everything else here is cheap to serve.

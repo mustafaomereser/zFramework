@@ -23,14 +23,15 @@
         </div>
 
         <div class="col-md-6 col-lg-4">
-            <div class="card zf-card h-100 zf-card-muted">
+            <a href="{{ route('push-notification.examples') }}" class="card zf-card h-100 text-decoration-none">
                 <div class="card-body">
                     <div class="zf-icon"><i class="fad fa-bell"></i></div>
                     <h5 class="card-title">Push notifications</h5>
-                    <p class="card-text text-secondary">Reach a user whose tab is closed. Needs a VAPID key pair - <code>php terminal push-notification keys app</code>.</p>
-                    <span class="badge text-bg-light border">README §21</span>
+                    <p class="card-text text-secondary">Reach a user whose tab is closed. Subscribe this browser, then send to it, to yourself, to a topic or to everyone - from the page or the terminal.</p>
+                    <span class="badge text-bg-light border">PushNotification::</span>
+                    <span class="badge text-bg-light border">push-notification.js</span>
                 </div>
-            </div>
+            </a>
         </div>
 
         <div class="col-md-6 col-lg-4">
