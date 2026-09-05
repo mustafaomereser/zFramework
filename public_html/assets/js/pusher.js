@@ -69,7 +69,7 @@
      * @param {string|null} app key in config `apps`; null is the server's default
      */
     function Handle(app) {
-        this.app = app;
+        this.name = app;
         this.connection = null;
     }
 
@@ -86,7 +86,7 @@
             return this.connection = (async () => {
                 await library();
 
-                const query  = this.app ? { app: this.app } : {};
+                const query  = this.name ? { app: this.name } : {};
                 const config = await getJson(settings.routes.config, query);
                 const params = Object.assign({ _token: settings.token || findToken() || config._token }, query);
 
