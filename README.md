@@ -2965,7 +2965,8 @@ framework is not what the request is waiting for.
 
 `bench run` measures one moment on demand. The **Profiling** module under
 `modules/` records what actual requests cost, one file per request under
-`analysis/profiling/`, and `/profiling` compares them.
+`analysis/profiling/`, and `/profiling` compares them (in the menu whenever the module is on;
+with `enabled` false it shows the old runs and says recording is off).
 
 ```php
 // config/framework.php

@@ -481,7 +481,7 @@ Skip a model entirely with `$model->ignoreAnalyze = true`.
 
 ## Profiling module
 
-`modules/Profiling` records real requests and serves them back at `/profiling`, grouped by URL.
+`modules/Profiling` records real requests and serves them back at `/profiling`, grouped by URL. The module puts `/profiling` in the menu whenever it is on; recording itself needs `framework.profiling.enabled` - off, the page says so and old runs stay readable.
 Disabling the module stops recording regardless of config.
 
 ```php

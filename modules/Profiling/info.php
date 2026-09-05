@@ -9,7 +9,7 @@ use zFramework\Core\Facades\Config;
 return [
     'status'            => true,
     'name'              => 'Profiling',
-    'description'       => 'Records what each request costs and compares runs. Needs framework.profiling.enabled.',
+    'description'       => 'Records what each request costs and compares runs. Recording needs framework.profiling.enabled; the report page is always in the menu.',
     'author'            => 'Mustafa',
     'created_at'        => '2026-08-01 00:00:00',
     'framework_version' => '3.0.0',
@@ -23,11 +23,12 @@ return [
      * answering.
      *
      * Recording still has to be switched on in config/framework.php - turning
-     * this module off stops it entirely, turning it on does not start it.
+     * this module off stops it entirely, turning it on does not start it. The
+     * menu entry does not depend on that: the report page is where the
+     * "recording is off" line is read, and existing runs stay comparable.
      */
     'callback' => function () {
-        if (!Config::framework('profiling.enabled')) return;
-        Recorder::begin();
+        if (Config::framework('profiling.enabled')) Recorder::begin();
         $GLOBALS['menu']['profiling'] = [
             'icon'  => 'fad fa-flask',
             'title' => 'Profiler',
