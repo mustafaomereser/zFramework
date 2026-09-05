@@ -57,7 +57,7 @@ commit it, never hand-write it.
     'previous'  => 10,       // earlier reports the page links to
     'callback'  => fn($log_path, $log) => ...,   // dies on CLI unless ZF_WORKER is defined
 ],
-'trusted-proxies' => [],       // addresses ip() will read a forwarded header from.
+'trusted-proxies' => ['127.0.0.1', '::1'],   // ip() and host() (scheme/host for asset()/route()) read forwarded headers only from these. Default: the machine itself - ngrok, a local nginx. Production: the real proxy; [] when served directly.
                                // Empty trusts none: REMOTE_ADDR and nothing else.
 'session' => [
     'driver'         => 'file',   // file | redis (redis for multi-server)

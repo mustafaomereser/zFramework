@@ -2009,7 +2009,7 @@ return [
     'route'    => ['caching' => true, 'auto-check' => false],
     'log'      => ['enabled' => true, 'level' => 'debug', 'days' => 14],
     'throttle' => ['enabled' => true, 'limit' => 60, 'window' => 60, 'by' => 'ip', 'block' => 0],
-    'trusted-proxies' => [],   // addresses ip() may read a forwarded header from
+    'trusted-proxies' => ['127.0.0.1', '::1'],   // ip()/host() read forwarded headers only from these; the machine itself by default (ngrok, a local nginx) - the real proxy in production
     'session'  => ['driver' => 'file', 'gc_probability' => 1],
     'response' => ['ajax' => ['include-alerts' => true], 'cache-ttl' => 600, 'page-cache' => true],
     'cache'    => ['apcu' => true],

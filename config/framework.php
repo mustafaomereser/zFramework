@@ -173,8 +173,15 @@ return [
      * counts as the proxy, so the whole site shares one bucket.
      *
      *   'trusted-proxies' => ['10.0.0.5'],
+     *
+     * The default trusts the machine itself: a tunnel like ngrok, or a local
+     * nginx in front of Apache, connects from 127.0.0.1 / ::1 and carries the
+     * visitor's scheme and host in X-Forwarded-*, and without this every asset()
+     * url on an https tunnel came out http (mixed content). Replace it with the
+     * real proxy's address in production, and make it [] on a box where some
+     * other local process could reach PHP with headers of its own.
      */
-    'trusted-proxies' => [],
+    'trusted-proxies' => ['127.0.0.1', '::1'],
 
     /**
      * Sessions.
