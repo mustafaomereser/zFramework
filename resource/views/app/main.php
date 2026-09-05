@@ -29,6 +29,9 @@ use zFramework\Core\Facades\Lang;
                     <a class="btn btn-sm border" href="/">
                         <i class="fad fa-home"></i> <?= _l('lang.home-page') ?>
                     </a>
+                    <a class="btn btn-sm border" href="<?= route('examples') ?>">
+                        <i class="fad fa-flask"></i> <?= _l('lang.examples') ?>
+                    </a>
                     <?php foreach ($GLOBALS['menu'] ?? [] as $module => $menu) : ?>
                         <a class="btn btn-sm border" href="<?= $menu['route'] ?>">
                             <i class="<?= $menu['icon'] ?>"></i> <?= $menu['title'] ?>

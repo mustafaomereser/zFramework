@@ -3344,6 +3344,12 @@ LivePusher.on('orders', 'created', order => addRow(order));
 </script>
 ```
 
+**See it running:** `/demo/pusher` on a fresh install - chat, ping, a server-fed
+progress bar, private and presence channels, each with its code. `/demo` lists the
+examples; `App/Controllers/ExamplesController.php` and `resource/views/app/pages/examples/`
+are theirs to delete. (The path is `/demo`, not `/examples`, because XAMPP proxies
+`/examples` to Tomcat.)
+
 No SDK on either side of the framework: the server talks to Pusher's REST API
 with a signed POST (that is all the official library does), and the page loads
 Pusher's own `pusher-js` from their CDN when it is not already there.

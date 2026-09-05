@@ -502,6 +502,8 @@ Endpoints (application side, `route/web.php`): `GET /pusher/config` (key + clust
 `POST /pusher/auth` (Auth middleware; policy in `App/Controllers/PusherController.php`). Both take
 `?app=`. Page helper: `public_html/assets/js/pusher.js` → `LivePusher.on(channel, event, fn)`,
 `.on(channel, {event: fn})`, `.off()`, `.socketId()`, `LivePusher.app('admin').on(…)`.
+Working demo: `/demo/pusher` (`App/Controllers/ExamplesController.php`, routes `examples`,
+`pusher.examples`, `pusher.examples.send`; the path is `/demo` because XAMPP proxies `/examples`).
 Usage: `references/recipes.md` §16 and README §22.
 
 ### AutoSSL, cPanel, Query Analyzer, RoadRunner

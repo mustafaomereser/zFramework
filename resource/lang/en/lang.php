@@ -2,6 +2,7 @@
 
 return [
     'home-page'      => 'Home Page',
+    'examples'      => 'Examples',
     'welcome'        => 'Welcome!',
     'languages'      => 'Languages',
     'current'        => 'Current',

@@ -2,6 +2,7 @@
 
 return [
     'home-page'      => 'Ana Sayfa',
+    'examples'      => 'Örnekler',
     'welcome'        => 'Hoş geldin!',
     'languages'      => 'Diller',
     'current'        => 'Mevcut',

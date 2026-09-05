@@ -6,6 +6,7 @@ use App\Controllers\WelcomeController;
 use App\Controllers\LanguageController;
 use App\Controllers\PushNotificationController;
 use App\Controllers\PusherController;
+use App\Controllers\ExamplesController;
 
 Route::get('/language/{lang}', [LanguageController::class, 'set'])->name('language');
 
@@ -24,6 +25,12 @@ Route::pre('/push-notification')->group(function () {
 # only, the policy is in the controller.
 Route::get('/pusher/config', [PusherController::class, 'config'])->name('pusher.config');
 Route::middleware([App\Middlewares\Auth::class])->group(fn() => Route::post('/pusher/auth', [PusherController::class, 'auth'])->name('pusher.auth'));
+
+# Working examples, linked from the welcome page. Delete these three lines with
+# ExamplesController and resource/views/app/pages/examples/ when not wanted.
+Route::get('/demo', [ExamplesController::class, 'index'])->name('examples');
+Route::get('/demo/pusher', [ExamplesController::class, 'pusher'])->name('pusher.examples');
+Route::post('/demo/pusher/send', [ExamplesController::class, 'pusherSend'])->name('pusher.examples.send');
 
 # Five attempts per five minutes, per ip. A login form is the one place on a web
 # app worth limiting by default - everything else here is cheap to serve.
