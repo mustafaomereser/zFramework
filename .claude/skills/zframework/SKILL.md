@@ -1,6 +1,6 @@
 ---
 name: zframework
-description: Use when working with zFramework, a self-written PHP framework (PHP >=8.1). It borrows Laravel's vocabulary and does NOT behave like Laravel - writing Laravel from memory produces broken code here (rows are arrays not objects, most Blade directives do not exist, Route::resource takes no options, the destroy method is called delete). Read this BEFORE writing any application code on top of it - scaffolding a project, adding routes/models/controllers/migrations/views, or answering "how do I do X here" - and check references/api.md for a signature rather than assuming. Triggers - zFramework, zFramework\Core, Route::, Abstracts\Model, php terminal make, resource/views, App/Controllers, modules/, migration, Auth::attempt, view(), Alerts::, AutoSSL, cPanel API, push notification, MongoModel, Mongo::, mongoconnections.php, PostgreSQL/pgsql, php terminal tests, tests/.
+description: Use when working with zFramework, a self-written PHP framework (PHP >=8.1). It borrows Laravel's vocabulary and does NOT behave like Laravel - writing Laravel from memory produces broken code here (rows are arrays not objects, most Blade directives do not exist, Route::resource takes no options, the destroy method is called delete). Read this BEFORE writing any application code on top of it - scaffolding a project, adding routes/models/controllers/migrations/views, or answering "how do I do X here" - and check references/api.md for a signature rather than assuming. Triggers - zFramework, zFramework\Core, Route::, Abstracts\Model, php terminal make, resource/views, App/Controllers, modules/, migration, Auth::attempt, view(), Alerts::, AutoSSL, cPanel API, push notification, Pusher::, pusher.js, Pusher Channels, MongoModel, Mongo::, mongoconnections.php, PostgreSQL/pgsql, php terminal tests, tests/.
 ---
 
 # zFramework Working Guide
@@ -68,7 +68,7 @@ And one that is not a mistake but a rule:
 
 ```
 App/            Controllers, Middlewares, Models, Observers, Providers, Requests   ← application code
-config/         app, framework, mail, model, languages, crypt, push-notification
+config/         app, framework, mail, model, languages, crypt, push-notification, pusher
 database/       connections.php, mongoconnections.php, migrations/, seeders/
 route/          web.php, api.php, dynamic/
 resource/       views/  (view('a.b') → resource/views/a/b.php), lang/{tr,en}/
@@ -113,6 +113,7 @@ README.md       107 KB full reference; section numbers below
 | Let's Encrypt certificates (http-01/dns-01, wildcard) | `AutoSSL` | §17 |
 | cPanel management (domains, dns, cron, db, mail, ssl) | `cPanel\*` | §18 |
 | Web push notifications (VAPID) | `PushNotification::` | §21 |
+| Live events to the open page (Pusher Channels, private/presence, several apps) | `Pusher::` + `assets/js/pusher.js` (`LivePusher`) | §22 |
 | MySQL backup/restore | `php terminal db backup/restore` | §14 |
 | Seeding | `database/seeders/` + `oncreateSeeder()` on a migration | §2.6 |
 | Query analysis (EXPLAIN, missing indexes) | `profiling.queryAnalyze`, `sqlDebug(true)` | §19 |

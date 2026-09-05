@@ -471,6 +471,39 @@ PushNotification::client(?string $app = null): array
 ```
 Usage: `references/recipes.md` → "Push notifications" and README §21.
 
+### Pusher — `zFramework\Core\Facades\Pusher`
+
+Pusher Channels (live events to the open page; not push notifications). Static calls are the
+default app's, `Pusher::app('admin')->…` another entry of `config/pusher.php` `apps`. The
+methods are protected on purpose and reached through `__callStatic`/`__call` - both spellings
+below work, an editor sees them via `@method`.
+
+```php
+Pusher::app(?string $app = null): static                 // InvalidArgumentException when not in config
+Pusher::available(): bool                                // app_id + key + secret present
+Pusher::config(): array                                  // the entry with defaults + shared dispatch/queue_name/timeout
+Pusher::endpoint(): string                               // https://api-{cluster}.pusher.com or the configured host
+Pusher::client(): array                                  // key, cluster (+ wsHost/forceTLS/… for a self-hosted server) - never the secret
+Pusher::trigger(string|array $channels, string $event, mixed $data = [], ?string $socketId = null): bool
+    // per config `dispatch`: defer (default, Defer::after) | queue (Jobs\SendPusherEvent) | inline
+    // false when the app has no credentials; InvalidArgumentException over Pusher's limits
+Pusher::triggerNow(string|array $channels, string $event, mixed $data = [], ?string $socketId = null): array
+    // ['ok' => bool, 'status' => int, 'body' => string, 'error' => ?string] - the HTTP call itself
+Pusher::authenticate(string $channel, string $socketId, ?array $user = null): array
+    // private-: ['auth']; presence-: + ['channel_data'] from $user['user_id'] (required) and ['user_info']
+    // RuntimeException when not configured (never signs with an empty secret)
+Pusher::webhook(string $body, string $key, string $signature): bool
+Pusher::get(string $path, array $query = []): array      // GET under /apps/{app_id}; + 'data' decoded
+Pusher::sign(string $method, string $path, string $body = '', array $query = [], ?int $timestamp = null): array
+```
+Limits refused before the request: 100 channels, 10 KB data, names `A-Za-z0-9_-=@,.;` ≤164, socket
+id `\d+\.\d+`. Data that is not a string is json-encoded once and travels as one string.
+Endpoints (application side, `route/web.php`): `GET /pusher/config` (key + cluster + `_token`),
+`POST /pusher/auth` (Auth middleware; policy in `App/Controllers/PusherController.php`). Both take
+`?app=`. Page helper: `public_html/assets/js/pusher.js` → `LivePusher.on(channel, event, fn)`,
+`.on(channel, {event: fn})`, `.off()`, `.socketId()`, `LivePusher.app('admin').on(…)`.
+Usage: `references/recipes.md` §16 and README §22.
+
 ### AutoSSL, cPanel, Query Analyzer, RoadRunner
 Signatures live in `references/infrastructure.md` — it covers ACME certificate issuance
 (http-01 and dns-01/wildcard), the eight cPanel classes, query analysis, the worker runtime and
@@ -535,6 +568,8 @@ php terminal queue work {queue}        php terminal queue size {queue}
 
 # Push
 php terminal push-notification keys {app} | test | send {app} --title= --body= --url= --user= --all
+php terminal pusher status {app}          # config/pusher.php entry + GET /channels against the API
+php terminal pusher test {app} {channel} {event}   # send one event now; `-` for the default app; defaults zf-test / ping
                               | subscribers {app} | prune {app} --failures=10
 
 # Security / release / server

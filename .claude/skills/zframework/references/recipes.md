@@ -552,3 +552,24 @@ php terminal tests run posts
 Plain PHP: `test('name', fn)` with `same()/truthy()/contains()/throws()`; DB work on `Test::db()`
 with `Test::table('x')` (= `zf_test_x`) tables dropped in `Test::cleanup()`. See `tests/db.php`
 and `tests/http.php` (a real `php -S` + curl round-trip) for the two shapes.
+
+## 16. Live updates on the open page (Pusher Channels)
+
+```php
+Pusher::trigger('orders', 'created', $order);                        // default app, sent after the response
+Pusher::trigger('orders', 'created', $order, request('socket_id')); // not back to the page that caused it
+Pusher::app('admin')->trigger('audit', 'login', ['who' => Auth::id()]);
+```
+
+```html
+<script src="/assets/js/pusher.js"></script>
+<script>
+LivePusher.on('orders', 'created', o => addRow(o));
+LivePusher.on('private-orders-<?= Auth::id() ?>', { shipped: fn });   // signed by /pusher/auth (Auth middleware)
+</script>
+```
+
+Credentials in `config/pusher.php` `apps`; `php terminal pusher status` and `pusher test` before
+blaming the page. Private/presence policy lives in `App/Controllers/PusherController.php::auth()`.
+Not to be confused with push notifications (`PushNotification::`, README §21), which reach a user
+whose tab is closed.

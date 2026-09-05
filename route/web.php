@@ -5,6 +5,7 @@ use zFramework\Core\Route;
 use App\Controllers\WelcomeController;
 use App\Controllers\LanguageController;
 use App\Controllers\PushNotificationController;
+use App\Controllers\PusherController;
 
 Route::get('/language/{lang}', [LanguageController::class, 'set'])->name('language');
 
@@ -17,6 +18,12 @@ Route::pre('/push-notification')->group(function () {
     Route::post('/subscribe', [PushNotificationController::class, 'subscribe'])->name('subscribe');
     Route::post('/unsubscribe', [PushNotificationController::class, 'unsubscribe'])->name('unsubscribe');
 });
+
+# Pusher Channels (config/pusher.php): the page reads the public key here, and
+# private-/presence- subscriptions are signed at /pusher/auth - signed-in users
+# only, the policy is in the controller.
+Route::get('/pusher/config', [PusherController::class, 'config'])->name('pusher.config');
+Route::middleware([App\Middlewares\Auth::class])->group(fn() => Route::post('/pusher/auth', [PusherController::class, 'auth'])->name('pusher.auth'));
 
 # Five attempts per five minutes, per ip. A login form is the one place on a web
 # app worth limiting by default - everything else here is cheap to serve.

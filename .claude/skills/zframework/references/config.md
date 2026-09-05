@@ -169,6 +169,29 @@ A subscription belongs to an **application key**, not to the installation — on
 several products and none can reach another's subscribers. Changing a key pair invalidates every
 subscription taken with the old one.
 
+## `config/pusher.php`
+
+```php
+'default'    => 'app',       // Pusher::trigger() is Pusher::app('app')->trigger()
+'dispatch'   => 'defer',     // defer (after the response) | queue (Jobs\SendPusherEvent, worker `queue work pusher`) | inline
+'queue_name' => 'pusher',
+'timeout'    => 5,           // seconds to wait for the API
+'apps' => [
+    'app' => [
+        'app_id'  => '',         // the four values from the app's Keys page at dashboard.pusher.com
+        'key'     => '',         // public by design - /pusher/config hands it to the page
+        'secret'  => '',         // signs every request and every private/presence answer; never reaches a page
+        'cluster' => 'eu',
+        'host'    => '',         // a self-hosted Soketi/pusher-compatible server; cluster is then ignored
+        'port'    => null,
+        'scheme'  => 'https',
+    ],
+],
+```
+Live events to the **open** page - not `push-notification.php`, which reaches a user whose tab is
+closed. An app with an empty credential makes `trigger()` a quiet false and `authenticate()` a
+RuntimeException. See README §22.
+
 ## `config/crypt.php`
 
 ```php

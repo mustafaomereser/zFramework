@@ -28,6 +28,7 @@
 | 🗓️ Cron scripts — one file per job, `cron/cron.php` boots it | ⬆️ Self-update — core only, config merged not overwritten |
 | 🚫 Throttle blocking — refuse a flood outright for N seconds | 🐘 PostgreSQL — same models, migrations in both dialects, one-round-trip inserts |
 | 🍃 MongoDB — `MongoModel`, relations that cross into SQL, atomic verbs | 🧪 Tests — `php terminal tests`, plain-PHP files, one process each, no PHPUnit |
+| 📡 Pusher Channels — live events to the open page, private/presence signing, no SDK | 🧩 Several Pusher apps side by side, self-hosted Soketi works, `assets/js/pusher.js` on the page |
 
 ---
 
@@ -122,6 +123,7 @@ replacement for it.
 - [19. Going to Production](#19-going-to-production)
 - [20. RoadRunner](#20-roadrunner)
 - [21. Push Notifications](#21-push-notifications)
+- [22. Pusher Channels](#22-pusher-channels)
 
 ---
 
@@ -2109,6 +2111,10 @@ php terminal security key --regen         # regenerate crypt key + salt
 php terminal push-notification keys app   # generate a VAPID key pair
 php terminal push-notification test       # check encryption against the RFC vectors
 
+# Pusher Channels
+php terminal pusher status                # config/pusher.php + does the API answer; `status admin` for another app
+php terminal pusher test                  # send `ping` to `zf-test` now; `test - orders created` picks channel/event
+
 # Release
 php terminal release make --name=v1.2 --minify
 
@@ -3318,3 +3324,142 @@ Web push is one implementation of
 message, validate one subscription, tell the client what it needs. An
 application that later wants FCM for its android build extends that class and
 names it in config; nothing in the call sites changes.
+
+## 22. Pusher Channels
+
+The page is open and something happened elsewhere — a new message, an order,
+a progress bar that should move. [Pusher Channels](https://pusher.com/channels)
+keeps a websocket from the browser to Pusher, and the server publishes into it.
+This is the other half of §21: push notifications reach a user who has left,
+Channels reach the one who is here. They sit side by side.
+
+```php
+Pusher::trigger('orders', 'created', ['id' => 812, 'total' => '49.90']);
+```
+
+```html
+<script src="/assets/js/pusher.js"></script>
+<script>
+LivePusher.on('orders', 'created', order => addRow(order));
+</script>
+```
+
+No SDK on either side of the framework: the server talks to Pusher's REST API
+with a signed POST (that is all the official library does), and the page loads
+Pusher's own `pusher-js` from their CDN when it is not already there.
+
+### Setting it up
+
+**1. Create a Channels app** at dashboard.pusher.com and paste its four values
+into `config/pusher.php`:
+
+```php
+'apps' => [
+    'app' => ['app_id' => '1234567', 'key' => '…', 'secret' => '…', 'cluster' => 'eu'],
+],
+```
+
+`secret` never reaches a page; `key` is public by design. Keep the file out of
+a public repository the way `config/crypt.php` is.
+
+**2. Check it:**
+
+```bash
+php terminal pusher status      # the API answers, or which of the four is wrong
+php terminal pusher test        # sends `ping` to `zf-test`; watch it arrive in the dashboard's Debug Console
+```
+
+**3. On the page** — `pusher.js` reads the key and cluster from
+`/pusher/config`, so nothing is pasted into javascript by hand:
+
+```js
+LivePusher.on('orders', 'created', order => ...);
+LivePusher.on('orders', { created: fn, cancelled: fn });   // several events at once
+LivePusher.off('orders');                                    // leave the channel
+```
+
+### Private and presence channels
+
+A channel named `private-…` or `presence-…` asks the server whether this
+socket may join. `/pusher/auth` answers, behind the Auth middleware, and the
+policy is in `App/Controllers/PusherController.php` — the default lets any
+signed-in user into any private channel, and the comment there shows where to
+narrow it:
+
+```php
+if (str_starts_with($channel, 'private-orders-') && !str_ends_with($channel, '-' . $user['id'])) abort(403);
+```
+
+Presence channels also carry who is in them. The controller sends `user_id`
+and a `user_info` with the user's name; the page gets the members:
+
+```js
+LivePusher.on('presence-room-4', {
+    'pusher:subscription_succeeded': members => members.each(m => show(m.info.name)),
+    'pusher:member_added':           m => show(m.info.name),
+    'pusher:member_removed':         m => hide(m.id),
+});
+```
+
+`pusher.js` posts the page's csrf token with the auth request; a page with no
+form on it gets the token from `/pusher/config` instead.
+
+### When the call is made
+
+`trigger()` never makes the visitor wait. `config/pusher.php` `dispatch`:
+
+| | | |
+|---|---|---|
+| `defer` (default) | after the response is sent, same process | nothing to run; lost if the process dies first |
+| `queue` | `Queue::push`, a worker sends it | survives the request; `php terminal queue work pusher` |
+| `inline` | right now | `trigger()` returns whether Pusher took it |
+
+`Pusher::triggerNow()` is always inline and returns `['ok', 'status', 'body', 'error']`.
+
+### Not echoing back to the sender
+
+The page that caused the event usually updated itself already. Pass its socket
+id and that connection is skipped:
+
+```js
+const socketId = await LivePusher.socketId();   // send it with the form
+```
+```php
+Pusher::trigger('orders', 'created', $order, request('socket_id'));
+```
+
+### Several apps
+
+One entry per product in `apps`; `Pusher::app('admin')->trigger(…)` picks one,
+the static call is the `default`. On the page `LivePusher.app('admin').on(…)`
+does the same, and both endpoints take `?app=admin`.
+
+### Self-hosted
+
+[Soketi](https://docs.soketi.app) and other pusher-compatible servers speak the
+same protocol. Put the server in the app's `host`, `port` and `scheme`; the
+cluster is then ignored, and `/pusher/config` tells `pusher-js` where to
+connect.
+
+### Webhooks
+
+Pusher can POST to you when a channel becomes occupied or a member joins.
+Verify the body before trusting it:
+
+```php
+if (!Pusher::webhook(file_get_contents('php://input'), $_SERVER['HTTP_X_PUSHER_KEY'], $_SERVER['HTTP_X_PUSHER_SIGNATURE'])) abort(403);
+```
+
+### What can go wrong
+
+- **`trigger()` returns false and nothing arrives**: the app has no
+  credentials. It is a quiet false on purpose, so the call site is the same on
+  a machine without an account; `pusher status` says which value is empty.
+- **HTTP 401 from the API** is the key or secret; **404** is the app_id or the
+  cluster. `pusher status` prints both.
+- **The page connects but `private-…` fails with 403**: the controller's policy
+  refused it, or the request had no csrf token — the auth endpoint is a POST
+  like every other one.
+- **Limits**: 100 channels per trigger, 10 KB of data per event, channel names
+  from `A-Za-z0-9_-=@,.;`. All refused before the request goes out, with the
+  reason, as an `InvalidArgumentException`.
