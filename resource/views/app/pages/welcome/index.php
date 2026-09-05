@@ -53,7 +53,37 @@
 
 @section('footer')
 <script>
+    // Command history like a shell: up/down walk it, a half-typed line is kept
+    // while browsing, and it survives a reload (localStorage, last 50).
+    (() => {
+        const input = document.querySelector('[name="command"]');
+        const key   = 'zf-terminal-history';
+        let history = [], cursor = 0, draft = '';
+        try { history = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) {}
+        cursor = history.length;
+
+        window.terminalHistory = command => {
+            command = command.trim();
+            if (!command) return;
+            if (history[history.length - 1] !== command) history.push(command);
+            history = history.slice(-50);
+            cursor  = history.length;
+            draft   = '';
+            try { localStorage.setItem(key, JSON.stringify(history)); } catch (e) {}
+        };
+
+        input.addEventListener('keydown', e => {
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+            e.preventDefault();
+            if (cursor === history.length) draft = input.value;
+            cursor = e.key === 'ArrowUp' ? Math.max(0, cursor - 1) : Math.min(history.length, cursor + 1);
+            input.value = cursor === history.length ? draft : history[cursor];
+            input.setSelectionRange(input.value.length, input.value.length);
+        });
+    })();
+
     $('#terminal-form').sbmt((form, btn) => {
+        terminalHistory($('[name="command"]').val());
         $('[name="command"]').attr('disabled', 'true').addClass('disabled');
         $('#terminal-body').html(`<div class="d-flex align-items-center justify-content-center h-100 w-100"><div><i class="fa fa-spin fa-spinner me-2"></i> <?= _l('lang.loading') ?></div></div>`);
         $.post('<?= route("store") ?>', $.core.SToA(form), e => ($('[name="command"]').removeAttr('disabled').removeClass('disabled').val(null).focus(), $('#terminal-body').html(String(e).replace(/^(\s|<br\s*\/?>)+/i, '')).scrollTop(99999999999))).error_callback = e => $('#terminal-body').html(JSON.parse(e.responseText).message);
