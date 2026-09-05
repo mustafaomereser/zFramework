@@ -114,6 +114,7 @@ README.md       107 KB full reference; section numbers below
 | cPanel management (domains, dns, cron, db, mail, ssl) | `cPanel\*` | §18 |
 | Web push notifications (VAPID) | `PushNotification::` | §21 |
 | Live events to the open page (Pusher Channels, private/presence, several apps) | `Pusher::` + `assets/js/pusher.js` (`LivePusher`) | §22 |
+| Working demos of Pusher and push notifications, with their code on the page | `/demo`, `/demo/pusher`, `/demo/push-notification` (`App/Controllers/ExamplesController.php`, deletable) | §21, §22 |
 | MySQL backup/restore | `php terminal db backup/restore` | §14 |
 | Seeding | `database/seeders/` + `oncreateSeeder()` on a migration | §2.6 |
 | Query analysis (EXPLAIN, missing indexes) | `profiling.queryAnalyze`, `sqlDebug(true)` | §19 |

@@ -570,6 +570,7 @@ LivePusher.on('private-orders-<?= Auth::id() ?>', { shipped: fn });   // signed 
 ```
 
 Credentials in `config/pusher.php` `apps`; `php terminal pusher status` and `pusher test` before
-blaming the page. Private/presence policy lives in `App/Controllers/PusherController.php::auth()`.
+blaming the page. `/demo/pusher` runs chat/ping/progress/private/presence with the code under each;
+`/demo/push-notification` does the same for push (subscribe, then send to browser/user/topic/all). Private/presence policy lives in `App/Controllers/PusherController.php::auth()`.
 Not to be confused with push notifications (`PushNotification::`, README §21), which reach a user
 whose tab is closed.
