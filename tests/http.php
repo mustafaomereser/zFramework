@@ -93,6 +93,53 @@ test('seeded admin signs in and stays signed in', function () use ($request) {
     contains('admin', $page, 'the next request must already be signed in');
 });
 
+test('remember-me: auth-stay-in alone signs back in, a half-expired pair does not', function () use ($request, $port) {
+    # Cookie names are the encrypted key; the values come from the sign-in above.
+    $name = fn(string $key) => \zFramework\Core\Facades\Cookie::keyparse($key);
+    $raw  = function (string $path, array $cookies) use ($port): array {
+        $ch = curl_init("http://127.0.0.1:$port$path");
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_TIMEOUT => 10, CURLOPT_COOKIE => implode('; ', array_map(fn($k, $v) => "$k=$v", array_keys($cookies), $cookies))]);
+        $out  = curl_exec($ch);
+        $info = curl_getinfo($ch);
+        curl_close($ch);
+        return [$info['http_code'], substr((string) $out, 0, $info['header_size']), substr((string) $out, $info['header_size'])];
+    };
+
+    $request('/sign-out'); # the jar is signed in from the test above; attempt() refuses a second sign-in
+    [, , $body] = $request('/auth');
+    preg_match("/_token' value='([^']+)'/", $body, $m);
+    [$code, $headers, $json] = $request('/sign-in', "_token={$m[1]}&email=admin@localhost.com&password=admin&keep-logged-in=1");
+    if ($code === 302 || !str_contains((string) $json, '"status":1')) skip('no seeded admin user on this database (`db migrate --seed`)');
+
+    $issued = [];
+    preg_match_all('/^Set-Cookie: ([^=]+)=([^;]*)(.*)$/mi', $headers, $all, PREG_SET_ORDER);
+    foreach ($all as $c) $issued[$c[1]] = ['value' => $c[2], 'attrs' => $c[3]];
+    foreach (['auth-token', 'auth-password', 'auth-stay-in'] as $key) truthy(isset($issued[$name($key)]), "$key was not issued at sign-in");
+
+    preg_match('/Max-Age=(\d+)/', $issued[$name('auth-token')]['attrs'], $day);
+    preg_match('/Max-Age=(\d+)/', $issued[$name('auth-stay-in')]['attrs'], $long);
+    same(86400, (int) ($day[1] ?? 0), 'auth-token lives a day');
+    truthy((int) ($long[1] ?? 0) > 86400 * 365, 'auth-stay-in outlives it by far');
+
+    # A day later: auth-token and auth-password are gone, only auth-stay-in is presented.
+    [$code, $headers, $page] = $raw('/auth-content', [$name('auth-stay-in') => $issued[$name('auth-stay-in')]['value']]);
+    same(200, $code);
+    contains('admin', $page, 'the remember-me cookie alone must sign back in');
+    contains('Set-Cookie: ' . $name('auth-token') . '=', $headers, 'and a fresh auth-token is issued with it');
+
+    # auth-token without auth-password is a broken pair: the session ends and the remember-me cookie goes with it.
+    [$code, $headers, $page] = $raw('/auth-content', [$name('auth-token') => $issued[$name('auth-token')]['value'], $name('auth-stay-in') => $issued[$name('auth-stay-in')]['value']]);
+    same(200, $code);
+    falsy(str_contains($page, 'admin'), 'a token without its password cookie is not a session');
+    truthy(preg_match('/^Set-Cookie: ' . preg_quote($name('auth-stay-in'), '/') . '=[^\r\n]*Max-Age=0/mi', $headers), 'auth-stay-in is dropped with it');
+
+    # Garbage in the cookie is a guest, not an error.
+    [$code, , $page] = $raw('/auth-content', [$name('auth-stay-in') => 'garbage']);
+    same(200, $code);
+    falsy(str_contains($page, 'admin'));
+    falsy(str_contains($page, 'Warning:'));
+});
+
 test('json is answered as json', function () use ($request) {
     [$code, $headers] = $request('/no/such/page', null, ['Accept: application/json']);
     same(404, $code);
