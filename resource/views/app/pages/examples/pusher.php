@@ -172,10 +172,22 @@ LivePusher.on('private-examples-user-<?= $userId ?? 'ID' ?>', 'note', n => show(
         return j;
     };
 
-    // Connection state, for the badge.
-    const pusher = await LivePusher.connect();
-    const conn   = document.getElementById('conn');
+    // The form must never fall through to a plain GET, connected or not.
+    document.getElementById('chat-form').addEventListener('submit', e => e.preventDefault());
+
+    // Connection state, for the badge. A failure here (no config, a blocked
+    // CDN, a wrong cluster) is said on the badge and the page stays usable.
+    const conn = document.getElementById('conn');
+    let pusher;
+    try {
+        pusher = await LivePusher.connect();
+    } catch (error) {
+        conn.textContent = 'failed: ' + error.message;
+        conn.className   = 'badge text-bg-danger';
+        return;
+    }
     pusher.connection.bind('state_change', s => { conn.textContent = s.current; conn.className = 'badge ' + (s.current === 'connected' ? 'text-bg-success' : 'text-bg-secondary'); });
+    pusher.connection.bind('error', e => { conn.textContent = 'error: ' + (e.error && e.error.data && e.error.data.message || e.type || 'connection'); conn.className = 'badge text-bg-danger'; });
     document.getElementById('socket').textContent = await LivePusher.socketId();
 
     // 1. Chat
