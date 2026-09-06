@@ -55,7 +55,8 @@ commit it, never hand-write it.
     'mask'      => [],       // key names shown as •••••• — empty means nothing is hidden;
                              //   substring match on the key, everywhere in the report
     'previous'  => 10,       // earlier reports the page links to
-    'callback'  => fn($log_path, $log) => ...,   // dies on CLI unless ZF_WORKER is defined
+    'callback'  => [App\Services\ErrorLog::class, 'handle'],   // ErrorLog::handle(string $path, string $html) after the report is written;
+                             //   the shipped one dies on CLI (not ZF_WORKER) printing the path - add Slack/Sentry/mail there
 ],
 'trusted-proxies' => ['127.0.0.1', '::1'],   // ip() and host() (scheme/host for asset()/route()) read forwarded headers only from these. Default: the machine itself - ngrok, a local nginx. Production: the real proxy; [] when served directly.
                                // Empty trusts none: REMOTE_ADDR and nothing else.

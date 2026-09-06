@@ -52,11 +52,10 @@ return [
         'mask'      => [],
         'previous'  => 10,
 
-        'callback' => function ($log_path, $log) {
-            # ZF_WORKER: a long-running HTTP worker also runs under the CLI SAPI, and
-            # die() there would kill the worker rather than end the request.
-            if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) die(zFramework\Kernel\Terminal::text("[color=red]-> report written to[/color][color=green] $log_path [/color]"));
-        },
+        # Called with ($path, $html) after the report is written and the visitor
+        # answered. A class rather than a closure here, so this file stays plain
+        # data and the "tell someone" code lives with the application, testable.
+        'callback' => [App\Services\ErrorLog::class, 'handle'],
     ],
 
     /**

@@ -67,7 +67,7 @@ And one that is not a mistake but a rule:
 ## Directory map
 
 ```
-App/            Controllers, Middlewares, Models, Observers, Providers, Requests   ← application code
+App/            Controllers, Middlewares, Models, Observers, Providers, Requests, Services (ErrorLog)   ← application code
 config/         app, framework, mail, model, languages, crypt, push-notification, pusher
 database/       connections.php, mongoconnections.php, migrations/, seeders/
 route/          web.php, api.php, dynamic/

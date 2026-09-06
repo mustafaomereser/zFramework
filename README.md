@@ -2001,7 +2001,7 @@ return [
 ```php
 return [
     'debug'        => true,    // the one switch: error page, query log, analyzer, unminified compile
-    'error'        => ['logging' => true, 'keep_days' => 14, 'stream' => false, 'mask' => [], 'previous' => 10, 'callback' => fn($path, $html) => null],
+    'error'        => ['logging' => true, 'keep_days' => 14, 'stream' => false, 'mask' => [], 'previous' => 10, 'callback' => [App\Services\ErrorLog::class, 'handle']],   // ErrorLog::handle($path, $html) after the report is written - Slack/Sentry/mail go there
     'force-https'  => false,   // redirect http → https
     'x-powered-by' => true,    // false hides the header
     'pagination'   => ['default-view' => 'layouts.pagination.default'],
