@@ -95,6 +95,34 @@ class Config
     }
 
     /**
+     * Class properties, not function statics: those were invisible to
+     * clearCache() and to `state check`, so Config::set('framework', ...) - or
+     * a worker outliving an edit - kept answering the old value forever.
+     */
+    private static ?bool $debugCache = null;
+    private static ?array $frameworkCache = null;
+
+    /**
+     * Whether the application runs with debugging on.
+     *
+     * framework.debug is the switch (config/framework.php); app.debug is read
+     * only for an application that has not moved it yet. One place, because a
+     * dozen call sites each reading a config key is how a moved key gets missed
+     * by one of them.
+     *
+     * @return bool
+     */
+    public static function debug(): bool
+    {
+        if (self::$debugCache !== null) return self::$debugCache;
+
+        $value = self::framework('debug');
+        if ($value === null) $value = self::get('app.debug');
+
+        return self::$debugCache = is_scalar($value) && (bool) $value;
+    }
+
+    /**
      * Read a framework setting from config/framework.php.
      *
      *   Config::framework('view.caching')
@@ -110,33 +138,6 @@ class Config
      * @param string $key Dotted path, starting with the subject.
      * @return mixed
      */
-    /**
-     * Whether the application runs with debugging on.
-     *
-     * framework.debug, or app.debug for an application that has not moved it.
-     * One place, because a dozen call sites each reading a config key is how a
-     * moved key gets missed by one of them.
-     *
-     * @return bool
-     */
-    /**
-     * Class properties, not function statics: those were invisible to
-     * clearCache() and to `state check`, so Config::set('framework', ...) - or
-     * a worker outliving an edit - kept answering the old value forever.
-     */
-    private static ?bool $debugCache = null;
-    private static ?array $frameworkCache = null;
-
-    public static function debug(): bool
-    {
-        if (self::$debugCache !== null) return self::$debugCache;
-
-        $value = self::framework('debug');
-        if ($value === null) $value = self::get('app.debug');
-
-        return self::$debugCache = is_scalar($value) && (bool) $value;
-    }
-
     public static function framework(string $key): mixed
     {
         # bootstrap.php already read config/framework.php and left it here, so
