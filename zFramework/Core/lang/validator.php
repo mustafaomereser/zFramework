@@ -9,7 +9,6 @@
 return [
     'errors' => [
         'required'  => 'is required.',
-        'nullable'  => 'cannot be both required and nullable.',
         'email'     => 'must be a valid e-mail address.',
         'type'      => 'is {now-type}, but must be {must-type}.',
         'max'       => 'is {now-val}, but may be at most {max-val}.',

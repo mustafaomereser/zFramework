@@ -122,7 +122,9 @@ class Terminal
 
     public static function do()
     {
-        self::clear();
+        # Not for `update --report`, which runs inside an update that is already
+        # printing: clearing there pushed the first half of its output off screen.
+        if (!isset(self::$parameters['--report'])) self::clear();
 
         # `push-notification` is the class PushNotification.
         $command = strtolower(self::$commands[0] ?? '');
