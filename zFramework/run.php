@@ -123,10 +123,64 @@ class Run
         self::$dumpStyled = false;
     }
 
+    /**
+     * Whether initProviders() has run in this process.
+     */
+    private static bool $providersLoaded = false;
+
+    /**
+     * Instantiate every App/Providers class, once per process.
+     *
+     * Once, because more than one path reaches it outside a request - a terminal
+     * command building the route table, then a view rendered by the same command
+     * - and a provider registering binds or listeners twice doubles them.
+     *
+     * @return self
+     */
     public static function initProviders()
     {
+        if (self::$providersLoaded) return new self();
+        self::$providersLoaded = true;
+
         foreach (glob(BASE_PATH . "/App/Providers/*.php") as $provider) new ($provider = str_replace("/", "\\", str_replace([BASE_PATH . '/', '.php'], '', $provider)));
         return new self();
+    }
+
+    /**
+     * The view engine's settings: where templates and their compiled cache live,
+     * then config/framework.php's `view` block.
+     *
+     * @return array
+     */
+    public static function viewSettings(): array
+    {
+        return [
+            'caches' => FRAMEWORK_PATH . '/storage/views',
+            'dir'    => BASE_PATH . '/resource/views',
+            'suffix' => ''
+        ] + (array) Config::framework('view');
+    }
+
+    /**
+     * What view() needs outside a request: its settings and the providers that
+     * register binds and directives.
+     *
+     * boot() does this for a request. A terminal command, a scheduled task, a
+     * queue job or a cron script never boots, so a view() there rendered with no
+     * template directory and none of the binds - a reminder mail from the
+     * scheduler could not be rendered at all. View calls this itself the first
+     * time it renders unconfigured; nothing needs to call it by hand.
+     *
+     * Directives registered from a middleware (App/Middlewares/ViewDirectives)
+     * are not covered: middlewares belong to requests. Register those that a
+     * mail template uses from a provider.
+     *
+     * @return void
+     */
+    public static function bootViews(): void
+    {
+        if (empty(\zFramework\Core\View::$config)) \zFramework\Core\View::setSettings(self::viewSettings());
+        self::initProviders();
     }
 
     public static function findModules(string $path)
@@ -245,12 +299,7 @@ class Run
             self::includer(FRAMEWORK_PATH . '/modules', false);
             self::includer(FRAMEWORK_PATH . '/modules/error_handlers/loader.php');
 
-            \zFramework\Core\View::setSettings([
-                'caches'  => "$storage_path/views",
-                'dir'     => BASE_PATH . '/resource/views',
-                'suffix'  => ''
-            ] + (array) Config::framework('view'));
-            #
+            \zFramework\Core\View::setSettings(self::viewSettings());
 
             # Before the route files, as it always was: a global middleware may set
             # up state the route definitions depend on - resolving a tenant and

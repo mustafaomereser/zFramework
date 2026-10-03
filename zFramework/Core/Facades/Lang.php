@@ -69,7 +69,24 @@ class Lang
      */
     public static function currentLocale(): string
     {
+        self::ensureLocale();
         return self::$locale;
+    }
+
+    /**
+     * Fall back to app.lang when nothing chose a locale.
+     *
+     * The Language middleware chooses one per request. A terminal command, a
+     * scheduled task or a cron script runs no middleware, so currentLocale()
+     * threw a TypeError and every get() came back null - a scheduled mail
+     * rendered without a single translated string. No cookie is written: there is
+     * no visitor to remember it for.
+     *
+     * @return void
+     */
+    private static function ensureLocale(): void
+    {
+        if (self::$locale === null || self::$path === null) self::locale(null, false);
     }
 
     /**
@@ -80,6 +97,8 @@ class Lang
      */
     public static function get(string $_name, array $data = [])
     {
+        self::ensureLocale();
+
         $name = explode('.', $_name);
         $lang = self::$path . "/" . $name[0] . ".php";
         if (!is_file($lang)) return null;

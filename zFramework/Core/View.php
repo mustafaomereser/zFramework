@@ -282,6 +282,9 @@ class View
      */
     public static function view(string $view_name, array $data = [])
     {
+        # Outside a request nothing has configured the engine yet; see Run::bootViews().
+        if (!self::$config) \zFramework\Run::bootViews();
+
         # Views nest - a layout renders a page, pagination renders its own view -
         # so only the outermost call is timed. Timing each would report the same
         # milliseconds several times over.

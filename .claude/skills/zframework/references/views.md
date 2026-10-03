@@ -321,6 +321,13 @@ segment is the directory name, capitalised: `blog.views…` resolves on Windows 
 
 `view()` returns the rendered markup as a string — that is how mail bodies are built.
 
+**Outside a request too.** A terminal command, a `schedule/` task, a queue job or a `cron/`
+script never boots, so the first `view()` there calls `Run::bootViews()` itself: view settings
+from `config/framework.php` + every `App/Providers` class (once per process, `initProviders()`
+is idempotent). `Lang` falls back to `app.lang` when no middleware chose a locale, so `_l()`
+works in a scheduled mail. Not covered: directives registered from a *middleware*
+(`App/Middlewares/ViewDirectives`) — a directive a mail template uses belongs in a provider.
+
 Data is `extract()`ed into the template. To inject data into a layout on every render without
 threading it through every controller:
 
