@@ -314,6 +314,15 @@ replaced: `bootstrap.php`, `run.php`, `Core/`, `Kernel/`, `modules/`.
 - `resource/lang/<locale>/<file>.php lacks N key(s) the core reads: …` — add them to that
   locale (`errors.*`, `validator.errors.*`). Until then `Lang::get()` answers those keys from the
   core's English copy in `zFramework/Core/lang/`, so nothing is blank - but it is English.
+- `composer.json: this version requires <pkg> <constraint> (missing|yours: …)` — only the core's
+  `require` is compared; the application's own packages never trigger it.
+- `<key> stays decided by app.php (null here …)` / `kept <key> = … here` — `debug` and
+  `force-https` are never moved with their value: the old file keeps it, the new one gets `null`
+  (which defers). Do not 'fix' that by copying the value over unless the user says `app.php` is
+  not kept per environment.
+
+These lines come from the new core: `update` runs `update --report=<extracted release>` in a
+fresh process after the swap. `--report` is internal; it reads a release already on disk.
 
 **`zFramework/vendor/` and `zFramework/storage/` are never touched.** Neither is in the
 repository, so replacing `zFramework/` wholesale would delete composer's packages and every
