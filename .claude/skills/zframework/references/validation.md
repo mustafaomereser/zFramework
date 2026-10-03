@@ -167,6 +167,9 @@ Behaviour that is not obvious:
   `str_repeat('x', 150)` and also rejects the number `150`, and accepts `80`. Declare the type
   when the input is ambiguous — a numeric string is auto-detected as a number, so `'150'` is
   compared as 150, not as 3 characters. `type:string` forces the other reading.
+  **Any field whose length matters needs `type:string`**: `'password' => ['required', 'min:8']`
+  accepts `"12345"` (12345 ≥ 8), and `'title' => ['max:30']` refuses `"2024"`. Write
+  `['required', 'type:string', 'min:8']`.
 - **Every rule except `required` passes on an empty value.** `email`, `min`, `max`, `type` all
   begin with `if (!strlen($value)) return true;`. That is what makes `['nullable', 'email']`
   mean "optional, but a valid address if present".

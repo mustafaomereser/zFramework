@@ -44,6 +44,12 @@ test('types and bounds still hold for scalars', function () use ($passes) {
     truthy($passes(['s' => 'abc'], ['s' => ['regex:"^a.c$"']]));
 });
 
+test('an all-digit value is a number unless type:string says otherwise', function () use ($passes) {
+    truthy($passes(['p' => '12345'], ['p' => ['required', 'min:8']]), 'untyped: 12345 >= 8 - the documented behaviour');
+    falsy($passes(['p' => '12345'], ['p' => ['required', 'type:string', 'min:8']]), 'type:string measures five characters');
+    truthy($passes(['t' => '2024'], ['t' => ['type:string', 'max:30']]));
+});
+
 test('an unknown rule is a loud error, not a silent pass', function () {
     throws(\Exception::class, fn() => Validator::validate(['x' => '1'], ['x' => ['no-such-rule']]));
 });

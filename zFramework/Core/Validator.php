@@ -153,9 +153,14 @@ class Validator
         };
 
         # What min/max measure. A declared type wins: `type:string` on "150" asks
-        # for three characters, `type:integer` asks for the number 150. Detection
-        # only decides when nothing was declared - every value off a form is a
-        # string, so "150" would otherwise always be read as a number.
+        # for three characters, `type:integer` asks for the number 150.
+        #
+        # Undeclared, an all-digit value is measured as a number - as it has been
+        # since before the rule classes. Every value off a form is a string, so
+        # this is what lets `'qty' => ['min:1', 'max:10']` work untyped; it is also
+        # why `'password' => ['min:8']` lets "12345" through (12345 >= 8) and
+        # `'title' => ['max:30']` refuses "2024". A field whose length matters
+        # declares `type:string`.
         $type = $declared ?? $detected;
 
         $length = match ($type) {
