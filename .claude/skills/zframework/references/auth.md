@@ -6,7 +6,9 @@
 
 ```php
 Auth::attempt(array $fields = [], bool $staymein = false): bool
-Auth::login(array $user): bool          // $user must contain id (and the password column)
+Auth::login(array $user, bool $staymein = false): bool
+    // $user must contain id (and the password column). staymein writes auth-stay-in like attempt();
+    // never build that cookie yourself - its format is private. Missing api_token/password are fetched by id.
 Auth::token_login(string $token): bool  // by the api_token column
 Auth::check(): bool
 Auth::user()                            // array, or false when nobody is logged in

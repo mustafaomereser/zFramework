@@ -160,6 +160,23 @@ test('remember-me: auth-stay-in alone signs back in, a half-expired pair does no
     falsy(str_contains($page, 'Warning:'));
 });
 
+test('Auth::login() can issue the remember-me cookie itself', function () {
+    # In-process: an application that checks the password itself and then logs in.
+    $user = \zFramework\Core\Facades\Auth::model()->select('id, email')->where('email', 'admin@localhost.com')->first();
+    if (!$user) skip('no seeded admin user on this database (`db migrate --seed`)');
+
+    $cookie = \zFramework\Core\Facades\Cookie::keyparse('auth-stay-in');
+    unset($_COOKIE[$cookie]);
+    Test::cleanup(fn() => \zFramework\Core\Facades\Auth::logout());
+
+    truthy(\zFramework\Core\Facades\Auth::login($user + ['password' => 'x']));
+    falsy(isset($_COOKIE[$cookie]), 'remember-me is opt-in');
+
+    truthy(\zFramework\Core\Facades\Auth::login($user, true), 'api_token and the password column are fetched when the row lacks them');
+    truthy(isset($_COOKIE[$cookie]), 'staymein wrote no auth-stay-in');
+    contains('|', \zFramework\Core\Crypter::decode($_COOKIE[$cookie]), 'the same token|trace format attempt() writes');
+});
+
 test('json is answered as json', function () use ($request) {
     [$code, $headers] = $request('/no/such/page', null, ['Accept: application/json']);
     same(404, $code);

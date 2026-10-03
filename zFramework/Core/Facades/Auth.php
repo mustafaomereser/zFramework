@@ -236,12 +236,21 @@ class Auth
 
     /**
      * Login from a User model result array.
-     * @param array $user
+     *
+     * $staymein issues the remember-me cookie, as attempt() does. An application
+     * that verifies the password itself - a legacy hash format, an external
+     * check - had no way to ask for it other than copying the cookie's private
+     * format, which would break silently the day the format changed.
+     *
+     * @param array $user     id and the password column; api_token is looked up when missing.
+     * @param bool  $staymein
      * @return bool
      */
-    public static function login(array $user): bool
+    public static function login(array $user, bool $staymein = false): bool
     {
         if (!isset($user['id'])) return false;
+
+        if ($staymein) $user = self::remember($user);
 
         if (self::tokenMode()) {
             $token = bin2hex(random_bytes(32));
@@ -261,6 +270,21 @@ class Auth
         self::store('auth-password', $user[self::columns()['password']]);
         self::store('auth-token', (string) $user['id']);
         return true;
+    }
+
+    /**
+     * Write the remember-me cookie for a user.
+     *
+     * @param array $user id, password column, api_token (fetched by id when absent)
+     * @return array $user with what had to be fetched filled in
+     */
+    private static function remember(array $user): array
+    {
+        $password = self::columns()['password'];
+        if (!isset($user['api_token'], $user[$password])) $user += (array) self::model()->select('api_token, ' . $password)->where('id', $user['id'])->first();
+        if (!empty($user['api_token'])) self::store('auth-stay-in', $user['api_token'] . '|' . self::passwordTrace($user[$password] ?? ''), time() * 2);
+
+        return $user;
     }
 
     /**
@@ -412,8 +436,7 @@ class Auth
         if (!@$user['id'] || ($plain !== null && !$valid)) return false;
 
         if (@$user['id']) {
-            self::login($user);
-            if ($staymein) self::store('auth-stay-in', $user['api_token'] . '|' . self::passwordTrace($user[self::columns()['password']] ?? ''), time() * 2);
+            self::login($user, $staymein);
             return true;
         }
 

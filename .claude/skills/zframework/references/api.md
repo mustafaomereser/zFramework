@@ -236,7 +236,7 @@ middleware are in `references/auth.md`.** Signatures here; behaviour there.
 
 ```php
 Auth::attempt(array $fields = [], bool $staymein = false): bool
-Auth::login(array $user): bool          Auth::token_login(string $token): bool
+Auth::login(array $user, bool $staymein = false): bool   Auth::token_login(string $token): bool
 Auth::check(): bool                     Auth::user()
 Auth::id(): ?int                        Auth::logout(): bool
 Auth::model(): User                     Auth::encodePassword(?string $plain)

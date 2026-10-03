@@ -590,8 +590,9 @@ Auth::attempt(['email' => 'user@example.com', 'password' => 'secret'], staymein:
 // staymein: true sets a persistent cookie (auth-stay-in): the user's api_token plus a
 // trace of the password hash, so the cookie stops working when the password changes
 
-// Login directly from a user row (e.g. after OAuth)
+// Login directly from a user row (e.g. after OAuth, or a password you verified yourself)
 Auth::login($userRow);
+Auth::login($userRow, staymein: true);   // same remember-me cookie attempt() writes; api_token fetched if the row lacks it
 
 // Login via api_token value
 Auth::token_login('api_token_string');
