@@ -1,6 +1,6 @@
 <?php
 define('FRAMEWORK_PATH', __DIR__);
-define('FRAMEWORK_VERSION', '3.2.0');
+define('FRAMEWORK_VERSION', '3.3.0');
 $app_config = include(BASE_PATH . "/config/app.php");
 
 // Read once, here, because two of its keys decide headers that go out before
