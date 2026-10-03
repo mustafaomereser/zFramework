@@ -373,6 +373,12 @@ class Run
             self::$bootIndex    = \zFramework\Core\Route::currentIndex();
             self::$bootIncluded = count(self::$included);
         } catch (\zFramework\Core\ResponseSignal $signal) {
+            # A worker boots before any request exists: there is nobody to answer,
+            # and the table left half-built would turn every later request into a
+            # quiet 404. Stop the worker loudly instead - something at boot decided
+            # per request, which a booted-once server cannot honour.
+            if (defined('ZF_WORKER')) throw new \LogicException('abort()/redirect() while a worker was booting - a global middleware or a route file decides per request; move it into Route::middleware()->group().', 0, $signal);
+
             self::$bootSignal = $signal;
         } catch (\Throwable $errorHandle) {
             errorHandler($errorHandle);
@@ -508,7 +514,7 @@ class Run
             try {
                 errorHandler($errorHandle);
             } catch (\zFramework\Core\ResponseSignal $signal) {
-                $signal->send();
+                self::sendSignal($signal);
             }
         }
 

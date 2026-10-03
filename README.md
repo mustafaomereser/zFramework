@@ -1545,7 +1545,8 @@ Two things to know before relying on this:
   standalone check runs while booting, like the global middlewares in
   `App/Middlewares/autoload.php`. An `abort()`/`redirect()` there is sent as that request's
   response. It only holds under FPM without a route cache — a cached table never re-reads the
-  file and a worker boots once — so prefer the group form above, which runs per request.
+  file, and a worker boots before any request exists, so there it stops with a `LogicException`
+  — prefer the group form above, which runs per request.
 
 Group settings only apply through `->group()`, and they accumulate inward: a nested group
 inherits the outer prefix and middleware list, and the outer settings are restored afterwards.

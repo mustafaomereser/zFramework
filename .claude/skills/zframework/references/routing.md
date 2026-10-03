@@ -325,7 +325,8 @@ Called at the top level of a `route/*.php` file (the 2.x style, gating the route
 an `if`), it runs **while booting**, like the global ones in `App/Middlewares/autoload.php`. An
 `abort()`/`redirect()` there is caught by `Run::boot()` and sent as that request's response.
 It still only works under FPM without a route cache: a cached table never re-reads the file,
-and a worker boots once. Prefer `Route::middleware([...], $fallback)->group(...)`, which is
+and a worker boots once — there it throws a `LogicException` and the worker stops, rather than
+serving a half-built table as 404s. Prefer `Route::middleware([...], $fallback)->group(...)`, which is
 evaluated per request in `Route::match()`.
 
 ## Matching order
