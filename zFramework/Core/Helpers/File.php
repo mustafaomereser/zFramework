@@ -189,6 +189,90 @@ class File
     }
 
     /**
+     * Open an image by what the file is, not what it is called.
+     *
+     * getimagesize() reads the header, so a PNG uploaded as photo.webp still
+     * opens - the extension-picked imagecreatefromwebp() returned false for it
+     * and the caller died passing false to imagecopyresampled(). A type GD has
+     * no dedicated loader for falls back to imagecreatefromstring().
+     *
+     * @param string $file
+     * @param int    $type IMAGETYPE_* as getimagesize() reported it.
+     * @return \GdImage|false
+     */
+    private static function openImage(string $file, int $type): \GdImage|false
+    {
+        $loader = [
+            IMAGETYPE_JPEG => 'imagecreatefromjpeg',
+            IMAGETYPE_PNG  => 'imagecreatefrompng',
+            IMAGETYPE_GIF  => 'imagecreatefromgif',
+            IMAGETYPE_WEBP => 'imagecreatefromwebp',
+            IMAGETYPE_BMP  => 'imagecreatefrombmp',
+            IMAGETYPE_AVIF => 'imagecreatefromavif',
+        ][$type] ?? null;
+
+        try {
+            $image = $loader && function_exists($loader) ? @$loader($file) : @imagecreatefromstring((string) file_get_contents($file));
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $image ?: false;
+    }
+
+    /**
+     * A blank canvas for a target format.
+     *
+     * imagecreatetruecolor() starts opaque black: transparent areas came out
+     * black in every format that has an alpha channel. Formats without one get
+     * white instead, so a transparent PNG converted to JPEG is not black either.
+     *
+     * @param int    $width
+     * @param int    $height
+     * @param string $ext
+     * @return \GdImage
+     */
+    private static function canvas(int $width, int $height, string $ext): \GdImage
+    {
+        $canvas = imagecreatetruecolor($width, $height);
+
+        if (in_array($ext, ['png', 'gif', 'webp', 'avif'], true)) {
+            imagealphablending($canvas, false);
+            imagesavealpha($canvas, true);
+            imagefill($canvas, 0, 0, imagecolorallocatealpha($canvas, 0, 0, 0, 127));
+        } else imagefill($canvas, 0, 0, imagecolorallocate($canvas, 255, 255, 255));
+
+        return $canvas;
+    }
+
+    /**
+     * Write an image in the format its extension names.
+     *
+     * Quality only where the format takes one on a 0-100 scale: imagepng()'s
+     * third argument is a 0-9 compression level and threw a ValueError at 100,
+     * imagegif() takes no third argument at all, and imagebmp()'s is a bool.
+     *
+     * @param \GdImage $image
+     * @param string   $path
+     * @param string   $ext
+     * @return bool    False for a format GD cannot write here.
+     */
+    private static function saveImage(\GdImage $image, string $path, string $ext): bool
+    {
+        $writer = [
+            'jpg'  => fn() => imagejpeg($image, $path, 100),
+            'jpeg' => fn() => imagejpeg($image, $path, 100),
+            'png'  => fn() => imagepng($image, $path),
+            'gif'  => fn() => imagegif($image, $path),
+            'webp' => fn() => imagewebp($image, $path, 100),
+            'bmp'  => fn() => imagebmp($image, $path),
+            'avif' => fn() => function_exists('imageavif') && imageavif($image, $path, 100),
+        ][$ext] ?? null;
+
+        return $writer ? (bool) $writer() : false;
+    }
+
+    /**
      * Resize an image file.
      * @param string      $file   Path relative to public_dir
      * @param array       $sizes  width, height, desired_sizes
@@ -207,9 +291,12 @@ class File
         ];
 
         $info = pathinfo($file);
-        $ext  = strtolower($info['extension']);
+        $ext  = strtolower($info['extension'] ?? '');
 
-        [$image_width, $image_height] = getimagesize($file);
+        # Not an image, or a damaged one.
+        $probe = @getimagesize($file);
+        if (!$probe || !$probe[0] || !$probe[1]) return false;
+        [$image_width, $image_height] = $probe;
 
         if (!$sizes['desired_sizes']) {
             $src_aspect = $image_width / $image_height;
@@ -218,28 +305,21 @@ class File
             else $sizes['width'] = $sizes['height'] * $src_aspect;
         }
 
+        # The aspect maths yields fractions; GD takes whole pixels.
+        $sizes['width']  = max(1, (int) round($sizes['width']));
+        $sizes['height'] = max(1, (int) round($sizes['height']));
+
         $to_save = $new_name
             ? str_replace($info['filename'], $new_name, $file)
             : str_replace(".$ext", '', $file) . '-' . implode('x', [$sizes['width'], $sizes['height']]) . ".$ext";
 
-        $callbacks = [
-            'jpg'  => ['source' => fn() => imagecreatefromjpeg($file), 'target' => fn($t) => imagejpeg($t, $to_save, 100)],
-            'jpeg' => ['source' => fn() => imagecreatefromjpeg($file), 'target' => fn($t) => imagejpeg($t, $to_save, 100)],
-            'png'  => ['source' => fn() => imagecreatefrompng($file),  'target' => fn($t) => imagepng($t, $to_save, 100)],
-            'gif'  => ['source' => fn() => imagecreatefromgif($file),  'target' => fn($t) => imagegif($t, $to_save, 100)],
-            'webp' => ['source' => fn() => imagecreatefromwebp($file), 'target' => fn($t) => imagewebp($t, $to_save, 100)],
-            'bmp'  => ['source' => fn() => imagecreatefrombmp($file),  'target' => fn($t) => imagebmp($t, $to_save, 100)],
-            'avif' => ['source' => fn() => imagecreatefromavif($file), 'target' => fn($t) => imageavif($t, $to_save, 100)],
-        ][$ext] ?? null;
+        $source = self::openImage($file, $probe[2]);
+        if (!$source) return false;
 
-        if (!$callbacks) return false;
-
-        $source = $callbacks['source']();
-        $target = imagecreatetruecolor($sizes['width'], $sizes['height']);
+        $target = self::canvas($sizes['width'], $sizes['height'], $ext);
         imagecopyresampled($target, $source, 0, 0, 0, 0, $sizes['width'], $sizes['height'], $image_width, $image_height);
-        $callbacks['target']($target);
 
-        return self::removePublic($to_save);
+        return self::saveImage($target, $to_save, $ext) ? self::removePublic($to_save) : false;
     }
 
     /**
@@ -253,39 +333,21 @@ class File
         $file = public_dir($file);
         if (!is_file($file)) return false;
 
+        $to      = strtolower($to);
         $info    = pathinfo($file);
-        $ext     = strtolower($info['extension']);
         $to_save = $info['dirname'] . '/' . $info['filename'] . '.' . $to;
 
-        $sources = [
-            'jpeg' => fn() => imagecreatefromjpeg($file),
-            'jpg'  => fn() => imagecreatefromjpeg($file),
-            'png'  => fn() => imagecreatefrompng($file),
-            'gif'  => fn() => imagecreatefromgif($file),
-            'webp' => fn() => imagecreatefromwebp($file),
-            'bmp'  => fn() => imagecreatefrombmp($file),
-            'avif' => fn() => imagecreatefromavif($file),
-        ];
+        $probe = @getimagesize($file);
+        if (!$probe || !$probe[0] || !$probe[1]) return false;
+        [$width, $height] = $probe;
 
-        $targets = [
-            'jpeg' => fn($t) => imagejpeg($t, $to_save, 100),
-            'jpg'  => fn($t) => imagejpeg($t, $to_save, 100),
-            'png'  => fn($t) => imagepng($t, $to_save, 100),
-            'gif'  => fn($t) => imagegif($t, $to_save, 100),
-            'webp' => fn($t) => imagewebp($t, $to_save, 100),
-            'bmp'  => fn($t) => imagebmp($t, $to_save, 100),
-            'avif' => fn($t) => imageavif($t, $to_save, 100),
-        ];
+        $from = self::openImage($file, $probe[2]);
+        if (!$from) return false;
 
-        if (!isset($sources[$ext], $targets[$to])) return false;
-
-        [$width, $height] = getimagesize($file);
-        $from   = $sources[$ext]();
-        $target = imagecreatetruecolor($width, $height);
+        $target = self::canvas($width, $height, $to);
         imagecopyresampled($target, $from, 0, 0, 0, 0, $width, $height, $width, $height);
-        $targets[$to]($target);
 
-        return self::removePublic($to_save);
+        return self::saveImage($target, $to_save, $to) ? self::removePublic($to_save) : false;
     }
 
     /**

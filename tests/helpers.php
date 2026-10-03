@@ -74,6 +74,42 @@ test('a missing config key is null at any depth', function () {
     truthy(is_array(config('mail.from')), 'lists still come back whole');
 });
 
+test('images open by content, keep transparency and fail soft', function () {
+    if (!function_exists('imagecreatetruecolor')) return skip('no GD');
+
+    $dir = public_dir('/zf_test_images');
+    if (!is_dir($dir)) mkdir($dir, 0777, true);
+    Test::cleanup(fn() => rrmdir($dir));
+
+    $im = imagecreatetruecolor(200, 100);
+    imagealphablending($im, false);
+    imagesavealpha($im, true);
+    imagefill($im, 0, 0, imagecolorallocatealpha($im, 0, 0, 0, 127));
+    imagefilledrectangle($im, 50, 25, 150, 75, imagecolorallocate($im, 255, 0, 0));
+    imagepng($im, "$dir/t.png");
+    imagepng($im, "$dir/png-named.webp");
+    imagejpeg($im, "$dir/p.jpg");
+    imagegif($im, "$dir/g.gif");
+    file_put_contents("$dir/broken.png", 'not an image');
+
+    $png = File::resizeImage('/zf_test_images/t.png', ['width' => 50, 'height' => 50, 'desired_sizes' => false]);
+    truthy($png, 'imagepng(..., 100) threw a ValueError');
+    $out = imagecreatefrompng(public_dir($png));
+    same([50, 25], [imagesx($out), imagesy($out)], 'aspect kept, whole pixels');
+    same(127, (imagecolorat($out, 0, 0) >> 24) & 0x7F, 'the transparent corner stays transparent');
+
+    truthy(File::resizeImage('/zf_test_images/png-named.webp', ['width' => 40, 'height' => 40]), 'a PNG called .webp');
+    truthy(File::resizeImage('/zf_test_images/g.gif', ['width' => 20, 'height' => 20]), 'imagegif() takes no quality');
+    same(false, File::resizeImage('/zf_test_images/broken.png'));
+
+    $jpg = File::convertImage('/zf_test_images/t.png', 'jpg');
+    truthy($jpg);
+    same(0xFFFFFF, imagecolorat(imagecreatefromjpeg(public_dir($jpg)), 0, 0), 'transparency onto JPEG is white, not black');
+    truthy(File::convertImage('/zf_test_images/p.jpg', 'webp'));
+    truthy(File::convertImage('/zf_test_images/t.png', 'bmp'));
+    same(false, File::convertImage('/zf_test_images/t.png', 'xyz'));
+});
+
 test('abort() as JSON carries the pending alerts', function () {
     $_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
     Test::cleanup(function () {
