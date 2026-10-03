@@ -19,6 +19,9 @@ redirect(string $url = "/");
 back(?string $add);                // back to REFERER, with an optional suffix
 refresh();
 abort(int $code = 418, $message = null);   // JSON when Http::wantsJson() (X-Requested-With or Accept: application/json)
+                                           // JSON body: {message, code, alerts} - alerts unless response.ajax.include-alerts is false
+// redirect()/back()/refresh() keep pending Alerts and JustOneTime for the next page;
+// abort() and downloads consume them.
 
 // Request
 method();                          // honours the _method override in POST
@@ -427,6 +430,7 @@ zFramework\Core\Jobs\SendPushNotifications::handle(array $payload)
 // cannot swallow its own redirect.
 new ResponseSignal(int $status = 0, array $headers = [], string $body = '')
 $signal->send(): void
+$signal->navigates(): bool   // Location or Refresh header - the run loop keeps alerts for the next page
 
 // CLI side
 zFramework\Kernel\Helpers\Ask::do(string $question, object $callback)   // interactive prompt

@@ -182,6 +182,17 @@ class Run
     private static bool $booted = false;
 
     /**
+     * A response decided while booting, sent by the request that follows.
+     *
+     * The global middlewares in App/Middlewares/autoload.php run during boot, and
+     * so does a route file that calls Middleware::middleware() itself rather than
+     * through Route::middleware()->group(). An abort() or redirect() from either
+     * is the request's answer, not a boot failure - caught as \Throwable it was
+     * reported as a 500 carrying "ResponseSignal" for a class name.
+     */
+    private static ?\zFramework\Core\ResponseSignal $bootSignal = null;
+
+    /**
      * Route table as it stood after boot, before any route/dynamic definitions.
      */
     private static array $bootRoutes = [];
@@ -312,6 +323,8 @@ class Run
             self::$bootRoutes   = \zFramework\Core\Route::$routes;
             self::$bootIndex    = \zFramework\Core\Route::currentIndex();
             self::$bootIncluded = count(self::$included);
+        } catch (\zFramework\Core\ResponseSignal $signal) {
+            self::$bootSignal = $signal;
         } catch (\Throwable $errorHandle) {
             errorHandler($errorHandle);
         }
@@ -357,6 +370,26 @@ class Run
     }
 
     /**
+     * Send a signal's response and consume what it displayed.
+     *
+     * Alerts and JustOneTime data outlive a redirect: the page it leads to is
+     * where they are shown. Clearing them here as well - which every
+     * redirect()/back() did since they became signals - left the "saved" or
+     * validation message of every form submission in a session nobody read.
+     *
+     * @param \zFramework\Core\ResponseSignal $signal
+     * @return void
+     */
+    private static function sendSignal(\zFramework\Core\ResponseSignal $signal): void
+    {
+        $signal->send();
+        if ($signal->navigates()) return;
+
+        \zFramework\Core\Facades\Alerts::unset();
+        \zFramework\Core\Facades\JustOneTime::unset();
+    }
+
+    /**
      * The request itself, inside the buffer handle() opened.
      *
      * @return void
@@ -375,6 +408,15 @@ class Run
         # a worker it was once per lifetime, so a visitor holding only auth-stay-in
         # was never logged back in after the first request the worker served.
         if (defined('ZF_WORKER') && class_exists(\zFramework\Core\Facades\Auth::class, false)) \zFramework\Core\Facades\Auth::init();
+
+        # Answered during boot; see $bootSignal. Nothing after it ran - the route
+        # table is incomplete - so there is nothing to match against either.
+        if (self::$bootSignal) {
+            $signal = self::$bootSignal;
+            self::$bootSignal = null;
+            self::sendSignal($signal);
+            return;
+        }
 
         global $storage_path;
         $pageCache = (bool) (\zFramework\Core\Facades\Config::framework('response.page-cache') ?? true);
@@ -408,9 +450,7 @@ class Run
             # abort(), redirect(), refresh(), a file download: the response is
             # ready and nothing else should run. Unlike die(), this leaves a
             # long-running worker alive to serve the next request.
-            $signal->send();
-            \zFramework\Core\Facades\Alerts::unset();
-            \zFramework\Core\Facades\JustOneTime::unset();
+            self::sendSignal($signal);
         } catch (\Throwable $errorHandle) {
             # With debug off the handler ends in abort(500), a ResponseSignal thrown
             # from inside this catch. Under FPM the global exception handler sent

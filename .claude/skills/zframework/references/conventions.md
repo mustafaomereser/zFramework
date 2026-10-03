@@ -25,9 +25,10 @@ findings.
 
 - **Never echo what `errorHandler()` returns.** `handle.php` already prints it, so
   `die(errorHandler($e))` renders the page twice. Correct form: `errorHandler($err); die;`
-- **Alerts survive a redirect, and that is load-bearing.** `Run::handle()` clears
+- **Alerts survive a redirect, and that is load-bearing.** `Run::sendSignal()` clears
   `Alerts` and `JustOneTime` after a `ResponseSignal`, but skips the clear when the
-  signal carries a `Location` or `Refresh` header. Without that skip the whole
+  signal carries a `Location` or `Refresh` header (`$signal->navigates()`; `tests/http.php`
+  covers it over a real socket). Without that skip the whole
   flash-then-redirect pattern is dead: `Alerts::danger(…); return back();` writes the
   alert, the 302 goes out, and the alert is deleted before the browser has fetched the
   page that would have shown it — every validation message, every "saved", silently

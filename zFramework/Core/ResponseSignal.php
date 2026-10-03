@@ -32,6 +32,21 @@ class ResponseSignal extends \Error
     }
 
     /**
+     * Whether the browser goes on to another page after this response.
+     *
+     * redirect(), back() and refresh() hand the visitor to a page that has not
+     * rendered yet - that page is where pending alerts and JustOneTime data are
+     * shown, so they must survive this request. abort() and a download are the
+     * end of the line and consume them.
+     *
+     * @return bool
+     */
+    public function navigates(): bool
+    {
+        return isset($this->headers['Location']) || isset($this->headers['Refresh']);
+    }
+
+    /**
      * Emit the response this signal carries.
      * @return void
      */

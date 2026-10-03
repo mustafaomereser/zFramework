@@ -82,6 +82,26 @@ test('a form round-trip: real token in, wrong token refused', function () use ($
     same(406, $bad, 'a fake token is refused');
 });
 
+test('a failed form redirects back and the next page shows its alerts', function () use ($request, $port) {
+    [, , $body] = $request('/auth');
+    preg_match("/_token' value='([^']+)'/", $body, $m);
+
+    # Not ajax: the validator raises an alert per failed rule and calls back().
+    [$code, $headers] = $request('/sign-in', "_token={$m[1]}&email=&password=", ["Referer: http://127.0.0.1:$port/"]);
+    same(302, $code, 'a failed validation redirects');
+
+    [, , $page] = $request('/');
+    truthy(preg_match('/showAlerts\((\[.*?\]|\{.*?\})\)/s', $page, $a), 'no alert block on the page');
+    contains('danger', $a[1], 'the redirect cleared the alerts before the page it led to could show them');
+
+    [, , $again] = $request('/');
+    preg_match('/showAlerts\((\[.*?\]|\{.*?\})\)/s', $again, $b);
+    falsy(str_contains($b[1] ?? '', 'danger'), 'shown once, then consumed');
+
+    # /sign-in allows five posts in five minutes; the sign-in tests below need theirs.
+    @rrmdir(FRAMEWORK_PATH . '/storage/ratelimit');
+});
+
 test('seeded admin signs in and stays signed in', function () use ($request) {
     [, , $body] = $request('/auth');
     preg_match("/_token' value='([^']+)'/", $body, $m);

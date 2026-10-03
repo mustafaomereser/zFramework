@@ -73,3 +73,22 @@ test('a missing config key is null at any depth', function () {
     same(null, config('push-notification.apps.zzz.channel'));
     truthy(is_array(config('mail.from')), 'lists still come back whole');
 });
+
+test('abort() as JSON carries the pending alerts', function () {
+    $_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
+    Test::cleanup(function () {
+        unset($_SERVER['HTTP_X_REQUESTED_WITH']);
+        \zFramework\Core\Facades\Alerts::unset();
+    });
+
+    \zFramework\Core\Facades\Alerts::danger('zf-test-alert');
+    try {
+        abort(400, 'nope');
+    } catch (ResponseSignal $e) {
+        $body = json_decode($e->body, true);
+    }
+
+    same('nope', $body['message'] ?? null);
+    same(['danger', 'zf-test-alert'], array_values($body['alerts'] ?? [])[0] ?? null);
+    falsy($e->navigates(), 'an abort consumes the alerts');
+});

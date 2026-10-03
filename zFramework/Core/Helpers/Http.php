@@ -56,7 +56,15 @@ class Http
     {
         # wantsJson(), not isAjax(): a fetch() or curl -H 'Accept: application/json'
         # sends no X-Requested-With, and was handed the HTML error page to parse.
-        if (self::wantsJson()) throw new \zFramework\Core\ResponseSignal($code, ['Content-Type' => 'application/json; charset=utf-8'], json_encode(compact('message', 'code'), JSON_UNESCAPED_UNICODE));
+        #
+        # Pending alerts go along, as Response::json() sends them: the run loop
+        # clears them after an abort, so a JSON client never got to see the
+        # messages the request raised before giving up.
+        if (self::wantsJson()) {
+            $body = compact('message', 'code');
+            if (\zFramework\Core\Facades\Config::framework('response.ajax.include-alerts') ?? true) $body['alerts'] = \zFramework\Core\Facades\Alerts::get();
+            throw new \zFramework\Core\ResponseSignal($code, ['Content-Type' => 'application/json; charset=utf-8'], json_encode($body, JSON_UNESCAPED_UNICODE));
+        }
 
         $view = @view(self::$error_view . ".$code", compact('message', 'code'));
         throw new \zFramework\Core\ResponseSignal($code, [], !empty($view) ? $view : (string) $message);
