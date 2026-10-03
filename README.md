@@ -356,7 +356,7 @@ class Post extends Model
     public $db         = 'local';        // connection name from database/connections.php; defaults to first
     public $guard      = ['secret'];     // columns left out when the query names none itself
     public $primary    = 'id';           // auto-detected from schema if omitted
-    public $deleted_at = 'deleted_at';   // used by softDelete trait
+    public $deleted_at = 'deleted_at';   // used by softDelete trait; config/model.php deleted_at_type: 'date' (default, also when the key is missing) | 'bool'
     // created_at / updated_at are not set by the model: the migration's `timestamps`
     // gives them DEFAULT CURRENT_TIMESTAMP / ON UPDATE. Their names are global,
     // in config/model.php (`consts`), not per model.
@@ -1191,6 +1191,10 @@ View::bind('app.main', fn() => [
 This is where data the layout needs belongs. A layout that queries or computes cannot be
 rendered from a second controller without repeating the work.
 
+A bind added later reaches pages that are already cached: the compiled view's manifest lists
+every view in its chain, and a cache hit applies whatever binds those names have now — no
+`cache clear views` needed.
+
 ---
 
 ### 3.1. Page Caching
@@ -1407,7 +1411,7 @@ Either way, keep the derived fields in one place — never duplicate them across
 ```php
 Validator::validate($_REQUEST, [
     'email'    => ['required', 'email', 'unique:' . User::class . ';key:email'],
-    'password' => ['required', 'min:8', 'max:72'],
+    'password' => ['required', 'type:string', 'min:8', 'max:72'],
     'confirm'  => ['required', 'same:password'],
     'age'      => ['nullable', 'type:int', 'min:18', 'max:120'],
     'role_id'  => ['required', 'exists:' . Role::class . ';key:id'],
@@ -1429,7 +1433,7 @@ happens:
 
 | Situation | What happens |
 |---|---|
-| AJAX request | `abort(400, Response::json($errors))` |
+| AJAX request | `abort(400, Response::json($errors))` — `message` is the errors as a JSON string (what `main.js` parses), `alerts` alongside |
 | Normal request | `back()` — redirect to the referer, alerts waiting |
 | A callback was passed | the callback runs and **execution continues** |
 
@@ -1480,6 +1484,10 @@ is the update-form spelling, without which editing a row collides with its own v
 string, so `'150'` is detected as a number and `max:100` rejects it; `type:string` makes the
 same rule mean "at most 100 characters" and it passes. `int`, `str`, `bool` and `double` are
 accepted spellings.
+
+So **a field whose length matters says `type:string`.** Untyped, `'password' => ['min:8']`
+accepts `"12345"` (12345 ≥ 8) and `'title' => ['max:30']` refuses `"2024"`. The other way round
+is what keeps `'qty' => ['min:1', 'max:10']` working without a type.
 
 **`required` and `nullable` together throw** — an exception, not a validation failure. Pick one.
 
@@ -1532,6 +1540,11 @@ Two things to know before relying on this:
   unmatched, so the request ends as a plain **404**.
 - **Every middleware in the list runs**, even after one declines. There is no short-circuit;
   the ones that failed arrive together in `$declines`.
+- **Called at the top of a route file** (the 2.x way of gating the routes below it), a
+  standalone check runs while booting, like the global middlewares in
+  `App/Middlewares/autoload.php`. An `abort()`/`redirect()` there is sent as that request's
+  response. It only holds under FPM without a route cache — a cached table never re-reads the
+  file and a worker boots once — so prefer the group form above, which runs per request.
 
 Group settings only apply through `->group()`, and they accumulate inward: a nested group
 inherits the outer prefix and middleware list, and the outer settings are restored afterwards.
@@ -1882,7 +1895,10 @@ path, so it is never loaded.
 ## 9. Alerts
 
 Flash messages stored in session. Cleared at the end of the request that consumed them —
-render or `Response::json()` — and they survive one redirect to be shown there.
+render, `Response::json()`, an `abort()` page — and they survive `redirect()`, `back()` and
+`refresh()` to be shown on the page those lead to. `abort()` answering JSON carries them in its
+body (`{message, code, alerts}`), as `Response::json()` does, unless
+`response.ajax.include-alerts` is off.
 
 ```php
 Alerts::success('Record saved.');
@@ -2199,13 +2215,17 @@ Then one crontab entry per script, in cPanel or wherever the host keeps them:
 |---|---|
 | config | `config('app.title')` works |
 | helpers | `base_path()`, `view()`, `_l()` … |
+| views | the first `view()` sets up the engine and runs `App/Providers` once, so binds apply |
+| language | `_l()` reads `app.lang` — no middleware chose a locale |
 | autoloading | `App\Models\User` resolves |
 | database | queries run |
 | facades | `Log`, `Mail`, `Auth`, `Cache` … |
 
 **What it deliberately leaves out:** it sets `$cron_mode`, which makes `bootstrap.php` skip the
 session setup and the `force-https` redirect — neither means anything without a browser. It
-also never loads routes, providers or modules, so the route table is empty.
+also never loads routes or modules, so the route table is empty. Providers load only when a
+`view()` needs them. A directive registered from a middleware (`ViewDirectives`) is not
+there; one a mail template uses belongs in a provider.
 
 **Errors follow `config/framework.php` like everywhere else.** `cron.php` installs the same handler
 `terminal` does, so an uncaught throwable in a cron script is written to `error_logs/` when
@@ -2321,6 +2341,13 @@ Additive, nothing to migrate: PostgreSQL support (2.8 - a `pgsql:` DSN is the sw
 `php terminal tests`). Behaviour changes worth a glance: `withRealOrder()` ranks only visible rows
 on a softDelete model; `beginTransaction()` refuses non-InnoDB on MySQL only; `abort()` answers
 JSON to `Accept: application/json` as well as to X-Requested-With.
+
+Fixed since (found upgrading a 2.8 project): alerts set before `redirect()`/`back()` reach the
+next page again; an `abort()`/`redirect()` from a middleware that runs at boot is a response,
+not a 500; `abort()` JSON carries `alerts`; `File::resizeImage()`/`convertImage()` no longer
+throw on PHP 8 or blacken transparency; a later `View::bind()` reaches cached pages; `view()`
+and `_l()` work from `schedule/`, `cron/`, queue jobs and terminal commands; a
+`config/model.php` without `deleted_at_type` soft-deletes by date instead of writing NULL.
 
 ### Upgrading to 3.2.0
 
@@ -2517,6 +2544,8 @@ File::upload('/uploads', $_FILES['photos']);      // multiple file input → arr
 File::save('/uploads', 'https://example.com/image.jpg');  // download remote file
 File::resizeImage('photo.jpg', ['width' => 800, 'height' => 600, 'desired_sizes' => true], 'out.jpg');
 File::convertImage('photo.jpg', 'webp');
+// Both read the real format from the file (a PNG named .webp opens), keep transparency
+// (white behind it for jpg/bmp), and return false for an unreadable file or unknown target.
 File::delete('uploads/photo.jpg');               // inside public_dir only: '../' resolves outside and is refused
 ```
 
