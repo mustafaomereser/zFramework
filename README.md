@@ -1421,8 +1421,9 @@ Validator::validate($_REQUEST, [
 
 // Custom attribute names in error messages
 Validator::validate($_REQUEST, ['email' => ['required', 'email']], ['email' => 'E-mail Address']);
-// Messages: resource/lang/<locale>/validator.php. A rule with no message there (a project
-// older than the rule) uses the core's English default, zFramework/Core/Validator/messages.php.
+// Messages: resource/lang/<locale>/validator.php - edit freely, it always wins. A rule with no
+// message there (a project older than the rule) uses the core's English default from
+// zFramework/Core/lang/validator.php; errors.php (csrf, file, mail) falls back the same way.
 
 // With a callback — custom logic when validation fails.
 // It receives ($errors, $passed). Its return value is discarded and execution

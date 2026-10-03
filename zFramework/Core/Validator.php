@@ -177,7 +177,7 @@ class Validator
 
     /**
      * The message for a failed rule: the application's translation, else the
-     * core's own (Validator/messages.php).
+     * core's own (zFramework/Core/lang/validator.php, through Lang::get()).
      *
      * resource/lang belongs to the application and `update` never touches it,
      * so a rule newer than the project's language files used to fail with an
@@ -190,16 +190,10 @@ class Validator
      */
     private static function message(string $case, array $errors): string
     {
+        # Lang::get() falls back to the core's zFramework/Core/lang/validator.php.
         $message = Lang::get("validator.errors.$case", $errors);
-        if (is_string($message) && $message !== '') return $message;
 
-        static $defaults = null;
-        $defaults ??= include __DIR__ . '/Validator/messages.php';
-
-        $message = $defaults[$case] ?? $case;
-        foreach ($errors as $name => $value) $message = str_replace('{' . $name . '}', (string) $value, $message);
-
-        return $message;
+        return is_string($message) && $message !== '' ? $message : $case;
     }
 
     /**

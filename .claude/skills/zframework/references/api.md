@@ -374,6 +374,8 @@ Date::setLocale(string $set)      Date::locale()
 Lang::locale(?string $lang = null, bool $syncCookie = true)
 Lang::currentLocale(): string     Lang::list(): array
 Lang::get(string $name, array $data = [])        // = _l()
+    // resource/lang/<locale>/<file>.php first (the app edits these); a key missing there falls back to
+    // zFramework/Core/lang/<file>.php (errors, validator - English). Otherwise null.
 
 Config::get(string $config, bool $returnbool = true)   // 'app.title' dot notation
 Config::debug(): bool                                   // framework.debug, or app.debug if not moved

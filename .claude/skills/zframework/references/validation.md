@@ -186,7 +186,8 @@ Messages come from `resource/lang/<locale>/validator.php` — `validator.errors.
 text and `validator.attributes.<field>` for the field name, with `attributeNames` as the
 fallback. A rule the application's file has no message for (a project older than the rule —
 `update` never touches `resource/lang`) falls back to the core's English text in
-`zFramework/Core/Validator/messages.php`, placeholders filled; the application's own wins.
+`zFramework/Core/lang/validator.php` via `Lang::get()`, placeholders filled. The application's
+file is the one to edit and always wins; the core copy only fills keys it lacks.
 
 ## What happens on failure
 

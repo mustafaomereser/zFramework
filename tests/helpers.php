@@ -74,6 +74,22 @@ test('a missing app.lang directory falls back once, without a cookie', function 
     falsy(isset($_COOKIE[$cookie]), 'the fallback wrote the cookie the caller declined');
 });
 
+test('the project\'s language file wins, the core fills only what it lacks', function () {
+    $dir = BASE_PATH . '/resource/lang/zf_test_partial';
+    @mkdir($dir, 0777, true);
+    file_put_contents("$dir/errors.php", "<?php return ['file' => ['type' => 'BENIM {file_types}']];");
+    $was = Lang::$locale;
+    Test::cleanup(function () use ($dir, $was) {
+        rrmdir($dir);
+        Lang::locale($was, false);
+    });
+    Lang::locale('zf_test_partial', false);
+
+    same('BENIM jpg', Lang::get('errors.file.type', ['file_types' => 'jpg']), 'an edited message is the one used');
+    contains('expired', (string) Lang::get('errors.csrf.no-verify'), 'a key the project lacks comes from zFramework/Core/lang');
+    same(null, Lang::get('lang.no-such-key'), 'application text has no core default - still null');
+});
+
 test('multibyte, timestamps and sizes behave at the edges', function () {
     same('çç', Str::limit('çç', 3));
     same('ççç...', Str::limit('ççççç', 3));

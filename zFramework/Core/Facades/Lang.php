@@ -112,14 +112,33 @@ class Lang
         self::ensureLocale();
 
         $name = explode('.', $_name);
-        $lang = self::$path . "/" . $name[0] . ".php";
-        if (!is_file($lang)) return null;
 
-        $lang = include($lang);
-        unset($name[0]);
+        # The application's file first, then the core's own English for the keys
+        # the core reads (zFramework/Core/lang). resource/lang is the application's
+        # and `update` never writes it, so a key newer than the project - a new
+        # validator rule, a new error - came back null and its message was blank.
+        $lang = self::lookup((string) self::$path, $name);
+        if ($lang === null) $lang = self::lookup(FRAMEWORK_PATH . '/Core/lang', $name);
 
-        foreach ($name as $val) $lang = $lang[$val] ?? null;
         foreach ($data as $key => $val) $lang = str_replace("{" . $key . "}", $val ?? '', $lang);
+
+        return $lang;
+    }
+
+    /**
+     * One dotted key in one language directory, or null.
+     *
+     * @param string $dir
+     * @param array  $name the key split on dots; the first part names the file
+     * @return mixed
+     */
+    private static function lookup(string $dir, array $name): mixed
+    {
+        $file = "$dir/{$name[0]}.php";
+        if ($dir === '' || !is_file($file)) return null;
+
+        $lang = include($file);
+        foreach (array_slice($name, 1) as $val) $lang = is_array($lang) ? ($lang[$val] ?? null) : null;
 
         return $lang;
     }

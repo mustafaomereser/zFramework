@@ -312,8 +312,8 @@ replaced: `bootstrap.php`, `run.php`, `Core/`, `Kernel/`, `modules/`.
   for `terminal`, `cron/cron.php`, `public_html/index.php`. Diff; take the new one unless the
   application customised it (index.php often is), then merge by hand.
 - `resource/lang/<locale>/<file>.php lacks N key(s) the core reads: …` — add them to that
-  locale (`errors.*`, `validator.errors.*`). Validator messages fall back to English until then;
-  `errors.*` (csrf, file, mail) have no fallback.
+  locale (`errors.*`, `validator.errors.*`). Until then `Lang::get()` answers those keys from the
+  core's English copy in `zFramework/Core/lang/`, so nothing is blank - but it is English.
 
 **`zFramework/vendor/` and `zFramework/storage/` are never touched.** Neither is in the
 repository, so replacing `zFramework/` wholesale would delete composer's packages and every
