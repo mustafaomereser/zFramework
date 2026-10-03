@@ -166,7 +166,9 @@ class Validator
         $length = match ($type) {
             'integer' => (int) $value,
             'float'   => (float) $value,
-            default   => is_string($value) ? strlen($value) : 0,
+            # Characters, not bytes: strlen() counted "şçğü" as 8, so max:30 cut a
+            # Turkish title short and min:8 let a four-letter one through.
+            default   => is_string($value) ? mb_strlen($value, 'UTF-8') : 0,
         };
 
         return [$type, $length, $detected];

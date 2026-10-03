@@ -50,6 +50,12 @@ test('an all-digit value is a number unless type:string says otherwise', functio
     truthy($passes(['t' => '2024'], ['t' => ['type:string', 'max:30']]));
 });
 
+test('min/max count characters, not bytes', function () use ($passes) {
+    truthy($passes(['t' => 'şçğüöı'], ['t' => ['type:string', 'max:6']]), 'six Turkish letters are six characters, not twelve bytes');
+    falsy($passes(['t' => 'şçğü'], ['t' => ['type:string', 'min:5']]), 'four letters are not five');
+    truthy($passes(['t' => 'ğğğ'], ['t' => ['type:string', 'between:3,3']]));
+});
+
 test('an unknown rule is a loud error, not a silent pass', function () {
     throws(\Exception::class, fn() => Validator::validate(['x' => '1'], ['x' => ['no-such-rule']]));
 });

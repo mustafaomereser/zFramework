@@ -1455,8 +1455,8 @@ $r = Validator::validate(['age' => '150'], ['age' => ['required', 'max:100']], [
 | `required` | Field must be present and non-empty |
 | `nullable` | Field may be empty or absent. Most rules pass on an empty value anyway; `same`, `confirmed` and `unique` still evaluate it |
 | `type:string` / `type:int` / `type:float` / `type:bool` / `type:array` | Declares the type, and asserts the value can be read as it |
-| `min:N` | Minimum value for a number, minimum length for a string/array |
-| `max:N` | Maximum value for a number, maximum length for a string/array |
+| `min:N` | Minimum value for a number, minimum length (characters, `mb_strlen`) for a string, count for an array |
+| `max:N` | Maximum value for a number, maximum length (characters, `mb_strlen`) for a string, count for an array |
 | `same:other_field` | Must exactly match the value of `other_field` |
 | `email` | Must be a valid e-mail address |
 | `unique:Model;key:column` | Value must not already exist in the model's column |

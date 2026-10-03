@@ -132,7 +132,7 @@ Note the callback argument changes the control flow — see "What happens on fai
 | `email` | a valid address |
 | `url` | a valid **http or https** address |
 | `date` / `date:Y-m-d` | parseable, or that exact format and a real date in it |
-| `min:N` / `max:N` | the value for a number, the length for a string or array |
+| `min:N` / `max:N` | the value for a number, the character count (`mb_strlen`) for a string, the element count for an array |
 | `between:A,B` | the same measure, both ends inclusive |
 | `type:x` | declares the type and asserts the value can be read as it |
 | `in:a,b,c` / `not-in:a,b` | membership, compared as strings |
@@ -163,7 +163,7 @@ Behaviour that is not obvious:
 - **`between` reads the same measure `min`/`max` do**, so `type:` decides whether it is
   comparing a number or a length.
 - **`min` / `max` compare a *length* that depends on the type.** For a string it is
-  `strlen()`; for a number it is **the value itself**. So `max:100` rejects the string
+  `mb_strlen()` — characters, so `"şçğü"` is 4, not 8 bytes; for a number it is **the value itself**. So `max:100` rejects the string
   `str_repeat('x', 150)` and also rejects the number `150`, and accepts `80`. Declare the type
   when the input is ambiguous — a numeric string is auto-detected as a number, so `'150'` is
   compared as 150, not as 3 characters. `type:string` forces the other reading.
