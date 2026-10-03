@@ -22,6 +22,17 @@ class Session
     private static function load(): void
     {
         if (self::$cache !== null) return;
+
+        # A terminal command, a scheduled task, a cron script: no visitor, no
+        # cookie, and output already on the console - session_start() only
+        # warned "headers already sent" into the cron mail. Kept in memory for
+        # the process instead, so Alerts and the like still work. A worker runs
+        # under the CLI SAPI too but serves real visitors; it keeps the session.
+        if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) {
+            self::$cache = $_SESSION ?? [];
+            return;
+        }
+
         if (session_status() === PHP_SESSION_NONE) {
             # PHP's session module sends its own Cache-Control and a 1981 Expires
             # unless the limiter is empty. Those landed on top of whatever the
@@ -70,6 +81,13 @@ class Session
     public static function flush(): void
     {
         if (!self::$dirty || self::$cache === null) return;
+
+        # Memory only outside a request; see load().
+        if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) {
+            self::$dirty = false;
+            return;
+        }
+
         if (session_status() === PHP_SESSION_NONE) session_start();
         $_SESSION    = self::$cache;
         self::$dirty = false;

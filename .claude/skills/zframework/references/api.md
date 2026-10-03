@@ -248,6 +248,8 @@ Auth::forgetCache(string|int|null $id = null)
 Session::set(string $key, mixed $value): self
 Session::get(string $key): mixed        Session::delete(string $key): self
 Session::flush()                        Session::callback(\Closure $cb): mixed
+// CLI outside a worker (terminal, schedule, cron, queue): memory only for the process -
+// no session_start(), no "headers already sent" warning, nothing persisted.
 
 Alerts::success|danger|warning|info(string $text): self
 Alerts::name(string $name): self        // key for the NEXT alert; the same name overwrites (dedup), all names render together

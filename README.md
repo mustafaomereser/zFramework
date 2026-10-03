@@ -2220,6 +2220,7 @@ Then one crontab entry per script, in cPanel or wherever the host keeps them:
 | helpers | `base_path()`, `view()`, `_l()` … |
 | views | the first `view()` sets up the engine and runs `App/Providers` once, so binds apply |
 | language | `_l()` reads `app.lang` — no middleware chose a locale |
+| session | in memory for the process: `Alerts`, `Response::json()` work, nothing is started or written |
 | autoloading | `App\Models\User` resolves |
 | database | queries run |
 | facades | `Log`, `Mail`, `Auth`, `Cache` … |
