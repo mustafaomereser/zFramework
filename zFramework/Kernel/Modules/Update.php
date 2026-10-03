@@ -55,6 +55,12 @@ class Update
      * Language keys the core itself reads, per file: null for the whole file, or
      * the subtree. The rest of resource/lang is the application's own text.
      */
+    /**
+     * Keys that differ per machine. Moved between config files they are written
+     * as null, never with this machine's value - see configs().
+     */
+    private const ENVIRONMENT_KEYS = ['debug', 'force-https'];
+
     private const CORE_LANG = [
         'errors'    => null,
         'validator' => 'errors',
@@ -64,6 +70,10 @@ class Update
     {
         if (in_array('--rollback', Terminal::$parameters)) return self::rollback();
         if (in_array('--check', Terminal::$parameters))    return self::check();
+
+        # Internal: run() calls this in a fresh process once the new core is in place,
+        # so the report comes from the version just installed - see report().
+        if (isset(Terminal::$parameters['--report'])) return self::report((string) Terminal::$parameters['--report']);
 
         # `php terminal help` lists check and rollback under this command, because both
         # are public and documented - so they get typed as subcommands, and without
@@ -190,15 +200,19 @@ class Update
             }
         }
 
-        # 6. config
-        self::configs("$work/$root/config");
-
-        # 6b. application files the release also ships: reported, never written
-        self::projectFiles("$work/$root");
-
-        # 7. anything that needs a human
-        if (@file_get_contents("$work/$root/composer.json") !== @file_get_contents(BASE_PATH . '/composer.json'))
-            Terminal::text('[color=yellow]composer.json changed - run `composer install`.[/color]');
+        # 6-7. config, the application's own files, composer - reported by the core
+        # just installed, not by this one. This class was loaded from the old core, so
+        # whatever the new version learned to report (the entry points, the language
+        # keys) stayed silent until `update` was run a second time. A fresh process
+        # loads the new Update.php. Should it fail - or under --json, whose output
+        # would not reach the caller - this old code reports instead.
+        $reported = false;
+        if (!in_array('--json', Terminal::$parameters) && function_exists('passthru')) {
+            $flags = array_values(array_intersect(['--config', '--web'], Terminal::$parameters));
+            passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(BASE_PATH . '/terminal') . ' update --report=' . escapeshellarg("$work/$root") . ($flags ? ' ' . implode(' ', $flags) : ''), $code);
+            $reported = $code === 0;
+        }
+        if (!$reported) self::report("$work/$root");
 
         rrmdir($work . "/$root");
         @unlink($zip);
@@ -353,6 +367,48 @@ class Update
     }
 
     /**
+     * Everything after the core swap that needs a human: config drift, the
+     * application's own files, composer.
+     *
+     * @param string $shipped The extracted release root.
+     * @return void
+     */
+    private static function report(string $shipped): void
+    {
+        if (!is_dir($shipped)) {
+            Terminal::text('[color=red]Nothing to report on: ' . $shipped . ' is not there.[/color]');
+            return;
+        }
+
+        self::configs("$shipped/config");
+        self::projectFiles($shipped);
+        self::composer($shipped);
+    }
+
+    /**
+     * The packages the core needs, against the application's composer.json.
+     *
+     * Only `require`, and only the shipped side's packages: the file as a whole
+     * differs in every real project - its own packages, a name, scripts - and
+     * comparing all of it said "composer.json changed" after every update.
+     *
+     * @param string $shipped
+     * @return void
+     */
+    private static function composer(string $shipped): void
+    {
+        $need = json_decode((string) @file_get_contents("$shipped/composer.json"), true)['require'] ?? null;
+        $have = json_decode((string) @file_get_contents(BASE_PATH . '/composer.json'), true)['require'] ?? [];
+        if (!is_array($need)) return;
+
+        $differ = [];
+        foreach ($need as $package => $constraint)
+            if (($have[$package] ?? null) !== $constraint) $differ[] = "$package $constraint" . (isset($have[$package]) ? " (yours: {$have[$package]})" : ' (missing)');
+
+        if ($differ) Terminal::text('[color=yellow]composer.json: this version requires ' . implode(', ', $differ) . ' - update `require` and run `composer install`.[/color]');
+    }
+
+    /**
      * What the update could not do for the application, said out loud.
      *
      * Only the core is replaced, so an entry point whose new version boots
@@ -386,20 +442,25 @@ class Update
             Terminal::text("[color=yellow]$published differs from this release's - compare with $shown (kept, not applied).[/color]");
         }
 
-        # Language: only the locales the application has, only the keys the core reads.
+        # Language: every locale the application has, against what the core reads -
+        # zFramework/Core/lang, already the new version's by now. Not the skeleton's
+        # resource/lang: that is an example application, and a key missing from it
+        # (validator.errors.nullable was) went unreported in every project too.
         foreach (self::CORE_LANG as $file => $subtree) {
-            foreach (glob("$shipped/resource/lang/*/$file.php") ?: [] as $source) {
-                $locale = basename(dirname($source));
-                $mine   = BASE_PATH . "/resource/lang/$locale/$file.php";
-                if (!is_dir(dirname($mine))) continue;
+            $core = FRAMEWORK_PATH . "/Core/lang/$file.php";
+            if (!is_file($core)) continue;
 
-                $read = function (string $path) use ($subtree): array {
-                    $data = is_file($path) ? (static fn() => include $path)() : [];
-                    $data = is_array($data) ? $data : [];
-                    return $subtree === null ? $data : (is_array($data[$subtree] ?? null) ? $data[$subtree] : []);
-                };
+            $read = function (string $path) use ($subtree): array {
+                $data = is_file($path) ? (static fn() => include $path)() : [];
+                $data = is_array($data) ? $data : [];
+                return $subtree === null ? $data : (is_array($data[$subtree] ?? null) ? $data[$subtree] : []);
+            };
+            $wanted = self::keyPaths($read($core));
 
-                $missing = array_diff(self::keyPaths($read($source)), self::keyPaths($read($mine)));
+            foreach (glob(BASE_PATH . '/resource/lang/*', GLOB_ONLYDIR) ?: [] as $dir) {
+                $locale  = basename($dir);
+                $mine    = "$dir/$file.php";
+                $missing = array_diff($wanted, self::keyPaths($read($mine)));
                 if (!$missing) continue;
 
                 $prefix = $file . ($subtree ? ".$subtree" : '');
@@ -483,10 +544,33 @@ class Update
                 foreach ($moved as $key => $orphan) if (isset($located[$key]) && $located[$key]['type'] !== 'array') $patches[$located[$key]['offset']] = [$located[$key]['length'], $orphan['text'], $key, $orphan['from']];
                 krsort($patches);
                 foreach ($patches as $offset => [$length, $text, $key, $from]) {
-                    $merged['source']    = substr_replace($merged['source'], $text, $offset, $length);
-                    $merged['changes'][] = "moved $key from $from, kept your $text";
-                    $drift['added']      = array_values(array_diff($drift['added'], [$key]));
+                    # debug and force-https differ per machine, and app.php is often the
+                    # file kept apart per environment while framework.php is deployed.
+                    # Carried, a local debug => true went live with the next deploy. They
+                    # are written as null instead: framework.php then defers to app.php,
+                    # which still decides, here and on the server alike.
+                    if (in_array($key, self::ENVIRONMENT_KEYS, true)) {
+                        $merged['source']    = substr_replace($merged['source'], 'null', $offset, $length);
+                        $merged['changes'][] = "$key stays decided by $from (null here - it differs per environment; move it yourself if $from is not kept per environment)";
+                    } else {
+                        $merged['source']    = substr_replace($merged['source'], $text, $offset, $length);
+                        $merged['changes'][] = "moved $key from $from, kept your $text";
+                    }
+                    $drift['added'] = array_values(array_diff($drift['added'], [$key]));
                 }
+            }
+
+            # The other half: the file an environment key moved out of keeps it. The
+            # merge builds on the shipped file, which no longer has the key, so it
+            # dropped the line - with framework.php holding null, the setting was gone
+            # on this machine. Put back at the top of the array, as it was written.
+            foreach ($drift['removed'] as $key) {
+                if (!in_array($key, self::ENVIRONMENT_KEYS, true) || ($orphans[$key]['from'] ?? null) !== $name || !self::movedTo($key, $files, $name)) continue;
+                if (isset(ConfigMerge::locate($merged['source'])[$key])) continue;
+
+                $merged['source']    = preg_replace('/return\s*\[\R/', '$0    ' . var_export($key, true) . ' => ' . str_replace(['\\', '$'], ['\\\\', '\\$'], $orphans[$key]['text']) . ",\n", $merged['source'], 1);
+                $merged['changes'][] = "kept $key = {$orphans[$key]['text']} here - it differs per environment, so " . self::movedTo($key, $files, $name) . ' reads it from this file';
+                $drift['removed']    = array_values(array_diff($drift['removed'], [$key]));
             }
 
             if (!$merged['changes'] && !$merged['manual'] && !$drift['added'] && !$drift['removed']) continue;
