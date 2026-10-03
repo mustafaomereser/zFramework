@@ -246,7 +246,7 @@ class Db
                 $columns = ($columns + [$consts['deleted_at'] => [
                     'date' => ['nullable', 'datetime', 'default'],
                     'bool' => ['bool', 'default:1', 'required']
-                ][config('model.deleted_at_type')]]);
+                ][config('model.deleted_at_type') ?? 'date']]);
             }
             #endregion
             //

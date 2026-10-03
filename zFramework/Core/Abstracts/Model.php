@@ -25,7 +25,10 @@ abstract class Model extends DB
     public function __construct()
     {
         foreach (config('model.consts') as $key => $val) $this->{$key} = $val;
-        $this->deleted_at_type = config('model.deleted_at_type');
+        # 'date' when the key is missing, which is what soft delete always wrote
+        # before the key existed. A 2.x config/model.php carries no such key, and
+        # null here made delete() write NULL - the row was "deleted" and stayed live.
+        $this->deleted_at_type = config('model.deleted_at_type') ?? 'date';
 
         parent::__construct(@$this->db);
         parent::table($this->table);

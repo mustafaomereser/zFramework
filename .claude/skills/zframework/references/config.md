@@ -131,7 +131,7 @@ Override per send with `Mail::set([...])`.
     'updated_at' => 'updated_at',
     'deleted_at' => 'deleted_at',
 ],
-'deleted_at_type' => 'date',   // 'date' | 'bool'
+'deleted_at_type' => 'date',   // 'date' | 'bool'; missing key = 'date' (a 2.x config has none)
 ```
 `'bool'` inverts the sense on purpose: a column like `status` where 1 means "not deleted".
 Per-model override: the `$created_at` / `$updated_at` / `$deleted_at` properties (set one to
