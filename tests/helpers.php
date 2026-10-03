@@ -60,6 +60,20 @@ test('Accept-Language cannot name a directory', function () {
     same('tr', $locale('tr-TR,tr;q=0.9'));
 });
 
+test('a missing app.lang directory falls back once, without a cookie', function () {
+    $app = config('app');
+    Test::cleanup(fn() => \zFramework\Core\Facades\Config::clearCache());
+    \zFramework\Core\Facades\Config::$caches['app'] = ['lang' => 'zz-none'] + $app;
+
+    $_SERVER['HTTP_ACCEPT_LANGUAGE'] = 'qq';
+    $cookie = \zFramework\Core\Facades\Cookie::keyparse('lang');
+    unset($_COOKIE[$cookie]);
+
+    truthy(Lang::locale(null, false), 'recursed until the stack ran out');
+    same(Lang::list()[0], Lang::$locale, 'the first language there is');
+    falsy(isset($_COOKIE[$cookie]), 'the fallback wrote the cookie the caller declined');
+});
+
 test('multibyte, timestamps and sizes behave at the edges', function () {
     same('çç', Str::limit('çç', 3));
     same('ççç...', Str::limit('ççççç', 3));

@@ -23,9 +23,9 @@ class Lang
     /**
      * is selectable?
      * @param string $lang
-     * @return string
+     * @return string|false
      */
-    private static function canSelect(string $lang): string
+    private static function canSelect(string $lang): string|false
     {
         # A locale is letters, digits and dashes - `..` and `./` are directories
         # too, and Accept-Language is the visitor's to write.
@@ -54,7 +54,18 @@ class Lang
     public static function locale(?string $lang = null, bool $syncCookie = true): bool
     {
         $lang = strlen((string) $lang) ? $lang : (substr($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? (config('app.lang') ?? ''), 0, 2));
-        if (!$path = self::canSelect($lang)) return self::locale(Config::get('app.lang') ?? self::list()[0]);
+        if (!$path = self::canSelect($lang)) {
+            # app.lang, then whatever directory exists - each only once, and with
+            # the caller's $syncCookie. Retrying app.lang when its directory was
+            # missing recursed until the stack ran out, and the retry wrote the
+            # cookie a cookieless caller had asked not to write.
+            foreach ([Config::get('app.lang'), self::list()[0] ?? null] as $fallback)
+                if (strlen((string) $fallback) && $fallback !== $lang && self::canSelect($fallback)) return self::locale($fallback, $syncCookie);
+
+            # No language directory at all: nothing to translate from, get() is null.
+            self::$locale = (string) (Config::get('app.lang') ?? $lang);
+            return false;
+        }
         if ($syncCookie) Cookie::set('lang', $lang, time() * 2);
 
         self::$locale = $lang;
@@ -74,7 +85,8 @@ class Lang
     }
 
     /**
-     * Fall back to app.lang when nothing chose a locale.
+     * Choose a locale when nothing has: locale()'s own order - Accept-Language,
+     * then app.lang (which is all there is outside a request).
      *
      * The Language middleware chooses one per request. A terminal command, a
      * scheduled task or a cron script runs no middleware, so currentLocale()
