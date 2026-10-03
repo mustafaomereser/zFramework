@@ -16,6 +16,7 @@ return [
         'url'       => 'must be a valid http or https address.',
         'date'      => 'is not a valid date.',
         'between'   => 'is {now-val}, but must be between {min-val} and {max-val}.',
+        'length'    => 'is {now-val} characters long, but must be {length-val}.',
         'confirmed' => 'does not match {other}.',
     ],
 

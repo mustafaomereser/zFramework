@@ -1413,7 +1413,7 @@ Either way, keep the derived fields in one place — never duplicate them across
 ```php
 Validator::validate($_REQUEST, [
     'email'    => ['required', 'email', 'unique:' . User::class . ';key:email'],
-    'password' => ['required', 'type:string', 'min:8', 'max:72'],
+    'password' => ['required', 'length:8,72'],
     'confirm'  => ['required', 'same:password'],
     'age'      => ['nullable', 'type:int', 'min:18', 'max:120'],
     'role_id'  => ['required', 'exists:' . Role::class . ';key:id'],
@@ -1467,6 +1467,7 @@ $r = Validator::validate(['age' => '150'], ['age' => ['required', 'max:100']], [
 | `url` | A valid **http or https** address |
 | `date` / `date:Y-m-d` | Parseable, or that exact format and a real date in it |
 | `between:18,65` | The same measure min/max use, both ends inclusive |
+| `length:11` / `length:8,72` | Exactly N, or N to M, **characters** (`mb_strlen`) — never the value, whatever the type; elements for an array |
 | `confirmed` / `confirmed:field` | Equal to `<field>_confirmation`, or the named field |
 
 A few that are not obvious:
@@ -1487,9 +1488,11 @@ string, so `'150'` is detected as a number and `max:100` rejects it; `type:strin
 same rule mean "at most 100 characters" and it passes. `int`, `str`, `bool` and `double` are
 accepted spellings.
 
-So **a field whose length matters says `type:string`.** Untyped, `'password' => ['min:8']`
-accepts `"12345"` (12345 ≥ 8) and `'title' => ['max:30']` refuses `"2024"`. The other way round
-is what keeps `'qty' => ['min:1', 'max:10']` working without a type.
+So **a field whose length matters says so.** Untyped, `'password' => ['min:8']` accepts
+`"12345"` (12345 ≥ 8) and `'title' => ['max:30']` refuses `"2024"`. The other way round is what
+keeps `'qty' => ['min:1', 'max:10']` working without a type. For text, `length` is the plain
+spelling — `'password' => ['required', 'length:8,72']`, `'tc' => ['required', 'length:11']` — it
+always counts characters; `type:string` + `min`/`max` does the same.
 
 **`required` and `nullable` together throw** — an exception, not a validation failure. Pick one.
 

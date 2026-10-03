@@ -22,7 +22,7 @@ class SignupRequest extends Request
             // 'username'  => ['required', "exists:' . User::class. ';ex:$parameter1"],
             'username'  => ['required', 'unique:' . User::class],
             'email'     => ['required', 'email', 'unique:' . User::class],
-            'password'  => ['type:string', 'required', 'min:8', 'same:re-password'],
+            'password'  => ['required', 'length:8,72', 'same:re-password'],
             'terms'     => ['required']
         ];
     }

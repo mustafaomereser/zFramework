@@ -56,6 +56,22 @@ test('min/max count characters, not bytes', function () use ($passes) {
     truthy($passes(['t' => 'ğğğ'], ['t' => ['type:string', 'between:3,3']]));
 });
 
+test('length counts characters whatever the value looks like', function () use ($passes) {
+    truthy($passes(['tc' => '12345678901'], ['tc' => ['required', 'length:11']]), 'an all-digit value is still eleven characters');
+    falsy($passes(['tc' => '1234567890'], ['tc' => ['length:11']]));
+    falsy($passes(['p' => '12345'], ['p' => ['length:8,72']]), 'the min:8 trap does not exist here');
+    truthy($passes(['p' => 'şifreğüç'], ['p' => ['length:8,72']]), 'eight Turkish letters');
+    falsy($passes(['p' => str_repeat('a', 73)], ['p' => ['length:8,72']]));
+    truthy($passes(['p' => ''], ['p' => ['nullable', 'length:8,72']]), 'blank passes; required objects to it');
+    truthy($passes(['tags' => ['a', 'b']], ['tags' => ['length:1,3']]), 'an array counts its elements');
+});
+
+test('a length failure says what was expected', function () {
+    Validator::validate(['tc' => '123'], ['tc' => ['length:11']], [], function ($errors) use (&$got) { $got = $errors; });
+    contains('11', $got['tc']['length'] ?? '', 'no message, or no expected length in it');
+    contains('3', $got['tc']['length'] ?? '');
+});
+
 test('an unknown rule is a loud error, not a silent pass', function () {
     throws(\Exception::class, fn() => Validator::validate(['x' => '1'], ['x' => ['no-such-rule']]));
 });

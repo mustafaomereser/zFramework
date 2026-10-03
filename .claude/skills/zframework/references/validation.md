@@ -134,6 +134,7 @@ Note the callback argument changes the control flow — see "What happens on fai
 | `date` / `date:Y-m-d` | parseable, or that exact format and a real date in it |
 | `min:N` / `max:N` | the value for a number, the character count (`mb_strlen`) for a string, the element count for an array |
 | `between:A,B` | the same measure, both ends inclusive |
+| `length:N` / `length:A,B` | exactly N / A to B **characters** (`mb_strlen`), never the value — `"12345"` is 5 whatever the type; element count for an array |
 | `type:x` | declares the type and asserts the value can be read as it |
 | `in:a,b,c` / `not-in:a,b` | membership, compared as strings |
 | `regex:"^[a-z]+$"` | quoted, without delimiters |
@@ -167,9 +168,10 @@ Behaviour that is not obvious:
   `str_repeat('x', 150)` and also rejects the number `150`, and accepts `80`. Declare the type
   when the input is ambiguous — a numeric string is auto-detected as a number, so `'150'` is
   compared as 150, not as 3 characters. `type:string` forces the other reading.
-  **Any field whose length matters needs `type:string`**: `'password' => ['required', 'min:8']`
-  accepts `"12345"` (12345 ≥ 8), and `'title' => ['max:30']` refuses `"2024"`. Write
-  `['required', 'type:string', 'min:8']`.
+  **Any field whose length matters says so**: `'password' => ['required', 'min:8']`
+  accepts `"12345"` (12345 ≥ 8), and `'title' => ['max:30']` refuses `"2024"`. Prefer
+  `length` for text — `['required', 'length:8,72']`, `['length:11']` — which only ever counts
+  characters; `['type:string', 'min:8']` is the older equivalent. min/max stay as they are for numbers.
 - **Every rule except `required` passes on an empty value.** `email`, `min`, `max`, `type` all
   begin with `if (!strlen($value)) return true;`. That is what makes `['nullable', 'email']`
   mean "optional, but a valid address if present".

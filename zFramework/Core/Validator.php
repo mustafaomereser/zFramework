@@ -26,6 +26,7 @@ class Validator
         'url'       => Validator\Rules\Url::class,
         'date'      => Validator\Rules\Date::class,
         'between'   => Validator\Rules\Between::class,
+        'length'    => Validator\Rules\Length::class,
         'confirmed' => Validator\Rules\Confirmed::class,
     ];
 

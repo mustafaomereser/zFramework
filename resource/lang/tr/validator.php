@@ -16,6 +16,7 @@ return [
         'url'       => 'geçerli bir adres olmalıdır (http veya https).',
         'date'      => 'geçerli bir tarih değil.',
         'between'   => 'girdiğiniz {now-val}, {min-val} ile {max-val} arasında olmalıdır.',
+        'length'    => '{now-val} karakter, ama {length-val} karakter olmalıdır.',
         'confirmed' => '{other} ile aynı değil.',
     ],
 
