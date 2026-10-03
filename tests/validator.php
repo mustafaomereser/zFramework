@@ -72,6 +72,24 @@ test('a length failure says what was expected', function () {
     contains('3', $got['tc']['length'] ?? '');
 });
 
+test('a rule the project has no message for still says something', function () {
+    # A 2.x-era language file: required only, nothing for the rules that came later.
+    $dir = BASE_PATH . '/resource/lang/zf_test_old';
+    @mkdir($dir, 0777, true);
+    file_put_contents("$dir/validator.php", "<?php return ['errors' => ['required' => 'ESKI-required']];");
+    $was = \zFramework\Core\Facades\Lang::$locale;
+    Test::cleanup(function () use ($dir, $was) {
+        rrmdir($dir);
+        \zFramework\Core\Facades\Lang::locale($was, false);
+    });
+    \zFramework\Core\Facades\Lang::locale('zf_test_old', false);
+
+    $got = [];
+    Validator::validate(['a' => '', 'b' => 'abc'], ['a' => ['required'], 'b' => ['length:11']], [], function ($errors) use (&$got) { $got = $errors; });
+    contains('ESKI-required', $got['a']['required'], "the project's own message still wins");
+    contains('must be 11', $got['b']['length'], 'no message in the project: the core default, placeholders filled');
+});
+
 test('an unknown rule is a loud error, not a silent pass', function () {
     throws(\Exception::class, fn() => Validator::validate(['x' => '1'], ['x' => ['no-such-rule']]));
 });

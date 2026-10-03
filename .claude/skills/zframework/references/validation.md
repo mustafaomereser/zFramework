@@ -184,7 +184,9 @@ Behaviour that is not obvious:
 
 Messages come from `resource/lang/<locale>/validator.php` — `validator.errors.<rule>` for the
 text and `validator.attributes.<field>` for the field name, with `attributeNames` as the
-fallback.
+fallback. A rule the application's file has no message for (a project older than the rule —
+`update` never touches `resource/lang`) falls back to the core's English text in
+`zFramework/Core/Validator/messages.php`, placeholders filled; the application's own wins.
 
 ## What happens on failure
 

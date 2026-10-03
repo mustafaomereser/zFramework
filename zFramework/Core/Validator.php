@@ -111,7 +111,7 @@ class Validator
                 $rule = self::resolveRule($case);
 
                 if (!$rule->handle($ruleData)) {
-                    $errors[$key][$case] = (Lang::get("validator.attributes.$key") ?? ($attributeNames[$key] ?? $key)) . " " . Lang::get("validator.errors.$case", $rule->errors);
+                    $errors[$key][$case] = (Lang::get("validator.attributes.$key") ?? ($attributeNames[$key] ?? $key)) . " " . self::message($case, $rule->errors);
                     Alerts::danger($errors[$key][$case]);
                     unset($data[$key]);
                 } else $statics[$key] = $value;
@@ -173,6 +173,33 @@ class Validator
         };
 
         return [$type, $length, $detected];
+    }
+
+    /**
+     * The message for a failed rule: the application's translation, else the
+     * core's own (Validator/messages.php).
+     *
+     * resource/lang belongs to the application and `update` never touches it,
+     * so a rule newer than the project's language files used to fail with an
+     * empty message - an upgraded 2.x project had seven 3.x rules answering
+     * with nothing but the field name.
+     *
+     * @param string $case
+     * @param array  $errors placeholders the rule filled in
+     * @return string
+     */
+    private static function message(string $case, array $errors): string
+    {
+        $message = Lang::get("validator.errors.$case", $errors);
+        if (is_string($message) && $message !== '') return $message;
+
+        static $defaults = null;
+        $defaults ??= include __DIR__ . '/Validator/messages.php';
+
+        $message = $defaults[$case] ?? $case;
+        foreach ($errors as $name => $value) $message = str_replace('{' . $name . '}', (string) $value, $message);
+
+        return $message;
     }
 
     /**

@@ -1421,6 +1421,8 @@ Validator::validate($_REQUEST, [
 
 // Custom attribute names in error messages
 Validator::validate($_REQUEST, ['email' => ['required', 'email']], ['email' => 'E-mail Address']);
+// Messages: resource/lang/<locale>/validator.php. A rule with no message there (a project
+// older than the rule) uses the core's English default, zFramework/Core/Validator/messages.php.
 
 // With a callback — custom logic when validation fails.
 // It receives ($errors, $passed). Its return value is discarded and execution
