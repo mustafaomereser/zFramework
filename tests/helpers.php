@@ -100,6 +100,14 @@ test('images open by content, keep transparency and fail soft', function () {
 
     truthy(File::resizeImage('/zf_test_images/png-named.webp', ['width' => 40, 'height' => 40]), 'a PNG called .webp');
     truthy(File::resizeImage('/zf_test_images/g.gif', ['width' => 20, 'height' => 20]), 'imagegif() takes no quality');
+    $gif = File::convertImage('/zf_test_images/t.png', 'gif');
+    $out = imagecreatefromgif(public_dir($gif));
+    same(imagecolortransparent($out), imagecolorat($out, 0, 0), 'a transparent corner is the GIF transparent colour, not black');
+
+    mkdir("$dir/t.png.d");
+    copy("$dir/t.png", "$dir/t.png.d/t.png");
+    same('/zf_test_images/t.png.d/x.png', File::resizeImage('/zf_test_images/t.png.d/t.png', ['width' => 10, 'height' => 10], 'x'), 'the name is replaced in the file, not in the directories');
+    same('/zf_test_images/t.png.d/t-10x10.png', File::resizeImage('/zf_test_images/t.png.d/t.png', ['width' => 10, 'height' => 10]));
     same(false, File::resizeImage('/zf_test_images/broken.png'));
 
     $jpg = File::convertImage('/zf_test_images/t.png', 'jpg');

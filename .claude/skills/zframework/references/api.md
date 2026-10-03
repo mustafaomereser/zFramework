@@ -400,8 +400,11 @@ File::upload(string $path, array $file, array $options = []): string|array|false
     // returns a string or false; from a `multiple` input, always a list.
 File::save(string $path, string $file): string           // downloads a remote URL
 File::download(string $file): never                     // relative to public_dir; '..' outside it -> 404
-File::resizeImage(string $file, array $sizes = [], ?string $new_name = null)
-File::convertImage(string $file, string $to)
+File::resizeImage(string $file, array $sizes = [], ?string $new_name = null): string|false
+    // $file relative to public_dir. $sizes: width=50, height=50, desired_sizes=true (exact; false = fit, keep aspect).
+    // Writes beside the source as <name>-WxH.<ext>, or <new_name>.<ext> (new_name without extension).
+    // Format read from the content, not the extension; transparency kept (GIF: one transparent colour).
+File::convertImage(string $file, string $to): string|false   // <name>.<to>; white behind transparency for jpg/bmp
 File::delete(string $file): bool                        // '..' outside public_dir -> false
 File::executable(string $name): bool                    // php/phtml/phar/cgi/sh/.htaccess/html/svg ..., any dotted segment
 File::humanFileSize(float $bytes, int $decimals = 2)

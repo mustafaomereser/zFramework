@@ -365,8 +365,10 @@ $path = File::upload('/uploads/posts', $_FILES['cover'], [
 ]);
 if ($path === false) { Alerts::danger('Upload failed.'); return back(); }
 
-File::resizeImage(public_dir($path), ['width' => 1200, 'desired_sizes' => true]);
-File::convertImage(public_dir($path), 'webp');
+// Both take the path upload() returned - public_dir() is applied inside.
+// desired_sizes false = fit inside the box keeping the aspect; true = exactly width x height.
+File::resizeImage($path, ['width' => 1200, 'height' => 1200, 'desired_sizes' => false]);   // -> /uploads/posts/x-1200x800.jpg
+File::convertImage($path, 'webp');                                                         // -> /uploads/posts/x.webp
 ```
 
 A multiple input (`name="photos[]"`) returns an array. Delete with `File::delete($path)`.

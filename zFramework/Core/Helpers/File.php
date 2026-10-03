@@ -246,6 +246,29 @@ class File
     }
 
     /**
+     * Turn alpha into GIF's one transparent colour.
+     *
+     * GIF has no alpha channel: imagegif() quantised the transparent canvas and
+     * every transparent pixel came out opaque black. Flattened onto a key colour
+     * that is then declared transparent, fully transparent pixels stay so; a
+     * half-transparent edge takes some of the key colour, which is the format's
+     * limit rather than this code's.
+     *
+     * @param \GdImage $image
+     * @return \GdImage
+     */
+    private static function keyedForGif(\GdImage $image): \GdImage
+    {
+        $flat = imagecreatetruecolor(imagesx($image), imagesy($image));
+        $key  = imagecolorallocate($flat, 1, 254, 1);
+        imagefill($flat, 0, 0, $key);
+        imagecopy($flat, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
+        imagecolortransparent($flat, $key);
+
+        return $flat;
+    }
+
+    /**
      * Write an image in the format its extension names.
      *
      * Quality only where the format takes one on a 0-100 scale: imagepng()'s
@@ -263,7 +286,7 @@ class File
             'jpg'  => fn() => imagejpeg($image, $path, 100),
             'jpeg' => fn() => imagejpeg($image, $path, 100),
             'png'  => fn() => imagepng($image, $path),
-            'gif'  => fn() => imagegif($image, $path),
+            'gif'  => fn() => imagegif(self::keyedForGif($image), $path),
             'webp' => fn() => imagewebp($image, $path, 100),
             'bmp'  => fn() => imagebmp($image, $path),
             'avif' => fn() => function_exists('imageavif') && imageavif($image, $path, 100),
@@ -309,9 +332,11 @@ class File
         $sizes['width']  = max(1, (int) round($sizes['width']));
         $sizes['height'] = max(1, (int) round($sizes['height']));
 
-        $to_save = $new_name
-            ? str_replace($info['filename'], $new_name, $file)
-            : str_replace(".$ext", '', $file) . '-' . implode('x', [$sizes['width'], $sizes['height']]) . ".$ext";
+        # Built from the parts, not by str_replace() over the whole path: the file
+        # name replaced inside the directory names too (t.png under /t/ became
+        # /x/x.png, "public_html" lost its t's), and ".png" did the same to a
+        # directory called "sub.png.d".
+        $to_save = $info['dirname'] . '/' . ($new_name ?? $info['filename'] . '-' . $sizes['width'] . 'x' . $sizes['height']) . '.' . $info['extension'];
 
         $source = self::openImage($file, $probe[2]);
         if (!$source) return false;

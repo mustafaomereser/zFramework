@@ -2542,10 +2542,11 @@ File::upload('/uploads', $_FILES['photos']);      // multiple file input → arr
 // with or without `accept`, a name the server would run (php, phtml, phar, cgi, sh,
 // .htaccess, html, svg …) is refused; every dotted segment counts, so x.php.jpg too
 File::save('/uploads', 'https://example.com/image.jpg');  // download remote file
-File::resizeImage('photo.jpg', ['width' => 800, 'height' => 600, 'desired_sizes' => true], 'out.jpg');
+File::resizeImage('photo.jpg', ['width' => 800, 'height' => 600, 'desired_sizes' => true], 'out');  // -> out.jpg beside it
 File::convertImage('photo.jpg', 'webp');
 // Both read the real format from the file (a PNG named .webp opens), keep transparency
-// (white behind it for jpg/bmp), and return false for an unreadable file or unknown target.
+// (GIF: one transparent colour; white behind it for jpg/bmp), and return false for an
+// unreadable file or unknown target. desired_sizes false fits inside the box, keeping the aspect.
 File::delete('uploads/photo.jpg');               // inside public_dir only: '../' resolves outside and is refused
 ```
 
