@@ -190,7 +190,7 @@ The alert is raised where the rule fails, then one of three exits:
 
 | Situation | What happens |
 |---|---|
-| AJAX request | `abort(400, Response::json($errors))` |
+| AJAX request | `abort(400, Response::json($errors))` → `{"message": "<json string: errors + alerts>", "code": 400, "alerts": {...}}` — `JSON.parse(response.message)` for the errors; alerts appear in both |
 | Normal request | `back()` — redirect to the referer, alerts waiting |
 | A `$callback` was passed | `$callback($errors, $statics)` runs, **execution continues** |
 

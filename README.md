@@ -1435,7 +1435,7 @@ happens:
 
 | Situation | What happens |
 |---|---|
-| AJAX request | `abort(400, Response::json($errors))` — `message` is the errors as a JSON string (what `main.js` parses), `alerts` alongside |
+| AJAX request | `abort(400, Response::json($errors))` — `{"message": "<json>", "code": 400, "alerts": {...}}`: `message` is a JSON *string* of the errors with the alerts inside it too (what `main.js` parses), and the same alerts again at the top level from `abort()` |
 | Normal request | `back()` — redirect to the referer, alerts waiting |
 | A callback was passed | the callback runs and **execution continues** |
 
