@@ -185,6 +185,9 @@ the property, not a constructor argument (that form is `new Mongo('name')` for m
 new Mongo(?string $connection = null)   ->collection(string $name)   // model-less, as new DB()->table()
 
 where(string $key, $a = null, $b = null)         // 2 args = equals; 3 = operator: = != <> > >= < <= LIKE IN 'NOT IN'
+    // a null value throws InvalidArgumentException unless the operator is 'IS NULL'/'IS NOT NULL':
+    // where('deleted_by', 'IS NULL', null). There is no whereNull(). where('user_id', Auth::id())
+    // for a guest throws - guard the null (2.x silently built `= NULL`, which matches nothing).
 whereOr(string $key, $a = null, $b = null)       // OR over the whole chain, as on the SQL side
 whereIn / whereNotIn(string $column, array $in) // [] -> matches nothing / no-op
 whereBetween(string $column, $start, $stop)

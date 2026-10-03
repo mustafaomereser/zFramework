@@ -2357,6 +2357,11 @@ and `_l()` work from `schedule/`, `cron/`, queue jobs and terminal commands; a
 
 Nothing needs rewriting; these are the changes an existing project will notice.
 
+- **`where('col', null)` throws `InvalidArgumentException`** unless the operator is `IS NULL` /
+  `IS NOT NULL` - `where('col', 'IS NULL', null)`. 2.x built `col = NULL`, which matched nothing
+  in silence; the usual way in is `where('user_id', Auth::id())` on a guest, now a 500 that
+  names the column instead of an empty result.
+
 - **`debug`, `error`, `force-https`, `x-powered-by` and `pagination` moved from `config/app.php`
   to `config/framework.php`** - `app.php` is now only what the application is (title, version,
   lang, public); `error` gained `mask` and `previous`. The old place is still read for each of
