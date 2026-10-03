@@ -113,9 +113,10 @@ Verified behaviour, both of which are what make this work:
 - **A bind on the layout fires even when the request rendered a page that `@extends` it.**
   `parseExtends` compiles the parent through `compile()`, which applies the parent's binds and
   merges them back into the child's data. You do not bind per page.
-- **Binds re-run on a cache hit.** The manifest records which binds the chain used and
-  `View::view()` re-applies them before including the compiled file, so bound data is never
-  stale even though the template is not recompiled.
+- **Binds re-run on a cache hit.** The manifest records every view name in the chain and
+  `View::view()` applies whatever binds those names have *now* before including the compiled
+  file, so bound data is never stale and a `View::bind()` added later reaches an already-cached
+  page without `cache clear views`.
 
 Providers are auto-loaded — everything in `App/Providers/*.php` is instantiated at boot, so
 the constructor is where registration goes. Bind the layout by the name pages extend

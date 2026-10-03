@@ -21,8 +21,8 @@ class View
     static $hasDynamicExtends = false;
 
     /**
-     * Tracks which bind keys were used during compilation
-     * so they can be re-applied on cache hits.
+     * Every view name compiled into the page - the page, what it extends, what
+     * it includes - so a cache hit can apply whatever binds those names have now.
      */
     static $usedBinds         = [];
 
@@ -106,10 +106,12 @@ class View
      */
     private static function applyBinds(string $view_name, array $data): array
     {
-        if (isset(self::$binds[$view_name])) {
-            if (!in_array($view_name, self::$usedBinds)) self::$usedBinds[] = $view_name;
-            $data = self::$binds[$view_name]() + $data;
-        }
+        # Recorded whether or not it has a bind yet. Only the bound ones used to be,
+        # so a View::bind() added to a provider after the page was cached never
+        # reached it - the manifest's list was what a cache hit applied, and the
+        # template files it checks had not changed.
+        if (!in_array($view_name, self::$usedBinds)) self::$usedBinds[] = $view_name;
+        if (isset(self::$binds[$view_name])) $data = self::$binds[$view_name]() + $data;
         return $data;
     }
 
@@ -195,7 +197,9 @@ class View
         if (!file_exists($manifestPath)) return null;
 
         $manifest = json_decode(file_get_contents($manifestPath), true);
-        if (!is_array($manifest) || !isset($manifest['files'])) return null;
+        # 'views' rather than the older 'binds': that list named only the views
+        # bound at compile time, so a manifest carrying it is recompiled once.
+        if (!is_array($manifest) || !isset($manifest['files'], $manifest['views'])) return null;
 
         foreach ($manifest['files'] as $file => $mtime) if (!is_file($file) || filemtime($file) !== $mtime) return null;
 
@@ -204,7 +208,7 @@ class View
 
         return [
             'path'  => $cachePath,
-            'binds' => $manifest['binds'] ?? [],
+            'binds' => $manifest['views'],
         ];
     }
 
@@ -213,11 +217,11 @@ class View
      *
      * Manifest stores:
      *   files - dependent file paths and their modification times
-     *   binds - view names that have binds (re-applied on cache hit)
+     *   views - every view name in the chain; their binds are applied on a hit
      */
     private static function saveCache(string $view_name, string $compiled): string
     {
-        $manifest = ['files' => [], 'binds' => self::$usedBinds];
+        $manifest = ['files' => [], 'views' => self::$usedBinds];
         foreach (self::$compiledFiles as $file) $manifest['files'][$file] = filemtime($file);
 
         # Compiled file first, then the manifest that vouches for it, each written

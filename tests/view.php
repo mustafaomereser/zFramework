@@ -35,6 +35,17 @@ test('layout, sections and nested view() keep their own context', function () us
     same(trim($out), trim(View::view('t.page')), 'cache hit renders the same');
 });
 
+test('a bind added after the page was cached still reaches it', function () use ($write) {
+    $write('bound', "<i><?= \$late ?? 'none' ?></i>");
+    contains('<i>none</i>', View::view('t.bound'));
+
+    View::bind('t.bound', fn() => ['late' => 'yes']);
+    Test::cleanup(function () {
+        unset(View::$binds['t.bound']);
+    });
+    contains('<i>yes</i>', View::view('t.bound'), 'the cached page ignored a bind its manifest did not list');
+});
+
 test('abort() inside a template discards the partial output', function () use ($write) {
     $write('boom', "<b>PARTIAL</b>@php abort(404, 'nope') @endphp AFTER");
 
