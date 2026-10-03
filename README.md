@@ -356,7 +356,8 @@ class Post extends Model
     public $db         = 'local';        // connection name from database/connections.php; defaults to first
     public $guard      = ['secret'];     // columns left out when the query names none itself
     public $primary    = 'id';           // auto-detected from schema if omitted
-    public $deleted_at = 'deleted_at';   // used by softDelete trait; config/model.php deleted_at_type: 'date' (default, also when the key is missing) | 'bool'
+    public $deleted_at = 'deleted_at';   // used by softDelete trait; declared here it overrides config/model.php
+    // public $deleted_at_type = 'bool'; // likewise; config default 'date' (also when the key is missing)
     // created_at / updated_at are not set by the model: the migration's `timestamps`
     // gives them DEFAULT CURRENT_TIMESTAMP / ON UPDATE. Their names are global,
     // in config/model.php (`consts`), not per model.

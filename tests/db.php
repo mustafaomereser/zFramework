@@ -83,6 +83,20 @@ class ZfTestItem extends Model
     }
 }
 
+// Its own soft-delete column and sense, declared on the model rather than in config/model.php.
+class ZfTestActive extends Model
+{
+    use \zFramework\Core\Traits\DB\softDelete;
+    public $deleted_at      = 'active';
+    public $deleted_at_type = 'bool';
+    public function __construct()
+    {
+        $this->db    = Test::db();
+        $this->table = Test::table('items');
+        parent::__construct();
+    }
+}
+
 class ZfTestUser extends Model
 {
     public function __construct()
@@ -169,6 +183,17 @@ test('soft-deleted rows are invisible, whereOr included', function () {
 test('withRealOrder ranks only the visible rows', function () {
     $rows = (new ZfTestItem)->orderBy(['id' => 'ASC'])->withRealOrder()->get();
     same(count($rows), (int) $rows[0]['real_order'], 'soft-deleted rows must not inflate the rank');
+});
+
+test('a model declaring its own soft-delete column keeps it', function () use ($pdo, $items) {
+    $model = new ZfTestActive;
+    same(['active', 'bool'], [$model->deleted_at, $model->deleted_at_type], 'the constructor overwrote them from config/model.php');
+
+    $pdo->exec("INSERT INTO $items (title) VALUES ('flag')");
+    (new ZfTestActive)->where('title', 'flag')->delete();
+    $row = $pdo->query("SELECT active, deleted_at FROM $items WHERE title = 'flag'")->fetch(\PDO::FETCH_ASSOC);
+    same([0, null], [(int) $row['active'], $row['deleted_at']], 'the flag column flips, deleted_at is left alone');
+    falsy(in_array('flag', array_column((new ZfTestActive)->get(), 'title'), true));
 });
 
 test('unique honours ex: by the primary key', function () {

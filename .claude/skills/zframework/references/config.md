@@ -134,8 +134,11 @@ Override per send with `Mail::set([...])`.
 'deleted_at_type' => 'date',   // 'date' | 'bool'; missing key = 'date' (a 2.x config has none)
 ```
 `'bool'` inverts the sense on purpose: a column like `status` where 1 means "not deleted".
-Per-model override: the `$created_at` / `$updated_at` / `$deleted_at` properties (set one to
-`null` to disable auto-timestamping).
+Per-model override: declare `$deleted_at` and/or `$deleted_at_type` on the model
+(`public $deleted_at = 'active'; public $deleted_at_type = 'bool';`) and the config value is
+not applied to that model. `$created_at` / `$updated_at` are never read at runtime — the
+timestamps are the migration's `DEFAULT CURRENT_TIMESTAMP` / `ON UPDATE`, and the migration
+takes their names from `consts`; setting them on a model changes nothing.
 
 ## `config/languages.php`
 
