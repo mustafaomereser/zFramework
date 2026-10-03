@@ -2355,20 +2355,32 @@ unchanged, and `--rollback` put 3.1.2 back.
 report flagged. If something is wrong, `php terminal update --rollback` puts the previous core
 back.
 
-### New since 3.2.0
+### What `v3.2.0-release` carries beyond the first 3.2.0
 
 Additive, nothing to migrate: PostgreSQL support (2.8 - a `pgsql:` DSN is the switch), MongoDB
 (2.9 - `database/mongoconnections.php` + `MongoModel`), the test harness (14.4 - `tests/` and
-`php terminal tests`). Behaviour changes worth a glance: `withRealOrder()` ranks only visible rows
-on a softDelete model; `beginTransaction()` refuses non-InnoDB on MySQL only; `abort()` answers
-JSON to `Accept: application/json` as well as to X-Requested-With.
+`php terminal tests`), the `length:N` / `length:A,B` validator rule (always a character count),
+`Auth::login($user, staymein: true)`, and an `update` that reports the entry points and language
+keys it cannot write.
 
-Fixed since (found upgrading a 2.8 project): alerts set before `redirect()`/`back()` reach the
-next page again; an `abort()`/`redirect()` from a middleware that runs at boot is a response,
-not a 500; `abort()` JSON carries `alerts`; `File::resizeImage()`/`convertImage()` no longer
-throw on PHP 8 or blacken transparency; a later `View::bind()` reaches cached pages; `view()`
-and `_l()` work from `schedule/`, `cron/`, queue jobs and terminal commands; a
-`config/model.php` without `deleted_at_type` soft-deletes by date instead of writing NULL.
+Behaviour changes worth a glance:
+- `min`/`max`/`between` count characters (`mb_strlen`), not bytes - a Turkish value measures shorter
+  than before.
+- A key missing from `resource/lang/<locale>/errors.php` or `validator.php` falls back to the
+  core's English (`zFramework/Core/lang/`) instead of being blank; your file still wins.
+- A model's own `$deleted_at` / `$deleted_at_type` now override `config/model.php`.
+- Outside a request (terminal, schedule, cron) the session is memory only - no `session_start()`.
+- Under a worker, an `abort()`/`redirect()` while booting stops the worker with a `LogicException`.
+- `withRealOrder()` ranks only visible rows on a softDelete model; `beginTransaction()` refuses
+  non-InnoDB on MySQL only; `abort()` answers JSON to `Accept: application/json` as well.
+
+Fixed (found upgrading a 2.8 project): alerts set before `redirect()`/`back()` reach the next
+page again; an `abort()`/`redirect()` from a middleware that runs at boot is a response, not a
+500; `abort()` JSON carries `alerts`; `File::resizeImage()`/`convertImage()` no longer throw on
+PHP 8, blacken transparency (GIF included) or rewrite directory names; a later `View::bind()`
+reaches cached pages; `view()` and `_l()` work from `schedule/`, `cron/`, queue jobs and
+terminal commands; a `config/model.php` without `deleted_at_type` soft-deletes by date instead
+of writing NULL; a missing `app.lang` directory no longer recurses forever.
 
 ### Upgrading to 3.2.0
 
