@@ -40,6 +40,26 @@ class Update
      */
     private const CORE = ['bootstrap.php', 'run.php', 'Core', 'Kernel', 'modules'];
 
+    /**
+     * Entry points that live in the application but are written by the framework.
+     * Never replaced - an index.php is often customised - only compared.
+     * Published path => where it lives here.
+     */
+    private const ENTRY_POINTS = [
+        'terminal'              => '/terminal',
+        'cron/cron.php'         => '/cron/cron.php',
+        'public_html/index.php' => null, // public_dir(), whatever the directory is called
+    ];
+
+    /**
+     * Language keys the core itself reads, per file: null for the whole file, or
+     * the subtree. The rest of resource/lang is the application's own text.
+     */
+    private const CORE_LANG = [
+        'errors'    => null,
+        'validator' => 'errors',
+    ];
+
     public static function begin($methods)
     {
         if (in_array('--rollback', Terminal::$parameters)) return self::rollback();
@@ -172,6 +192,9 @@ class Update
 
         # 6. config
         self::configs("$work/$root/config");
+
+        # 6b. application files the release also ships: reported, never written
+        self::projectFiles("$work/$root");
 
         # 7. anything that needs a human
         if (@file_get_contents("$work/$root/composer.json") !== @file_get_contents(BASE_PATH . '/composer.json'))
@@ -327,6 +350,78 @@ class Update
         @unlink("$storage_path/routes.cache.php");
 
         Terminal::text('[color=green]Restored ' . basename($backup) . '.[/color]');
+    }
+
+    /**
+     * What the update could not do for the application, said out loud.
+     *
+     * Only the core is replaced, so an entry point whose new version boots
+     * differently (cron.php gained the error handler and $cron_mode) stayed old
+     * in every project that predates it, and a language file stayed without the
+     * messages of rules added since - an upgraded 2.x project answered seven
+     * 3.x rules with nothing. Neither is safe to overwrite; both are reported,
+     * and a changed entry point is left next to the backup to diff against.
+     *
+     * @param string $shipped The extracted release root.
+     * @return void
+     */
+    private static function projectFiles(string $shipped): void
+    {
+        global $storage_path;
+        $normalise = fn(string $file) => str_replace("\r\n", "\n", (string) @file_get_contents($file));
+        $keep      = "$storage_path/update-shipped";
+
+        # Only this update's: a copy left from an earlier one would be compared with
+        # files it no longer describes.
+        rrmdir($keep);
+
+        foreach (self::ENTRY_POINTS as $published => $local) {
+            $new  = "$shipped/$published";
+            $mine = $local === null ? public_dir('/index.php') : BASE_PATH . $local;
+            if (!is_file($new) || (is_file($mine) && $normalise($mine) === $normalise($new))) continue;
+
+            @mkdir(dirname("$keep/$published"), 0755, true);
+            @copy($new, "$keep/$published");
+            $shown = str_replace(path_fix(BASE_PATH), '', path_fix("$keep/$published"));
+            Terminal::text("[color=yellow]$published differs from this release's - compare with $shown (kept, not applied).[/color]");
+        }
+
+        # Language: only the locales the application has, only the keys the core reads.
+        foreach (self::CORE_LANG as $file => $subtree) {
+            foreach (glob("$shipped/resource/lang/*/$file.php") ?: [] as $source) {
+                $locale = basename(dirname($source));
+                $mine   = BASE_PATH . "/resource/lang/$locale/$file.php";
+                if (!is_dir(dirname($mine))) continue;
+
+                $read = function (string $path) use ($subtree): array {
+                    $data = is_file($path) ? (static fn() => include $path)() : [];
+                    $data = is_array($data) ? $data : [];
+                    return $subtree === null ? $data : (is_array($data[$subtree] ?? null) ? $data[$subtree] : []);
+                };
+
+                $missing = array_diff(self::keyPaths($read($source)), self::keyPaths($read($mine)));
+                if (!$missing) continue;
+
+                $prefix = $file . ($subtree ? ".$subtree" : '');
+                Terminal::text("[color=yellow]resource/lang/$locale/$file.php lacks " . count($missing) . " key(s) the core reads: " . implode(', ', array_map(fn($k) => "$prefix.$k", $missing)) . '[/color]');
+            }
+        }
+    }
+
+    /**
+     * Dotted paths to every leaf of a nested array.
+     *
+     * @param array  $data
+     * @param string $prefix
+     * @return array
+     */
+    private static function keyPaths(array $data, string $prefix = ''): array
+    {
+        $paths = [];
+        foreach ($data as $key => $value)
+            if (is_array($value)) $paths = array_merge($paths, self::keyPaths($value, "$prefix$key."));
+            else $paths[] = "$prefix$key";
+        return $paths;
     }
 
     /**

@@ -2305,8 +2305,19 @@ the core is touched:
 4. back up the five core paths to `storage/update-backup/<version>-<timestamp>`
 5. replace the core
 6. report the config differences, or apply them with `--config`
-7. say so if `composer.json` changed
-8. clear the compiled views and the route cache — both were built against the old core
+7. report what belongs to the application and so is never written (below)
+8. say so if `composer.json` changed
+9. clear the compiled views and the route cache — both were built against the old core
+
+**What the update reports but never writes.** Two kinds of file live in the application yet
+come from the framework:
+
+- **Entry points** — `terminal`, `cron/cron.php`, `public_html/index.php`. When one differs from
+  the release's, the release's copy is left in `storage/update-shipped/` to diff against; a
+  customised `index.php` is why nothing is overwritten. An unedited one: copy it over.
+- **Language keys the core reads** — `errors.php` whole and `validator.php`'s `errors`, for each
+  locale the application has. Missing keys are listed by name. A missing validator message is
+  not blank meanwhile: the rule falls back to the core's English text.
 
 **Config is merged, never overwritten.** `config/app.php` gains keys between versions, and your
 settings live in the same file. The merge takes the file the new version ships and splices only

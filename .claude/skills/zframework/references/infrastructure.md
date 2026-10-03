@@ -307,6 +307,14 @@ still left to a human: a container where both sides added keys (reported as `!`)
 The archive carries a whole project, so most of it is the application. Only the core is
 replaced: `bootstrap.php`, `run.php`, `Core/`, `Kernel/`, `modules/`.
 
+**Reported, never written** — after an update, read these lines and act on them:
+- `<file> differs from this release's - compare with /zFramework/storage/update-shipped/<file>`
+  for `terminal`, `cron/cron.php`, `public_html/index.php`. Diff; take the new one unless the
+  application customised it (index.php often is), then merge by hand.
+- `resource/lang/<locale>/<file>.php lacks N key(s) the core reads: …` — add them to that
+  locale (`errors.*`, `validator.errors.*`). Validator messages fall back to English until then;
+  `errors.*` (csrf, file, mail) have no fallback.
+
 **`zFramework/vendor/` and `zFramework/storage/` are never touched.** Neither is in the
 repository, so replacing `zFramework/` wholesale would delete composer's packages and every
 session, cache, log and lock. Verified across a real run: vendor stayed at 1961 files and
