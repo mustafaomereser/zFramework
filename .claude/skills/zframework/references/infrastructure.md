@@ -321,6 +321,11 @@ replaced: `bootstrap.php`, `run.php`, `Core/`, `Kernel/`, `modules/`.
   (which defers). Do not 'fix' that by copying the value over unless the user says `app.php` is
   not kept per environment.
 
+GitHub requests (branch list, version, archive) retry 3x on a dropped connection, timeout, 5xx or
+429; 403 / 404 fail at once. The red line says which: `no connection to GitHub (…)`, `did not
+answer within 30 seconds`, `refused (HTTP 403) - usually the hourly API limit`, `not found (HTTP
+404) - check the branch name`.
+
 These lines come from the new core: `update` runs `update --report=<extracted release>` in a
 fresh process after the swap. `--report` is internal; it reads a release already on disk.
 

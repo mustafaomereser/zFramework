@@ -2300,6 +2300,10 @@ the core is touched:
 
 **The steps**, in order, each one able to stop before anything is lost:
 
+Every request to GitHub - the branch list, the version, the archive - is tried three times
+when the connection drops, times out or gets a 5xx/429; a 403 (the API's hourly limit for your
+address) or a 404 is reported at once, and every failure says which of these it was.
+
 1. read the version from one remote file, rather than downloading an archive to find out
 2. download, and check the first two bytes are `PK` — a failed request arrives as an HTML page
 3. extract to `storage/update`, and refuse to continue unless it really contains a framework

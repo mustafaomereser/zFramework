@@ -140,7 +140,7 @@ class Update
         Terminal::text('[color=yellow]downloading...[/color]');
         $zip = "$work/source.zip";
         if (!self::download('https://github.com/' . self::REPO . '/archive/refs/heads/' . $branch . '.zip', $zip)) {
-            return Terminal::text('[color=red]Download failed.[/color]');
+            return Terminal::text('[color=red]Download failed - ' . (self::$fetchError ?? 'could not write storage/update/source.zip') . '.[/color]');
         }
 
         # A failed request often arrives as an HTML error page. Checking the
@@ -304,7 +304,7 @@ class Update
         $list = $body !== null ? json_decode($body, true) : null;
 
         if (!is_array($list)) {
-            Terminal::text('[color=red]Cannot list the branches - GitHub did not answer.[/color]');
+            Terminal::text('[color=red]Cannot list the branches - ' . (self::$fetchError ?? 'GitHub sent something that is not a branch list') . '.[/color]');
             return null;
         }
 
@@ -625,7 +625,7 @@ class Update
         $body = self::fetch($url);
 
         if ($body === null) {
-            Terminal::text('[color=red]Cannot reach GitHub.[/color]');
+            Terminal::text('[color=red]Cannot read the remote version - ' . self::$fetchError . '.[/color]');
             return null;
         }
 
@@ -641,28 +641,84 @@ class Update
      * @param string $url
      * @return string|null
      */
+    /**
+     * Why the last fetch() gave up, in words a person can act on. Null after a success.
+     */
+    private static ?string $fetchError = null;
+
+    /**
+     * GET a url, retrying what a retry can fix.
+     *
+     * api.github.com does not answer every request on every network - one
+     * project saw 200, nothing, 200 on three tries in a row - and a single miss
+     * ended the update with "GitHub did not answer". A dropped connection, a
+     * timeout, 429 and 5xx are tried three times, a second and then two apart.
+     * 403 (the API's hourly limit per IP) and 404 are answers, not accidents,
+     * and are reported at once.
+     *
+     * @param string $url
+     * @return string|null The body on 200; null with $fetchError set otherwise.
+     */
     private static function fetch(string $url): ?string
+    {
+        self::$fetchError = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            if ($attempt > 1) sleep($attempt - 1);
+
+            [$body, $code, $error, $timeout] = self::request($url);
+            if ($body !== null && $code === 200) {
+                self::$fetchError = null;
+                return $body;
+            }
+
+            self::$fetchError = match (true) {
+                $timeout                  => 'GitHub did not answer within 30 seconds',
+                $code === 0               => 'no connection to GitHub' . ($error ? " ($error)" : ''),
+                $code === 403             => 'GitHub refused (HTTP 403) - usually the hourly API limit for this address; try again later',
+                $code === 404             => 'not found on GitHub (HTTP 404) - check the branch name',
+                default                   => "GitHub answered HTTP $code",
+            };
+
+            if (in_array($code, [403, 404], true)) break;
+        }
+
+        if ($attempt > 1) self::$fetchError .= ', ' . min($attempt, 3) . ' attempts';
+        return null;
+    }
+
+    /**
+     * One GET.
+     *
+     * @param string $url
+     * @return array{0: ?string, 1: int, 2: string, 3: bool} body, HTTP code (0 for none), error, timed out
+     */
+    private static function request(string $url): array
     {
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_CONNECTTIMEOUT => 10,
                 CURLOPT_TIMEOUT        => 30,
                 CURLOPT_USERAGENT      => 'zFramework-updater',
             ]);
-            $body = curl_exec($ch);
-            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $body  = curl_exec($ch);
+            $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $errno = curl_errno($ch);
+            $error = curl_error($ch);
             curl_close($ch);
 
-            return ($body !== false && $code === 200) ? (string) $body : null;
+            return [$body === false ? null : (string) $body, $code, $error, $errno === CURLE_OPERATION_TIMEDOUT];
         }
 
         # allow_url_fopen is off on plenty of shared hosts, which is why curl is
         # tried first rather than this.
-        $body = @file_get_contents($url);
+        $body = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 30, 'user_agent' => 'zFramework-updater', 'ignore_errors' => true]]));
+        $code = preg_match('#^HTTP/\S+\s+(\d+)#', $http_response_header[0] ?? '', $m) ? (int) $m[1] : 0;
 
-        return $body === false ? null : $body;
+        return [$body === false ? null : $body, $code, $body === false ? 'request failed' : '', false];
     }
 
     /**
