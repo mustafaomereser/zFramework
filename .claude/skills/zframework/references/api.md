@@ -350,6 +350,8 @@ Queue::run(array $entry)                Queue::retry(array $entry, int $maxAttem
 // shipped jobs: zFramework\Core\Jobs\SendMail, SendPushNotifications
 
 Defer::after(\Closure $job, string $label = '')   // runs after the response is sent
+    // connection closed by litespeed_finish_request() (LSAPI) or fastcgi_finish_request() (FPM);
+    // under php -S / a worker the jobs still run, but before the client gets its response
 Defer::pending(): bool                  Defer::flush()
 ```
 

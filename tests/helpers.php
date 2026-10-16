@@ -166,3 +166,17 @@ test('abort() as JSON carries the pending alerts', function () {
     same(['danger', 'zf-test-alert'], array_values($body['alerts'] ?? [])[0] ?? null);
     falsy($e->navigates(), 'an abort consumes the alerts');
 });
+
+test('Defer closes the connection under LiteSpeed too, before the jobs run', function () {
+    # CLI has neither finish function. This file runs in its own process, so a
+    # stand-in for LSAPI's can be declared here without leaking anywhere.
+    if (function_exists('litespeed_finish_request')) return skip('a real LSAPI is loaded');
+    $GLOBALS['zf_defer_order'] = [];
+    eval('function litespeed_finish_request() { $GLOBALS["zf_defer_order"][] = "released"; return true; }');
+
+    \zFramework\Core\Facades\Defer::flushRequestState();
+    \zFramework\Core\Facades\Defer::after(function () { $GLOBALS['zf_defer_order'][] = 'job'; }, 'zf-test');
+    \zFramework\Core\Facades\Defer::flush();
+
+    same(['released', 'job'], $GLOBALS['zf_defer_order'], 'checking fastcgi_finish_request() alone kept LiteSpeed visitors waiting for the job');
+});

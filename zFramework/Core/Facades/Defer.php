@@ -109,9 +109,7 @@ class Defer
         # second must not delay what the user's next request reads.
         Session::flush();
 
-        # PHP-FPM only. Under the CLI dev server the jobs still run, the user just
-        # waits for them - same behaviour, different timing.
-        if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+        self::release();
 
         # index.php disables the collector for request speed; background work can
         # run long enough to need it.
@@ -136,11 +134,31 @@ class Defer
     }
 
     /**
+     * Hand the response to the client and close the connection, so the jobs run
+     * without anyone waiting on them.
+     *
+     * Each SAPI has its own call. PHP-FPM: fastcgi_finish_request(). LiteSpeed's
+     * own SAPI (LSAPI, the default on LiteSpeed and most cPanel hosts with it):
+     * litespeed_finish_request() - fastcgi_finish_request() does not exist there,
+     * and checking for it alone made every visitor wait out the deferred work.
+     * Neither under the CLI dev server or a worker: the jobs still run, the user
+     * just waits for them - same behaviour, different timing.
+     *
+     * @return bool Whether the connection was closed.
+     */
+    private static function release(): bool
+    {
+        if (function_exists('litespeed_finish_request')) return (bool) litespeed_finish_request();
+        if (function_exists('fastcgi_finish_request'))   return (bool) fastcgi_finish_request();
+        return false;
+    }
+
+    /**
      * Record a failed or slow job without ending the loop.
      *
      * errorHandler() writes the log and then aborts, and the abort throws. That is
      * right in a request and meaningless here - the response left at
-     * fastcgi_finish_request(), so the signal has nothing to turn into a 500 and
+     * release(), so the signal has nothing to turn into a 500 and
      * would only skip every job still queued. From the finally block it would take
      * the job's own exception with it.
      *

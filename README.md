@@ -1728,8 +1728,9 @@ a real queue.
 - **Nothing is persisted.** If the process dies after responding (deploy, FPM
   recycle via `pm.max_requests`, a fatal, `request_terminate_timeout` — which
   counts this time too) the job is gone. No retry, no trace.
-- **PHP-FPM only.** Under `php terminal run` the jobs still run, the user just
-  waits for them.
+- **PHP-FPM or LiteSpeed (LSAPI).** The connection is closed with
+  `fastcgi_finish_request()` or `litespeed_finish_request()`, whichever the SAPI has. Under
+  `php terminal run` or a worker the jobs still run, the user just waits for them.
 
 So it fits work whose loss is survivable: stats, logs, cache warming. For work
 that must not be lost — mail, payment notifications — what you defer should
