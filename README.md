@@ -2383,6 +2383,28 @@ unchanged, and `--rollback` put 3.1.2 back.
 report flagged. If something is wrong, `php terminal update --rollback` puts the previous core
 back.
 
+### Upgrading to 3.3.0
+
+Mostly fixes from the 2026-10-28 security review, plus AutoSSL. What an existing project notices:
+
+- **`AutoSSL::PROD` / `AutoSSL::STAGING` are gone** - write `AutoSSL::LE_PROD` / `AutoSSL::LE_STAGING`
+  (same URLs). New: `GTS_PROD` / `GTS_STAGING` for Google Trust Services, with an EAB key (§17).
+  Renewals no longer need `storage/AutoSSL` deleted: every issuance gets a fresh key and CSR,
+  `renewAll()` keeps every name, and an account the CA stopped accepting is retired and replaced.
+- **`auth-token` is `id|expires|hmac` in cookie mode** - a bare id is no longer accepted, so visitors
+  signed in without remember-me sign in once after updating; remember-me visitors do not notice.
+  Redis token mode is unchanged.
+- **Sign-in and sign-out give the session a new id and new CSRF tokens.** A page that posts again
+  after an AJAX sign-in without reloading gets a 406 once (`main.js` reloads on it).
+- **`ip()` reads X-Forwarded-For from the right, and `Client-IP` never**; only behind an address in
+  `framework.trusted-proxies` (now also CIDR ranges and `'cloudflare'`). Page cache keys on `host()`.
+- **`cURL` is one request per instance** - `cURL::set($url)->...->send()` reads the same, but
+  `cURL::post()` and the rest can no longer be called statically without `set()`. New: `method()`,
+  response headers in `$info['headers']`, default timeouts (§16).
+- A `_token` that is not a string is a 406, not a 500. `Auth::user()` leaves out the model's
+  `$guard` columns; the skeleton `User` guards `password`. `Defer` closes the connection under
+  LiteSpeed too. `update` retries GitHub and reports from the new core.
+
 ### What `v3.2.0-release` carries beyond the first 3.2.0
 
 Additive, nothing to migrate: PostgreSQL support (2.8 - a `pgsql:` DSN is the switch), MongoDB
