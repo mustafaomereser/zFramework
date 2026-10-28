@@ -600,6 +600,11 @@ Auth::token_login('api_token_string');
 // Logout — clears session/cookie tokens
 Auth::logout();
 
+// Signing in and out (login(), attempt(), logout()) gives the session a new id and new CSRF
+// tokens; its contents (alerts...) move along. Only ids the server issued are accepted
+// (session.use_strict_mode). A page that posts again without reloading after an AJAX sign-in
+// holds a stale token: main.js reloads on the 406.
+
 Auth::check();   // bool — is a user currently authenticated?
 Auth::user();    // the authenticated user's row, or false
 Auth::id();      // int|null — authenticated user's id

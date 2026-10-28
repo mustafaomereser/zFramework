@@ -251,6 +251,7 @@ Auth::forgetCache(string|int|null $id = null)
 Session::set(string $key, mixed $value): self
 Session::get(string $key): mixed        Session::delete(string $key): self
 Session::flush()                        Session::callback(\Closure $cb): mixed
+Session::regenerate(): void             // new id, same contents, old record deleted (Auth calls it on sign-in/out)
 // CLI outside a worker (terminal, schedule, cron, queue): memory only for the process -
 // no session_start(), no "headers already sent" warning, nothing persisted.
 

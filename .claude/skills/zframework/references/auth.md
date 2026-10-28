@@ -14,6 +14,8 @@ Auth::check(): bool
 Auth::user()                            // array, or false when nobody is logged in
 Auth::id(): ?int
 Auth::logout(): bool
+    // login()/attempt()/logout() regenerate the session id (contents kept) and reset the CSRF tokens -
+    // a form rendered before signing in answers 406 after it. Not in API mode (no session).
 Auth::model(): User                     // the user model, built lazily
 Auth::encodePassword(?string $plain): string|bool
 Auth::forgetCache(string|int|null $id = null): void

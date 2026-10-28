@@ -95,6 +95,41 @@ class Session
     }
 
     /**
+     * Give the session a new id, keeping what is in it.
+     *
+     * Called on sign-in and sign-out. An id that was known before - planted in
+     * the visitor's browser, or read off a shared machine - stops meaning
+     * anything: the old record is deleted, and the new id is not one anyone has
+     * seen. Alerts and the like move along with it.
+     *
+     * @return void
+     */
+    public static function regenerate(): void
+    {
+        # Memory only outside a request; see load(). Nothing to renumber.
+        if (PHP_SAPI === 'cli' && !defined('ZF_WORKER')) return;
+
+        # The new id has to reach the browser as a cookie. Under FPM the request
+        # buffer keeps headers unsent until shutdown (Run::handle()); a worker
+        # sends the cookie itself whenever session_id() moved.
+        if (headers_sent()) return;
+
+        self::load();
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_cache_limiter('');
+            self::cookieParams();
+            session_start();
+        }
+
+        # What this request has changed so far goes along to the new id.
+        $_SESSION = self::$cache;
+        session_regenerate_id(true);
+        session_write_close();
+        self::$dirty = false;
+    }
+
+    /**
      * Drop the in-memory session so the next request loads its own.
      *
      * flush() is called first: a long-running worker has no script shutdown, so

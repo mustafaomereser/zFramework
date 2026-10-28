@@ -50,7 +50,11 @@ if (!isset($cron_mode)) {
     # Config falls back to one config file per subject.
     if ($framework) $GLOBALS['framework_config'] = $framework;
 
-    $session_config = $framework['session'] ?? (@include(BASE_PATH . "/config/session.php") ?: []);
+    // Only ids this server issued. Without it a session id chosen by the visitor -
+    // or planted in their browser by someone else - was accepted and created as-is.
+    ini_set('session.use_strict_mode', '1');
+
+    $session_config =$framework['session'] ?? (@include(BASE_PATH . "/config/session.php") ?: []);
     $redis_config   = ($session_config['driver'] ?? 'file') === 'redis'
         ? ($framework['redis'] ?? (@include(BASE_PATH . "/config/redis.php") ?: []))
         : [];

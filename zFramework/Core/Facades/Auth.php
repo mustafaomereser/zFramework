@@ -250,6 +250,8 @@ class Auth
     {
         if (!isset($user['id'])) return false;
 
+        self::rotateSession();
+
         if ($staymein) $user = self::remember($user);
 
         if (self::tokenMode()) {
@@ -312,7 +314,27 @@ class Auth
         self::forget('auth-session');
         self::forget('auth-token');
         self::forget('auth-password');
+        self::rotateSession();
         return true;
+    }
+
+    /**
+     * A new session id and new CSRF tokens when the identity changes.
+     *
+     * Without it the session outlived sign-in and sign-out under the same id, and
+     * the session accepted any id the browser offered: a session planted in the
+     * visitor's browser before they signed in - with a CSRF token the planter had
+     * read - was still theirs afterwards. The tokens go too, since the id alone
+     * would leave the planted token valid. Not in API mode, which has no session.
+     *
+     * @return void
+     */
+    private static function rotateSession(): void
+    {
+        if (self::$api_mode) return;
+
+        Session::regenerate();
+        \zFramework\Core\Csrf::unset();
     }
 
     /**

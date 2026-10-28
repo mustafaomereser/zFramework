@@ -185,6 +185,46 @@ test('Auth::login() can issue the remember-me cookie itself', function () {
     contains('|', \zFramework\Core\Crypter::decode($_COOKIE[$cookie]), 'the same token|trace format attempt() writes');
 });
 
+test('a session id is the server\'s, and signing in replaces it', function () use ($port) {
+    # Its own jar: the shared one is signed in by now.
+    $jar = tempnam(sys_get_temp_dir(), 'zf_test_jar');
+    Test::cleanup(fn() => @unlink($jar));
+    $send = function (string $path, ?string $body = null, array $headers = []) use ($port, $jar): array {
+        $ch = curl_init("http://127.0.0.1:$port$path");
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIEFILE => $jar, CURLOPT_COOKIEJAR => $jar, CURLOPT_HEADER => true, CURLOPT_HTTPHEADER => $headers, CURLOPT_TIMEOUT => 10]);
+        if ($body !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        $out  = curl_exec($ch);
+        $info = curl_getinfo($ch);
+        curl_close($ch);
+        return [$info['http_code'], substr((string) $out, 0, $info['header_size']), substr((string) $out, $info['header_size'])];
+    };
+    $sid = fn(string $headers) => preg_match('/^Set-Cookie: PHPSESSID=([^;\r\n]+)/mi', $headers, $m) ? $m[1] : null;
+
+    # An id nobody issued is not adopted.
+    [, $headers] = $send('/auth', null, ['Cookie: PHPSESSID=zfplantedsession1234567890']);
+    $issued = $sid($headers);
+    truthy($issued && $issued !== 'zfplantedsession1234567890', 'a planted session id was taken as-is');
+    falsy(is_file(FRAMEWORK_PATH . '/storage/sessions/sess_zfplantedsession1234567890'), 'and a session file was created under it');
+
+    @rrmdir(FRAMEWORK_PATH . '/storage/ratelimit');
+    [, $headers, $body] = $send('/auth');
+    preg_match("/_token' value='([^']+)'/", $body, $m);
+    $before = $m[1] ?? '';
+    $id     = $sid($headers) ?? $issued;
+
+    [$code, $headers, $json] = $send('/sign-in', "_token=$before&email=admin@localhost.com&password=admin");
+    if (!str_contains((string) $json, '"status":1')) skip('no seeded admin user on this database (`db migrate --seed`)');
+
+    $after = $sid($headers);
+    truthy($after && $after !== $id, 'the session kept the id it had before signing in');
+    falsy(is_file(FRAMEWORK_PATH . "/storage/sessions/sess_$id"), 'the old session record is still there');
+
+    [$reused] = $send('/sign-out', "_token=$before");
+    same(406, $reused, 'a CSRF token read before signing in still works after it');
+
+    @rrmdir(FRAMEWORK_PATH . '/storage/ratelimit');
+});
+
 test('json is answered as json', function () use ($request) {
     [$code, $headers] = $request('/no/such/page', null, ['Accept: application/json']);
     same(404, $code);
