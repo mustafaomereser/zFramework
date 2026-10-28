@@ -10,9 +10,9 @@ query analysis, long-running workers, backups, releases.
 `zFramework\Core\Helpers\AutoSSL`. Implements the protocol directly; no shell, no certbot.
 
 ```php
-$ssl = new AutoSSL(AutoSSL::PROD);                    // Let's Encrypt (= LE_PROD); STAGING / LE_STAGING while testing
-$ssl = new AutoSSL(AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');   // custom openssl.cnf
-$ssl = new AutoSSL(AutoSSL::PROD, null, $accountId);  // sign as a specific account (verified with the CA; unusable throws)
+$ssl = new AutoSSL(AutoSSL::LE_PROD);                    // Let's Encrypt; LE_STAGING while testing (PROD / STAGING were removed in 3.3)
+$ssl = new AutoSSL(AutoSSL::LE_PROD, 'D:\xampp\apache\conf\openssl.cnf');   // custom openssl.cnf
+$ssl = new AutoSSL(AutoSSL::LE_PROD, null, $accountId);  // sign as a specific account (verified with the CA; unusable throws)
 // Google Trust Services: GTS_PROD / GTS_STAGING. Requires External Account Binding for the FIRST
 // registration only - key pair from `gcloud publicca external-account-keys create` (staging needs its own):
 $ssl = new AutoSSL(AutoSSL::GTS_PROD, null, null, ['kid' => $eabKid, 'hmac' => $eabHmac]);
@@ -95,7 +95,7 @@ a 5xx / short `Retry-After` once, requests time out (15 s connect, 60 s total), 
 `HTTP 400 badCSR - <detail>` rather than a raw body. Each issued folder gets `meta.json`
 (domains, ca, account, issued). `tests/autossl.php` runs the client against a stub CA.
 
-Use `AutoSSL::STAGING` while developing — production has rate limits that lock you out for a week.
+Use `AutoSSL::LE_STAGING` while developing — production has rate limits that lock you out for a week.
 Install the result on cPanel with `cPanel\SSL::install()` below.
 
 ---

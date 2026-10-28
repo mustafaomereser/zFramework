@@ -2626,13 +2626,16 @@ directory url). Supports `http-01` and `dns-01` challenges.
 ```php
 use zFramework\Core\Helpers\AutoSSL;
 
-$ssl = new AutoSSL(AutoSSL::PROD);
+$ssl = new AutoSSL(AutoSSL::LE_PROD);
 // On Windows with custom OpenSSL binary:
-$ssl = new AutoSSL(AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');
+$ssl = new AutoSSL(AutoSSL::LE_PROD, 'D:\xampp\apache\conf\openssl.cnf');
 
 // Staging (for testing):
-$ssl = new AutoSSL(AutoSSL::STAGING);
+$ssl = new AutoSSL(AutoSSL::LE_STAGING);
 ```
+
+`AutoSSL::PROD` / `AutoSSL::STAGING` were removed in 3.3: write `LE_PROD` / `LE_STAGING` (same Let's
+Encrypt directories), next to `GTS_PROD` / `GTS_STAGING`.
 
 On Windows without `OPENSSL_CONF` the minimal `openssl.cnf` the framework ships is used, so the
 second argument is only needed for a config of your own.
@@ -2661,9 +2664,9 @@ holding `account.key` and `account.kid`. The id is a number — the date and tim
 created plus three random digits — so a listing sorts by age.
 
 ```php
-$ssl = new AutoSSL(AutoSSL::PROD);                       // the oldest account registered with THIS CA that the CA
+$ssl = new AutoSSL(AutoSSL::LE_PROD);                       // the oldest account registered with THIS CA that the CA
                                                          // still accepts (checked on construction), or a new one
-$ssl = new AutoSSL(AutoSSL::PROD, null, '20260902195802774');   // a specific one - throws if the CA rejects it
+$ssl = new AutoSSL(AutoSSL::LE_PROD, null, '20260902195802774');   // a specific one - throws if the CA rejects it
 
 $ssl->account();          // id of the account this instance signs with
 $ssl->accounts();         // every account on disk, oldest first:

@@ -8,11 +8,9 @@ use ZipArchive;
 
 class AutoSSL
 {
-    # Let's Encrypt. PROD / STAGING stay as they were; the LE_ names say which CA.
-    public const STAGING    = 'https://acme-staging-v02.api.letsencrypt.org/directory';
-    public const PROD       = 'https://acme-v02.api.letsencrypt.org/directory';
-    public const LE_STAGING = self::STAGING;
-    public const LE_PROD    = self::PROD;
+    # Let's Encrypt.
+    public const LE_STAGING = 'https://acme-staging-v02.api.letsencrypt.org/directory';
+    public const LE_PROD    = 'https://acme-v02.api.letsencrypt.org/directory';
 
     # Google Trust Services (https://pki.goog). Both require External Account
     # Binding: an account is registered once with an EAB key from Google Cloud -
@@ -50,7 +48,7 @@ class AutoSSL
     private ?array $eab = null;
 
     /**
-     * @param string      $directoryUrl  AutoSSL::PROD / STAGING (Let's Encrypt), GTS_PROD / GTS_STAGING, or any ACME directory.
+     * @param string      $directoryUrl  AutoSSL::LE_PROD / LE_STAGING, GTS_PROD / GTS_STAGING, or any ACME directory.
      * @param string|null $openSSLConfig Path to an openssl.cnf, for Windows.
      * @param string|null $account       Which account to work as - an id from accounts().
      *                                   Null takes the oldest one there is, or registers
@@ -59,7 +57,7 @@ class AutoSSL
      *                                   Account Binding (GTS) and an account has to be registered.
      *                                   Used once; the registered account then works without it.
      */
-    public function __construct(string $directoryUrl = self::STAGING, ?string $openSSLConfig = null, ?string $account = null, ?array $eab = null)
+    public function __construct(string $directoryUrl = self::LE_STAGING,?string $openSSLConfig = null, ?string $account = null, ?array $eab = null)
     {
         $this->eab = $eab;
         global $storage_path;
@@ -102,7 +100,7 @@ class AutoSSL
         $usable = array_filter($this->accounts(), fn($a) => $a['usable']);
         uasort($usable, fn($a, $b) => [!$a['registered'], $a['id']] <=> [!$b['registered'], $b['id']]);
 
-        foreach ($usable as $id => $info) {
+        foreach (array_keys($usable) as $id) {
             try {
                 $this->useAccount($id);
             } catch (\InvalidArgumentException) {
