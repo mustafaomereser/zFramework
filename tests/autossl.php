@@ -104,19 +104,23 @@ if (preg_match('#^/acct/\w+$#', $path)) $reply(200, ['status' => $S['accounts'][
 if ($path === '/new-order') {
     $oid = (string) count($S['orders']);
     $ids = array_column($payload['identifiers'], 'value');
-    $S['orders'][$oid] = ['ids' => $ids, 'valid' => array_fill(0, count($ids), false), 'reads' => 0, 'status' => 'pending'];
+    # prevalid: authorizations the CA still holds from earlier (Let's Encrypt keeps them up to 30 days).
+    $S['orders'][$oid] = ['ids' => $ids, 'valid' => array_fill(0, count($ids), !empty($S['prevalid'])), 'reads' => 0, 'status' => 'pending'];
     $reply(201, ['status' => 'pending', 'finalize' => "{$S['base']}/finalize/$oid", 'authorizations' => array_map(fn($i) => "{$S['base']}/authz/$oid/$i", array_keys($ids))], ['Location' => "{$S['base']}/order/$oid"]);
 }
 
 if (preg_match('#^/authz/(\d+)/(\d+)$#', $path, $a)) {
-    $o = $S['orders'][$a[1]];
-    $reply(200, ['identifier' => ['type' => 'dns', 'value' => $o['ids'][$a[2]]], 'status' => $o['valid'][$a[2]] ? 'valid' : 'pending',
-        'challenges' => [['type' => 'http-01', 'url' => "{$S['base']}/chall/{$a[1]}/{$a[2]}", 'token' => "tok{$a[1]}x{$a[2]}"]]]);
+    $o         = $S['orders'][$a[1]];
+    $challenge = ['type' => 'http-01', 'url' => "{$S['base']}/chall/{$a[1]}/{$a[2]}", 'token' => "tok{$a[1]}x{$a[2]}"];
+    $status    = $o['valid'][$a[2]] === 'invalid' ? 'invalid' : ($o['valid'][$a[2]] ? 'valid' : 'pending');
+    if ($status === 'invalid') $challenge['error'] = ['type' => 'urn:ietf:params:acme:error:unauthorized', 'detail' => "Invalid response from http://{$o['ids'][$a[2]]}/.well-known/acme-challenge/{$challenge['token']}: 404"];
+    $reply(200, ['identifier' => ['type' => 'dns', 'value' => $o['ids'][$a[2]]], 'status' => $status, 'challenges' => [$challenge]]);
 }
 
 if (preg_match('#^/chall/(\d+)/(\d+)$#', $path, $a)) {
-    $S['orders'][$a[1]]['valid'][$a[2]] = true;
-    $reply(200, ['status' => 'valid']);
+    # fail_challenge: the CA could not fetch the file - the most common real failure.
+    $S['orders'][$a[1]]['valid'][$a[2]] = !empty($S['fail_challenge']) ? 'invalid' : true;
+    $reply(200, ['status' => 'processing']);
 }
 
 if (preg_match('#^/order/(\d+)$#', $path, $a)) {
@@ -271,4 +275,32 @@ test('an account the CA no longer knows is retired, not failed on forever', func
     truthy($fresh->account() !== $old, 'still signing as the account the CA rejects');
     contains('JWS verification error', (string) $fresh->accounts()[$old]['retired']);
     falsy($fresh->accounts()[$old]['usable']);
+});
+
+test('authorizations the CA still holds as valid are not challenged again', function () use ($state, $directory, $cnf) {
+    $state(['eab_required' => false, 'ready_lag' => 0, 'prevalid' => true, 'fail_challenge' => false, 'log' => []]);
+
+    $ssl   = new AutoSSL($directory, $cnf);
+    $order = $ssl->newOrder(['e.zf.test']);
+    same([], $ssl->challenge($order['authorizations']), 'a TXT record / challenge file asked for an authorization that is already valid');
+
+    $cert = $ssl->issue(['f.zf.test']);
+    truthy($cert['cert']);
+    same([], preg_grep('#^/chall/#', $state()['log']), 'a challenge was notified for nothing');
+});
+
+test('a failed authorization says why, and leaves no challenge file behind', function () use ($state, $directory, $cnf) {
+    $state(['eab_required' => false, 'ready_lag' => 0, 'prevalid' => false, 'fail_challenge' => true]);
+    $files = public_dir('/.well-known/acme-challenge');
+
+    $ssl = new AutoSSL($directory, $cnf);
+    try {
+        $ssl->issue(['g.zf.test']);
+        $message = 'no exception';
+    } catch (\Exception $e) {
+        $message = $e->getMessage();
+    }
+
+    contains('Invalid response from http://g.zf.test/.well-known/acme-challenge/', $message);
+    same([], glob("$files/*") ?: [], 'the challenge file was left in public_html');
 });

@@ -173,7 +173,7 @@ class AutoSSL
     /**
      * Every account on disk, oldest first.
      *
-     * @return array<string, array{id: string, kid: ?string, registered: bool, created: string, current: bool}>
+     * @return array<string, array{id: string, kid: ?string, registered: bool, ca: ?string, retired: string|false, usable: bool, created: string, current: bool}>
      */
     public function accounts(): array
     {
@@ -538,7 +538,7 @@ class AutoSSL
             throw new \InvalidArgumentException('AutoSSL: account `' . $this->account . '` is not registered yet and ' . parse_url($this->directoryUrl, PHP_URL_HOST) . ' requires External Account Binding - pass the EAB key to the constructor or createAccount().');
 
         $resp = $this->postAsJWS($url, $payload);
-        if (!in_array($resp['status'], [200, 201])) throw new \Exception("Account creation failed: " . $resp['body']);
+        if (!in_array($resp['status'], [200, 201])) throw new \Exception("Account creation failed: " . self::problem($resp));
 
         # One registration per EAB key: it is spent now.
         $this->eab = null;
@@ -562,7 +562,7 @@ class AutoSSL
         $id  = basename($id ?? $this->account);
         $dir = $this->accountsPath . "/$id";
 
-        foreach (['account.kid', 'account.key'] as $file) if (is_file("$dir/$file")) unlink("$dir/$file");
+        foreach (['account.kid', 'account.key', 'account.retired'] as $file) if (is_file("$dir/$file")) unlink("$dir/$file");
         if (is_dir($dir)) @rmdir($dir);
 
         if ($id === $this->account) {
@@ -597,10 +597,13 @@ class AutoSSL
 
         $zip      = new ZipArchive();
         $temp_zip = tempnam(sys_get_temp_dir(), 'zip');
-        if ($zip->open($temp_zip, ZipArchive::CREATE) !== TRUE) exit("Zip cannot open!");
+        # An exception, not exit(): exit ended the whole process - a worker included.
+        if ($zip->open($temp_zip, ZipArchive::CREATE) !== TRUE) throw new \RuntimeException("Zip cannot open!");
         $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($folder, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::LEAVES_ONLY);
         foreach ($files as $file) {
             $filePath = $file->getRealPath();
+            # A half-finished renewal's key is not part of what is installed.
+            if (str_ends_with($filePath, '.new')) continue;
             $zip->addFile($filePath, substr($filePath, strlen($folder) + 1));
         }
         $zip->close();
@@ -647,6 +650,7 @@ class AutoSSL
                 'url'        => $authUrl,
                 'identifier' => $adata['identifier']['value'] ?? null,
                 'wildcard'   => $adata['wildcard'] ?? false,
+                'status'     => $adata['status'] ?? null,
                 'challenges' => $adata['challenges'] ?? [],
             ];
         }
@@ -669,6 +673,12 @@ class AutoSSL
 
         $list = [];
         foreach ($authorizations as $auth) {
+            # Already proven: a CA reuses a valid authorization for a while (Let's
+            # Encrypt, up to 30 days), so a renewal often has nothing to answer.
+            # Publishing and notifying it anyway was a pointless request - and for
+            # dns-01, a TXT record asked of someone for nothing.
+            if (($auth['status'] ?? null) === 'valid') continue;
+
             $selected = null;
             foreach ($auth['challenges'] as $challenge) if ($challenge['type'] === $type) {
                 $selected = $challenge;
@@ -707,6 +717,22 @@ class AutoSSL
         if (($challenge['type'] ?? null) !== 'http-01') throw new \Exception("publishChallenge only supports http-01; dns-01 TXT records must be published manually");
         if (file_put_contents($challenge['filePath'], $challenge['content']) === false) throw new \Exception("Cannot write challenge file");
         chmod($challenge['filePath'], 0644);
+    }
+
+    /**
+     * Why an authorization failed, in the CA's words: the challenge's error -
+     * "Invalid response from http://.../.well-known/acme-challenge/...: 404" and
+     * the like - rather than the whole authorization object.
+     *
+     * @param array $authorization
+     * @return string
+     */
+    private static function authorizationError(array $authorization): string
+    {
+        foreach ($authorization['challenges'] ?? [] as $challenge)
+            if (!empty($challenge['error'])) return trim(preg_replace('/^urn:ietf:params:acme:error:/', '', (string) ($challenge['error']['type'] ?? '')) . ' - ' . ($challenge['error']['detail'] ?? ''), ' -');
+
+        return 'status ' . ($authorization['status'] ?? '?') . ' ' . json_encode($authorization);
     }
 
     private function cleanupChallenges(array $challenges): void
@@ -857,23 +883,25 @@ class AutoSSL
         $order      = $this->newOrder($domains);
         $challenges = $this->challenge($order['authorizations'], $challenge_type);
 
-        // publish + notify every challenge first, then poll each authorization.
-        foreach ($challenges as $challenge) {
-            $this->publishChallenge($challenge);
-            $this->notifyChallenge($challenge);
-        }
-
+        # The challenge files come down however this ends - a notify that throws, an
+        # authorization still pending after the last poll - not only on the paths
+        # that used to remember to.
         $authTries = [];
-        foreach ($order['authorizations'] as $auth) {
-            $challengeAuth = $this->challengeAuth($auth['url']);
-            $authTries[$auth['identifier']] = $challengeAuth['tries'];
-            if (!$challengeAuth['status']) {
-                $this->cleanupChallenges($challenges);
-                throw new \Exception("Authorization failed for " . $auth['identifier'] . ": " . json_encode($challengeAuth['adata'] ?? []));
+        try {
+            // publish + notify every challenge first, then poll each authorization.
+            foreach ($challenges as $challenge) {
+                $this->publishChallenge($challenge);
+                $this->notifyChallenge($challenge);
             }
-        }
 
-        $this->cleanupChallenges($challenges);
+            foreach ($order['authorizations'] as $auth) {
+                $challengeAuth = $this->challengeAuth($auth['url']);
+                $authTries[$auth['identifier']] = $challengeAuth['tries'];
+                if (!$challengeAuth['status']) throw new \Exception("Authorization failed for " . $auth['identifier'] . ": " . self::authorizationError($challengeAuth['adata'] ?? []));
+            }
+        } finally {
+            $this->cleanupChallenges($challenges);
+        }
         #endregion
 
         $finalize = $this->finalize($order, $domains);

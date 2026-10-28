@@ -52,12 +52,15 @@ renewAll(): void                 // renews everything under 20 days - with ALL i
 
 // The whole flow in one call (no wildcards)
 issue(array $domains, string $challenge_type = "http-01"): array
+// a failed authorization throws with the CA's reason ("Invalid response from http://.../.well-known/...: 404");
+// challenge files are removed however it ends
 // → ['cert' => ..., 'ca_bundle' => ..., 'private' => ...]
 
 // Step by step (required for dns-01 / wildcards)
 prepareDomain(string $domain): array
 newOrder(array $domains = []): array
-challenge(array $authorizations, string $type = "http-01"): array
+challenge(array $authorizations, string $type = "http-01"): array   // skips authorizations already `valid`
+                                                 // (CA reuse, LE up to 30 days) - the list can be shorter, even []
 publishChallenge(array $challenge): void       // writes the http-01 file itself
 notifyChallenge(array $challenge): string
 challengeAuth(string $authUrl, int $tries = 1): array
@@ -77,7 +80,9 @@ $cert = $ssl->issue(['example.com', 'www.example.com'], 'http-01');
 ```php
 $order   = $ssl->newOrder(['example.com', '*.example.com']);
 $records = $ssl->challenge($order['authorizations'], 'dns-01');
-// $records: [['domain' => '_acme-challenge.example.com', 'value' => '...'], ...]
+// $records: [['domain' => '*.example.com', 'record' => '_acme-challenge.example.com', 'value' => '...', ...], ...]
+// the TXT record is NAMED `record` (not `domain` - that is the name on the order); names already
+// validated at the CA are left out, so the list may be shorter than the order, or empty
 // create each as a TXT record, wait for propagation, then:
 foreach ($records as $c)                  $ssl->notifyChallenge($c);
 foreach ($order['authorizations'] as $a)  $ssl->challengeAuth($a['url']);

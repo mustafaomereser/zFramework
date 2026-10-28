@@ -2661,14 +2661,18 @@ holding `account.key` and `account.kid`. The id is a number — the date and tim
 created plus three random digits — so a listing sorts by age.
 
 ```php
-$ssl = new AutoSSL(AutoSSL::PROD);                       // the oldest account registered with THIS CA, or a new one
-$ssl = new AutoSSL(AutoSSL::PROD, null, '20260902195802774');   // a specific one
+$ssl = new AutoSSL(AutoSSL::PROD);                       // the oldest account registered with THIS CA that the CA
+                                                         // still accepts (checked on construction), or a new one
+$ssl = new AutoSSL(AutoSSL::PROD, null, '20260902195802774');   // a specific one - throws if the CA rejects it
 
 $ssl->account();          // id of the account this instance signs with
 $ssl->accounts();         // every account on disk, oldest first:
-                          //   [id => ['id', 'kid', 'registered', 'ca', 'usable', 'created', 'current']]
-                          //   ca = host of the kid; usable = registered with this instance's directory (or not yet registered)
+                          //   [id => ['id', 'kid', 'registered', 'ca', 'retired', 'usable', 'created', 'current']]
+                          //   ca = host of the kid; retired = why the CA stopped accepting it (or false);
+                          //   usable = not retired and registered with this instance's directory (or not yet registered)
 $id = $ssl->createAccount();   // registers a new account and switches to it; returns its id
+$id = $ssl->createAccount(['kid' => ..., 'hmac' => ...]);   // the same with External Account Binding (GTS)
+$ssl->requiresEab();      // does this CA refuse a registration without EAB?
 $ssl->useAccount($id);    // switch to an existing one
 $ssl->unlinkAccount();    // forget the current account (or unlinkAccount($id)) - local files only
 $ssl->verifyAccount();    // ['valid' => bool, 'reason' => ...] - asks the CA
@@ -2716,6 +2720,8 @@ $records = $ssl->challenge($order['authorizations'], 'dns-01');
 // $records is an array of challenges to create in DNS:
 // [['domain' => '*.example.com', 'record' => '_acme-challenge.example.com', 'value' => '...', 'url', 'token', 'authUrl'], ...]
 // the TXT record goes under `record`; `domain` is the name on the order
+// a name the CA still holds as validated (Let's Encrypt keeps them up to 30 days) is not in the
+// list - on a renewal it is often empty, and nothing has to be published
 
 // 1. Add each record as a TXT entry in your DNS
 // 2. Wait for propagation
