@@ -4,7 +4,7 @@
 
 **Easiest, fastest PHP framework. (Simple)**
 
-![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-blue)
+![PHP](https://img.shields.io/badge/PHP-%3E%3D8.2-blue)
 ![Version](https://img.shields.io/badge/version-3.4.0-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
@@ -2383,6 +2383,12 @@ unchanged, and `--rollback` put 3.1.2 back.
 report flagged. If something is wrong, `php terminal update --rollback` puts the previous core
 back.
 
+### Upgrading to 3.4.0
+
+- **PHP 8.2 or newer.** 8.1 is out of security support, and the vulnerability that prompted this
+  is open on everything before 8.2. Composer refuses the install on 8.1 - update PHP first, then the
+  framework.
+
 ### Upgrading to 3.3.0
 
 Mostly fixes from the 2026-10-28 security review, plus AutoSSL. What an existing project notices:
@@ -3204,7 +3210,7 @@ RoadRunner   : boot once, then handle only
 ### Running it
 
 **1. PHP packages.** They are suggestions rather than requirements, because they
-need PHP 8.2 and `ext-sockets` while the framework itself runs on 8.1 — pulling
+need `ext-sockets`, which the framework itself does not — pulling
 them in by default would break installs on hosts that cannot run RoadRunner
 anyway.
 
