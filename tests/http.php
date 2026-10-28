@@ -80,6 +80,14 @@ test('a form round-trip: real token in, wrong token refused', function () use ($
     same(200, $ok, 'a valid token reaches the controller');
     contains('"status":0', $json, 'and a wrong password is a clean json refusal');
     same(406, $bad, 'a fake token is refused');
+
+    # Not a string at all: a 500 with an error report on disk, for anyone, before.
+    $logs = glob(BASE_PATH . '/error_logs/*') ?: [];
+    [$array] = $request('/sign-in', '_token[]=x&email=x@y.z&password=wrong');
+    [$none]  = $request('/sign-in', 'email=x@y.z&password=wrong');
+    same(406, $array, '_token[] is refused, not a TypeError');
+    same(406, $none, 'a missing _token is refused');
+    same(count($logs), count(glob(BASE_PATH . '/error_logs/*') ?: []), 'no error report was written');
 });
 
 test('a failed form redirects back and the next page shows its alerts', function () use ($request, $port) {

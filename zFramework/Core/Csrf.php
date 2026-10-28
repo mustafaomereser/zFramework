@@ -102,7 +102,12 @@ class Csrf
     {
         # The safe methods carry no form and no token: HEAD is a GET without a
         # body, OPTIONS a preflight. Checked as writes, both answered 406.
-        if (!in_array(method(), ['GET', 'HEAD', 'OPTIONS'], true) && !self::compare(request('_token')) && $alwaysTrue != true) return false;
+        #
+        # A token that is not a string is no token: `_token[]=x` reached compare()
+        # as an array, a TypeError - a 500 and an error report on disk for anyone
+        # who sent one. _method[] had the same hole, closed in method().
+        $token = request('_token');
+        if (!in_array(method(), ['GET', 'HEAD', 'OPTIONS'], true) && !(is_string($token) && self::compare($token)) && $alwaysTrue != true) return false;
         return true;
     }
 }
