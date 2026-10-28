@@ -384,7 +384,9 @@ class Auth
         # signature that does not match is no session: it is ended below.
         [$user_id, $expires, $signature] = array_pad(explode('|', (string) $token, 3), 3, '');
 
-        if (self::$user == null && $user_id !== '') self::$user = self::model()->where('id', $user_id)->first();
+        # select('*'): the password column is what the check below compares, and a
+        # model that guards it (User::$guard) would leave it out of a plain query.
+        if (self::$user == null && $user_id !== '') self::$user = self::model()->select('*')->where('id', $user_id)->first();
         $hash = (string) (self::$user[self::columns()['password']] ?? '');
 
         # Not `return self::logout()`: that handed back logout()'s true, and the
@@ -399,7 +401,25 @@ class Auth
             return false;
         }
 
-        return self::$user;
+        return self::visible(self::$user);
+    }
+
+    /**
+     * The user row as the application sees it: without the columns the model
+     * guards.
+     *
+     * Auth keeps the whole row - it needs the password hash for every check - but
+     * what Auth::user() hands out follows User::$guard like any other query of
+     * that model would. Otherwise guarding `password` on the model changed nothing
+     * for the one row printed most often.
+     *
+     * @param array $row
+     * @return array
+     */
+    private static function visible(array $row): array
+    {
+        foreach ((array) (self::model()->guard ?? []) as $column) unset($row[$column]);
+        return $row;
     }
 
     /**
@@ -412,7 +432,7 @@ class Auth
      */
     private static function userFromToken()
     {
-        if (self::$user !== null) return self::$user;
+        if (self::$user !== null) return self::visible(self::$user);
         if (!$token = self::stored('auth-session')) return false;
 
         $session = Redis::get("auth:$token", 'session');
@@ -424,7 +444,7 @@ class Auth
         if (!$user) {
             # closureMode(false): relation closures cannot be serialised, and this
             # row is about to be cached. They are re-attached below either way.
-            $user = self::model()->closureMode(false)->where('id', $session['uid'])->first();
+            $user = self::model()->closureMode(false)->select('*')->where('id', $session['uid'])->first();
             if (@$user['id']) Redis::set($cacheKey, $user, self::USER_TTL, 'session');
         }
 
@@ -433,7 +453,8 @@ class Auth
         # Password changed since this token was issued -> the session is over.
         if (!hash_equals((string) ($user[self::columns()['password']] ?? ''), (string) ($session['pwd'] ?? ''))) return self::logout() && false;
 
-        return self::$user = self::model()->setClosures([$user])[0];
+        self::$user = self::model()->setClosures([$user])[0];
+        return self::visible(self::$user);
     }
 
     /**

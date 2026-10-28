@@ -12,6 +12,8 @@ Auth::login(array $user, bool $staymein = false): bool
 Auth::token_login(string $token): bool  // by the api_token column
 Auth::check(): bool
 Auth::user()                            // array, or false when nobody is logged in
+    // the row follows User::$guard (the skeleton guards password): Auth reads the hash itself, by
+    // name, for its checks - never take it from Auth::user(). Select it explicitly if you need it.
 Auth::id(): ?int
 Auth::logout(): bool
     // login()/attempt()/logout() regenerate the session id (contents kept) and reset the CSRF tokens -

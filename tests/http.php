@@ -219,6 +219,24 @@ test('auth-token carries a signed expiry, so a copied cookie dies with it', func
     falsy($as($id), 'the bare id the cookie used to hold - valid for as long as the password was');
 });
 
+test('a guarded password stays out of Auth::user() and the API, and signing in still works', function () use ($request) {
+    $Auth = \zFramework\Core\Facades\Auth::class;
+    $user = $Auth::model()->select('id, password, api_token')->where('email', 'admin@localhost.com')->first();
+    if (!$user) skip('no seeded admin user on this database (`db migrate --seed`)');
+    Test::cleanup(fn() => $Auth::logout());
+
+    $Auth::flushRequestState();
+    truthy($Auth::login($user));
+    $row = $Auth::user();
+    truthy($row && $row['id'] == $user['id'], 'signed in although the model guards the column the check compares');
+    falsy(array_key_exists('password', $row), 'User::$guard did not reach Auth::user()');
+
+    [$code, , $json] = $request('/api/v1', null, ['Auth-Token: ' . $user['api_token']]);
+    same(200, $code);
+    contains('"username"', $json, 'the API saw the user');
+    falsy(str_contains($json, $user['password']), 'the password hash went out in the API response');
+});
+
 test('a session id is the server\'s, and signing in replaces it', function () use ($port) {
     # Its own jar: the shared one is signed in by now.
     $jar = tempnam(sys_get_temp_dir(), 'zf_test_jar');

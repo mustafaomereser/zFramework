@@ -13,7 +13,9 @@ class User extends Model
 
     public $table       = "users";
     public $_not_found  = 'User is not found.';
-    // public $guard    = ['password', 'api_token'];
+    # Left out of every query that does not name it - Auth::user() included.
+    # Auth itself still reads it, by name, to check the cookie and the sign-in.
+    public $guard       = ['password'];
 
     # custom columns for Auth::class
     public $special_columns = [

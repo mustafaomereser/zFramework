@@ -608,7 +608,7 @@ Auth::logout();
 // holds a stale token: main.js reloads on the 406.
 
 Auth::check();   // bool — is a user currently authenticated?
-Auth::user();    // the authenticated user's row, or false
+Auth::user();    // the authenticated user's row, or false - without User::$guard columns (password)
 Auth::id();      // int|null — authenticated user's id
 
 // Hash a password using the configured method (bcrypt / md5 / crypter)
