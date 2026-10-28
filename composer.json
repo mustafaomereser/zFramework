@@ -3,7 +3,7 @@
         "vendor-dir": "zFramework/vendor/"
     },
     "require": {
-        "php": ">=8.1",
+        "php": ">=8.2",
         "phpmailer/phpmailer": "^6.6",
         "tedivm/jshrink": "~1.0"
     },
