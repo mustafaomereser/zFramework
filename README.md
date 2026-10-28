@@ -4,7 +4,7 @@
 
 **Easiest, fastest PHP framework. (Simple)**
 
-![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-blue)
+![PHP](https://img.shields.io/badge/PHP-%3E%3D8.2-blue)
 ![Version](https://img.shields.io/badge/version-3.3.0-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
@@ -3204,7 +3204,7 @@ RoadRunner   : boot once, then handle only
 ### Running it
 
 **1. PHP packages.** They are suggestions rather than requirements, because they
-need PHP 8.2 and `ext-sockets` while the framework itself runs on 8.1 — pulling
+need `ext-sockets`, which the framework itself does not — pulling
 them in by default would break installs on hosts that cannot run RoadRunner
 anyway.
 
