@@ -149,6 +149,29 @@ class Auth
     }
 
     /**
+     * The auth-token value: the user id, when it stops being valid, and an HMAC
+     * over both with the application's crypt key.
+     *
+     * The cookie expired in the browser after a day, but the server took a copy
+     * of it for as long as the password stayed the same - signing out did not
+     * end a stolen one. The expiry now travels inside, signed, so a copy is
+     * worthless after the same day. Remember-me is unaffected: auth-stay-in signs
+     * the visitor back in and a fresh stamp is issued (restore()).
+     *
+     * @param string   $id
+     * @param string   $hash    The password hash - a new password voids every stamp.
+     * @param int|null $expires Null: now plus the cookie lifetime.
+     * @return string
+     */
+    private static function stamp(string $id, string $hash, ?int $expires = null): string
+    {
+        $expires ??= time() + (Cookie::$options['expires'] ?: 86400);
+        $key       = (string) Config::get('crypt.key') . (string) Config::get('crypt.salt');
+
+        return "$id|$expires|" . hash_hmac('sha256', "$id|$expires|" . self::passwordTrace($hash), $key);
+    }
+
+    /**
      * The part of a password hash the remember-me cookie carries.
      *
      * @param null|string $hash
@@ -270,7 +293,7 @@ class Auth
         }
 
         self::store('auth-password', $user[self::columns()['password']]);
-        self::store('auth-token', (string) $user['id']);
+        self::store('auth-token', self::stamp((string) $user['id'], (string) ($user[self::columns()['password']] ?? '')));
         return true;
     }
 
@@ -355,11 +378,23 @@ class Auth
     {
         if (self::tokenMode()) return self::userFromToken();
 
-        if (!$user_id = self::stored('auth-token')) return false;
-        if (self::$user == null) self::$user = self::model()->where('id', $user_id)->first(); // ->where('api_token', 'test', 'OR')
+        if (!$token = self::stored('auth-token')) return false;
+
+        # id|expires|signature - see stamp(). Anything else, an expired stamp or a
+        # signature that does not match is no session: it is ended below.
+        [$user_id, $expires, $signature] = array_pad(explode('|', (string) $token, 3), 3, '');
+
+        if (self::$user == null && $user_id !== '') self::$user = self::model()->where('id', $user_id)->first();
+        $hash = (string) (self::$user[self::columns()['password']] ?? '');
+
         # Not `return self::logout()`: that handed back logout()'s true, and the
         # caller indexing it got a warning where it expected a row or false.
-        if (!@self::$user['id'] || !hash_equals((string) self::$user[self::columns()['password']], (string) self::stored('auth-password'))) {
+        if (
+            !@self::$user['id']
+            || !hash_equals($hash, (string) self::stored('auth-password'))
+            || (int) $expires < time()
+            || !hash_equals(self::stamp($user_id, $hash, (int) $expires), (string) $token)
+        ) {
             self::logout();
             return false;
         }

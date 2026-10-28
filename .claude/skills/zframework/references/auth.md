@@ -101,8 +101,11 @@ breaks logins:
 Which one is active is decided by whether Redis is configured *and* reachable
 (`redis.enabled` plus `Redis::available('session')`). Application code does not choose.
 
-**Cookie mode (no Redis).** Two cookies: `auth-token` holds the user id, `auth-password` holds
-the password hash. Every `Auth::user()` re-reads the row and `hash_equals` the stored hash
+**Cookie mode (no Redis).** Two cookies: `auth-token` holds `id|expires|hmac` - the user id, when
+it stops being valid (a day, the cookie lifetime) and an HMAC over both and the password trace,
+keyed with `config/crypt.php` - and `auth-password` holds the password hash. A copied cookie is
+worthless after its day even though the server keeps no session record; a bare id (the pre-3.3
+format) is not accepted, so signed-in visitors without remember-me sign in once after updating. Every `Auth::user()` re-reads the row and `hash_equals` the stored hash
 against the cookie — which is how *changing a password ends every other session*. It also
 means one SELECT per request that touches Auth.
 

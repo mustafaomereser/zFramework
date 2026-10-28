@@ -185,6 +185,40 @@ test('Auth::login() can issue the remember-me cookie itself', function () {
     contains('|', \zFramework\Core\Crypter::decode($_COOKIE[$cookie]), 'the same token|trace format attempt() writes');
 });
 
+test('auth-token carries a signed expiry, so a copied cookie dies with it', function () {
+    # In-process, like the login() test above: the cookie values are at hand.
+    $Auth   = \zFramework\Core\Facades\Auth::class;
+    $user   = $Auth::model()->select('id, password')->where('email', 'admin@localhost.com')->first();
+    if (!$user) skip('no seeded admin user on this database (`db migrate --seed`)');
+
+    $name = fn(string $key) => \zFramework\Core\Facades\Cookie::keyparse($key);
+    Test::cleanup(fn() => $Auth::logout());
+
+    truthy($Auth::login($user));
+    $stamp = \zFramework\Core\Crypter::decode($_COOKIE[$name('auth-token')]);
+    [$id, $expires, $signature] = array_pad(explode('|', $stamp, 3), 3, '');
+    same((string) $user['id'], $id);
+    truthy((int) $expires > time() + 86000 && (int) $expires <= time() + 86400, 'a day, like the cookie');
+
+    $as = function (string $token) use ($Auth, $name) {
+        $Auth::flushRequestState();
+        $_COOKIE[$name('auth-token')] = \zFramework\Core\Crypter::encode($token);
+        return $Auth::user();
+    };
+    $password = $_COOKIE[$name('auth-password')];
+
+    truthy($as($stamp), 'the stamp as issued');
+
+    $_COOKIE[$name('auth-password')] = $password;
+    falsy($as("$id|" . (time() + 999999) . "|$signature"), 'a pushed-back expiry with the old signature');
+
+    $_COOKIE[$name('auth-password')] = $password;
+    falsy($as("$id|" . (time() - 1) . '|' . hash_hmac('sha256', 'x', 'y')), 'an expired one');
+
+    $_COOKIE[$name('auth-password')] = $password;
+    falsy($as($id), 'the bare id the cookie used to hold - valid for as long as the password was');
+});
+
 test('a session id is the server\'s, and signing in replaces it', function () use ($port) {
     # Its own jar: the shared one is signed in by now.
     $jar = tempnam(sys_get_temp_dir(), 'zf_test_jar');
