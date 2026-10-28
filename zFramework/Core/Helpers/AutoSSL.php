@@ -4,6 +4,7 @@ namespace zFramework\Core\Helpers;
 
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use zFramework\Core\Facades\cURL;
 use ZipArchive;
 
 class AutoSSL
@@ -294,55 +295,26 @@ class AutoSSL
     }
 
     /**
-     * One HTTP request. Header names come back lower-cased - HTTP/2 sends them
-     * that way and HTTP/1.1 servers do not, and the callers asked for
-     * `Location` and `location` both to cover it.
+     * One HTTP request. Header names come back lower-cased (cURL facade) - HTTP/2
+     * sends them that way and HTTP/1.1 servers do not.
      *
-     * Timeouts are set: without them a CA that stopped answering held a cron
-     * run - and renewAll() with it - for as long as the connection stayed open.
-     * HEAD is NOBODY, not a custom verb: curl told to send HEAD as a custom
-     * request still waits for the body the headers announce.
+     * Timeouts are longer than the facade's: without any, a CA that stopped
+     * answering held a cron run - and renewAll() with it - for as long as the
+     * connection stayed open, but a busy CA can take a while to finalize.
      */
     private function httpRequest(string $url, string $method = 'GET', $body = null, array $headers = []): array
     {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HEADER         => true,
+        $request = cURL::set($url)->method($method)->headers($headers)->options([
             CURLOPT_CONNECTTIMEOUT => 15,
             CURLOPT_TIMEOUT        => 60,
             CURLOPT_USERAGENT      => 'zFramework-AutoSSL',
         ]);
+        if ($body !== null) $request->post($body);
 
-        if ($method === 'HEAD') curl_setopt($ch, CURLOPT_NOBODY, true);
-        elseif ($method !== 'GET') curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-
-        if ($body !== null) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-            $headers[] = 'Content-Length: ' . strlen($body);
-        }
-        if (!empty($headers)) curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        $res = curl_exec($ch);
-        if ($res === false) {
-            $err = curl_error($ch);
-            curl_close($ch);
-            throw new \Exception("cURL error: $err");
-        }
-        $hsize      = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        $status     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $rawHeaders = substr($res, 0, $hsize);
-        $body       = substr($res, $hsize);
-        curl_close($ch);
-
-        # Only the last header block: a `100 Continue` comes first on some servers.
-        $blocks     = array_values(array_filter(preg_split("/\r?\n\r?\n/", trim($rawHeaders))));
-        $rawHeaders = end($blocks) ?: '';
-
-        $hdrs = [];
-        foreach (preg_split("/\r?\n/", $rawHeaders) as $line) if (strpos($line, ':') !== false) {
-            [$k, $v] = explode(':', $line, 2);
-            $hdrs[strtolower(trim($k))] = trim($v);
-        }
+        [$status, $hdrs, $body] = $request->send(function ($response, $info, $error) {
+            if ($response === false) throw new \Exception("cURL error: {$error['error_message']}");
+            return [(int) $info['http_code'], $info['headers'], (string) $response];
+        });
 
         # Every ACME response carries the next nonce; keeping it saves a round trip
         # per request and is what the protocol expects (RFC 8555 §7.2).

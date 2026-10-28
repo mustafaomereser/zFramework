@@ -2614,6 +2614,24 @@ File::convertImage('photo.jpg', 'webp');
 // (GIF: one transparent colour; white behind it for jpg/bmp), and return false for an
 // unreadable file or unknown target. desired_sizes false fits inside the box, keeping the aspect.
 File::delete('uploads/photo.jpg');               // inside public_dir only: '../' resolves outside and is refused
+
+// HTTP client - every set() is its own request (the framework's AutoSSL, cPanel, Pusher,
+// push notifications and the updater all go through it)
+$body = cURL::set('https://api.example.com/items')->send();       // string, or false on failure
+
+$result = cURL::set('https://api.example.com/items/5')
+    ->method('PUT')                          // default GET, POST once post()/file() is called; HEAD waits for no body
+    ->headers(['Authorization' => "Bearer $token"])   // or ['Authorization: Bearer ...']; calls add up, a repeated name replaces
+    ->post(json_encode(['name' => 'x']))     // array = form fields, string = raw body
+    ->options([CURLOPT_TIMEOUT => 60])       // defaults: connect 10 s, total 30 s
+    ->send(fn($body, $info, $error) => [
+        'status'  => $info['http_code'],
+        'etag'    => $info['headers']['etag'] ?? null,   // response headers, lower-cased, final response only
+        'error'   => $error['error_message'],          // also $error['error_no']; a failure is never thrown
+    ]);
+
+cURL::set($url)->file('doc', 'report.csv', $csvString, 'text/csv')->send();   // content in memory
+cURL::set($url)->file('doc', 'report.csv', '/tmp/report.csv')->send();        // or a path on disk
 ```
 
 ---

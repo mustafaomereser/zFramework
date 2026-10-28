@@ -396,9 +396,18 @@ Csrf::check(bool $alwaysTrue = false): bool        Csrf::remainTimeOut(): int
 
 ### cURL / Http
 ```php
-cURL::set(string $url)->post(mixed $fields = [])->headers(array $h)
-    ->file($fieldname, $filename, $content, $mime = 'text/plain')
-    ->options(array $opts)->send(?\Closure $callback = null)
+cURL::set(string $url)            // static entry; every other method is on the instance it returns
+    ->method(string $m)           // default GET, POST after post()/file(); HEAD = no body
+    ->post(mixed $fields = [])    // array = form fields, string = raw body
+    ->headers(array $h)           // ['Name' => 'v'] or ['Name: v']; calls add up, a repeated name replaces
+    ->file($fieldname, $filename, $content, $mime = 'text/plain')   // $content: a path on disk, or the content itself
+    ->options(array $opts)        // CURLOPT_*; defaults connect 10 s, total 30 s, UA zFramework
+    ->send(?\Closure $callback = null)
+// no callback: body string, or false on failure (never throws)
+// callback fn($body, $info, $error): $info = curl_getinfo() + 'headers' (lower-cased, final response
+// only, repeated name = last value); $error = ['error_no' => int, 'error_message' => string]
+// Two requests built side by side are independent (no static state; nothing to reset in a worker).
+// Framework code making HTTP calls uses this, not raw curl_*.
 
 Http::isAjax(): bool             Http::abort(int $code = 418, $message = null)
 Http::wantsJson(): bool          // isAjax(), or Accept: application/json not led by text/html

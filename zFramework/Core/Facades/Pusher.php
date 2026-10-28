@@ -376,21 +376,15 @@ class Pusher
         $timeout = $this->config()['timeout'];
         $url     = $this->endpoint() . $path . '?' . http_build_query($this->sign($method, $path, $body, $query));
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST  => $method,
-            CURLOPT_TIMEOUT        => $timeout,
-            CURLOPT_CONNECTTIMEOUT => $timeout,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
-        ]);
-        if ($body !== '') curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        $request = cURL::set($url)
+            ->method($method)
+            ->headers(['Content-Type' => 'application/json', 'Accept' => 'application/json'])
+            ->options([CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => $timeout]);
+        if ($body !== '') $request->post($body);
 
-        $response = curl_exec($ch);
-        $status   = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $error    = curl_error($ch) ?: null;
-        curl_close($ch);
-
-        return ['ok' => $status >= 200 && $status < 300, 'status' => $status, 'body' => (string) $response, 'error' => $error];
+        return $request->send(function ($response, $info, $error) {
+            $status = (int) $info['http_code'];
+            return ['ok' => $status >= 200 && $status < 300, 'status' => $status, 'body' => (string) $response, 'error' => $error['error_message'] ?: null];
+        });
     }
 }

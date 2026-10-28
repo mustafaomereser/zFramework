@@ -2,6 +2,7 @@
 
 namespace zFramework\Kernel\Modules;
 
+use zFramework\Core\Facades\cURL;
 use zFramework\Kernel\Helpers\ConfigMerge;
 use zFramework\Kernel\Terminal;
 use ZipArchive;
@@ -695,23 +696,9 @@ class Update
      */
     private static function request(string $url): array
     {
-        if (function_exists('curl_init')) {
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_CONNECTTIMEOUT => 10,
-                CURLOPT_TIMEOUT        => 30,
-                CURLOPT_USERAGENT      => 'zFramework-updater',
-            ]);
-            $body  = curl_exec($ch);
-            $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $errno = curl_errno($ch);
-            $error = curl_error($ch);
-            curl_close($ch);
-
-            return [$body === false ? null : (string) $body, $code, $error, $errno === CURLE_OPERATION_TIMEDOUT];
-        }
+        if (function_exists('curl_init')) return cURL::set($url)
+            ->options([CURLOPT_FOLLOWLOCATION => true, CURLOPT_USERAGENT => 'zFramework-updater'])
+            ->send(fn($body, $info, $error) => [$body === false ? null : (string) $body, (int) $info['http_code'], $error['error_message'], $error['error_no'] === CURLE_OPERATION_TIMEDOUT]);
 
         # allow_url_fopen is off on plenty of shared hosts, which is why curl is
         # tried first rather than this.

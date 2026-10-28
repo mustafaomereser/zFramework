@@ -2,6 +2,8 @@
 
 namespace zFramework\Core\Helpers\cPanel;
 
+use zFramework\Core\Facades\cURL;
+
 /**
  * cPanel UAPI base client.
  *
@@ -31,21 +33,17 @@ class API
         $url = "https://" . self::$domain . ":2083/execute/" . $endpoint;
 
         if (!empty($params)) $url .= "?" . http_build_query($params);
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYHOST => self::$verifySSL,
-            CURLOPT_SSL_VERIFYPEER => self::$verifySSL,
-            CURLOPT_HTTPHEADER     => ["Authorization: cpanel " . self::$username . ":" . self::$apiToken]
-        ]);
+        $request = cURL::set($url)
+            ->headers(['Authorization' => "cpanel " . self::$username . ":" . self::$apiToken])
+            ->options([
+                CURLOPT_SSL_VERIFYHOST => self::$verifySSL ? 2 : 0,
+                CURLOPT_SSL_VERIFYPEER => self::$verifySSL,
+                # Installing a certificate can keep UAPI busy past the facade's 30 s.
+                CURLOPT_TIMEOUT        => 60,
+            ]);
 
-        if (count($post)) {
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
-        }
+        if (count($post)) $request->post($post);
 
-        $response = curl_exec($ch);
-        if (curl_errno($ch)) return ["error" => curl_error($ch)];
-        return json_decode($response, true);
+        return $request->send(fn($response, $info, $error) => $error['error_no'] ? ["error" => $error['error_message']] : json_decode((string) $response, true));
     }
 }

@@ -60,7 +60,6 @@ class Run
         \zFramework\Core\Facades\Response::class,
         \zFramework\Core\Facades\Mail::class,
         \zFramework\Core\Facades\PushNotification\PushNotification::class,
-        \zFramework\Core\Facades\cURL::class,
         \zFramework\Core\Route::class,
         \zFramework\Core\View::class,
         \zFramework\Core\Facades\DB::class,

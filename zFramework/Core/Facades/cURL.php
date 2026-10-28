@@ -3,25 +3,28 @@
 namespace zFramework\Core\Facades;
 
 use CURLFile;
+use CURLStringFile;
 
+/**
+ * One HTTP request per instance.
+ *
+ *   cURL::set($url)->headers([...])->post($body)->send(fn($body, $info, $error) => ...)
+ *
+ * The state used to live in statics, so two requests built side by side - or one
+ * started inside another's callback - wrote over each other, and a worker had to
+ * clear it between requests. Each set() is now its own request.
+ */
 class cURL
 {
-    static $cURL;
-    static $postFields      = null;
-    static $post            = false;
+    /** Defaults; options() overrides them. Without any, a host that stopped answering held the caller for as long as the connection stayed open. */
+    const CONNECT_TIMEOUT = 10;
+    const TIMEOUT         = 30;
 
-    /**
-     * Drop the handle and whatever was being posted with it.
-     * @return void
-     */
-    public static function flushRequestState(): void
-    {
-        if (self::$cURL instanceof \CurlHandle) @curl_close(self::$cURL);
-
-        self::$cURL       = null;
-        self::$postFields = null;
-        self::$post       = false;
-    }
+    private \CurlHandle $handle;
+    private mixed $postFields = null;
+    private bool $post        = false;
+    private ?string $method   = null;
+    private array $headers    = [];
 
     /**
      * set url and some options
@@ -30,52 +33,76 @@ class cURL
      */
     public static function set(string $url): self
     {
-        self::$cURL = curl_init($url);
-        curl_setopt(self::$cURL, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt(self::$cURL, CURLOPT_HEADER, false);
-        return new self();
+        $request = new self();
+        $request->handle = curl_init($url);
+        curl_setopt_array($request->handle, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HEADER         => false,
+            CURLOPT_CONNECTTIMEOUT => self::CONNECT_TIMEOUT,
+            CURLOPT_TIMEOUT        => self::TIMEOUT,
+            CURLOPT_USERAGENT      => 'zFramework',
+        ]);
+        return $request;
+    }
+
+    /**
+     * HTTP method. Without one it is GET, or POST once post()/file() is called.
+     * HEAD asks for no body: curl sent HEAD as a custom verb still waits for the
+     * body the headers announce.
+     * @param string $method
+     * @return self
+     */
+    public function method(string $method): self
+    {
+        $this->method = strtoupper($method);
+        return $this;
     }
 
     /**
      * Post parameters
-     * @param mixed $fiels
-     * @param string $type
+     * @param mixed $fields array (form fields) or string (raw body)
      * @return self
      */
-    public static function post(mixed $fields = []): self
+    public function post(mixed $fields = []): self
     {
-        self::$post = true;
-        self::$postFields = $fields;
-        return new self();
+        $this->post = true;
+        $this->postFields = $fields;
+        return $this;
     }
 
     /**
      * Post file parameters
      * @param string $fieldname
-     * @param string $filename
-     * @param string $content
+     * @param string $filename name the server sees
+     * @param string $content  path of a file on disk, or the content itself
      * @param string $mime_type
      * @return self
      */
-    public static function file(string $fieldname, string $filename, string $content, string $mime_type = "text/plain"): self
+    public function file(string $fieldname, string $filename, string $content, string $mime_type = "text/plain"): self
     {
-        self::$post = true;
-        self::$postFields[$fieldname] = new CURLFile($content, $mime_type, $filename);
-        return new self();
+        $this->post = true;
+        if (!is_array($this->postFields)) $this->postFields = [];
+
+        # CURLFile reads a path; content held in memory used to be taken for one
+        # and the upload failed. Anything that is not a file on disk is sent as is.
+        $this->postFields[$fieldname] = strlen($content) < PHP_MAXPATHLEN && !str_contains($content, "\0") && @is_file($content)
+            ? new CURLFile($content, $mime_type, $filename)
+            : new CURLStringFile($content, $filename, $mime_type);
+        return $this;
     }
 
     /**
-     * Set Request Headers
-     * @param array $headers
+     * Set Request Headers. Calls add up; a name given again replaces the earlier value.
+     * @param array $headers ['Name' => 'value'] or ['Name: value']
      * @return self
      */
-
-    public static function headers(array $headers)
+    public function headers(array $headers): self
     {
-        $output = [];
-        foreach ($headers as $key => $value) $output[] = "$key: $value";
-        curl_setopt(self::$cURL, CURLOPT_HTTPHEADER, $output);
-        return new self();
+        foreach ($headers as $key => $value) {
+            $line = is_int($key) ? (string) $value : "$key: $value";
+            $this->headers[strtolower(trim(strstr($line, ':', true) ?: $line))] = $line;
+        }
+        return $this;
     }
 
     /**
@@ -83,32 +110,53 @@ class cURL
      * @param array $options
      * @return self
      */
-    public static function options(array $options = []): self
+    public function options(array $options = []): self
     {
-        curl_setopt_array(self::$cURL, $options);
-        return new self();
+        curl_setopt_array($this->handle, $options);
+        return $this;
     }
 
     /**
      * Send request to target with all settings.
+     *
+     * The callback gets ($body, $info, $error):
+     *   $body  - string, or false when the request failed
+     *   $info  - curl_getinfo() plus 'headers': the response headers, names
+     *            lower-cased, from the final response only (not a `100 Continue`
+     *            or a redirect before it); a repeated name keeps the last value
+     *   $error - ['error_no' => int, 'error_message' => string]
+     * Without a callback the body (or false) is returned.
+     *
      * @param \Closure $callback
      */
-    public static function send(?\Closure $callback = null)
+    public function send(?\Closure $callback = null)
     {
-        if (self::$post) {
-            curl_setopt(self::$cURL, CURLOPT_POST, 1);
-            curl_setopt(self::$cURL, CURLOPT_POSTFIELDS, self::$postFields);
-            self::$postFields = [];
-            self::$post = false;
+        if ($this->post) {
+            curl_setopt($this->handle, CURLOPT_POST, true);
+            curl_setopt($this->handle, CURLOPT_POSTFIELDS, $this->postFields);
         }
 
-        $response = curl_exec(self::$cURL);
-        $err      = curl_errno(self::$cURL);
-        $errmsg   = curl_error(self::$cURL);
-        $header   = curl_getinfo(self::$cURL);
-        curl_close(self::$cURL);
+        if ($this->method === 'HEAD') curl_setopt($this->handle, CURLOPT_NOBODY, true);
+        elseif ($this->method !== null && $this->method !== ($this->post ? 'POST' : 'GET')) curl_setopt($this->handle, CURLOPT_CUSTOMREQUEST, $this->method);
 
-        if ($callback != null) return $callback($response, $header, ['error_no' => $err, 'error_message' => $errmsg]);
+        if ($this->headers) curl_setopt($this->handle, CURLOPT_HTTPHEADER, array_values($this->headers));
+
+        $headers = [];
+        curl_setopt($this->handle, CURLOPT_HEADERFUNCTION, function ($handle, string $line) use (&$headers) {
+            # Every status line starts a new response; only the last one's headers are kept.
+            if (preg_match('#^HTTP/\S+\s+\d{3}#', $line)) $headers = [];
+            elseif (str_contains($line, ':')) {
+                [$name, $value] = explode(':', $line, 2);
+                $headers[strtolower(trim($name))] = trim($value);
+            }
+            return strlen($line);
+        });
+
+        $response = curl_exec($this->handle);
+        $error    = ['error_no' => curl_errno($this->handle), 'error_message' => curl_error($this->handle)];
+        $info     = curl_getinfo($this->handle) + ['headers' => $headers];
+
+        if ($callback != null) return $callback($response, $info, $error);
 
         return $response;
     }
