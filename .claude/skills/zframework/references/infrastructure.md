@@ -5,14 +5,21 @@ query analysis, long-running workers, backups, releases.
 
 ---
 
-## AutoSSL — ACME v2 / Let's Encrypt
+## AutoSSL — ACME v2 / Let's Encrypt, Google Trust Services
 
 `zFramework\Core\Helpers\AutoSSL`. Implements the protocol directly; no shell, no certbot.
 
 ```php
-$ssl = new AutoSSL(AutoSSL::PROD);                    // or AutoSSL::STAGING while testing
+$ssl = new AutoSSL(AutoSSL::PROD);                    // Let's Encrypt (= LE_PROD); STAGING / LE_STAGING while testing
 $ssl = new AutoSSL(AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');   // custom openssl.cnf
-$ssl = new AutoSSL(AutoSSL::PROD, null, $accountId);  // sign as a specific account
+$ssl = new AutoSSL(AutoSSL::PROD, null, $accountId);  // sign as a specific account (verified with the CA; unusable throws)
+// Google Trust Services: GTS_PROD / GTS_STAGING. Requires External Account Binding for the FIRST
+// registration only - key pair from `gcloud publicca external-account-keys create` (staging needs its own):
+$ssl = new AutoSSL(AutoSSL::GTS_PROD, null, null, ['kid' => $eabKid, 'hmac' => $eabHmac]);
+$ssl = new AutoSSL(AutoSSL::GTS_PROD);                // afterwards: the registered account, no EAB
+// Without EAB and without a registered account: InvalidArgumentException, nothing written.
+// The EAB key is never stored. CAA records must allow `pki.goog` for GTS (`letsencrypt.org` for LE).
+// Windows without OPENSSL_CONF: the bundled Facades/PushNotification/openssl.cnf is used automatically.
 ```
 
 ```php
@@ -20,9 +27,15 @@ $ssl = new AutoSSL(AutoSSL::PROD, null, $accountId);  // sign as a specific acco
 // (account.key + account.kid). The id is numeric, date-based, so listings sort by age.
 // With no id given the constructor takes the oldest account, or registers one if none.
 account(): string                // id this instance signs with
-accounts(): array                // [id => [id, kid, registered, ca, usable, created, current]], oldest first;
-                                 // the constructor picks the oldest `usable` one - a staging account is never used against PROD
-createAccount(): string          // register a new account, switch to it, return its id
+accounts(): array                // [id => [id, kid, registered, ca, retired, usable, created, current]], oldest first;
+                                 // the constructor picks the oldest `usable` registered one - a staging account is never used against PROD
+                                 // and VERIFIES it with the CA: one the CA no longer accepts (deactivated, or
+                                 // `JWS verification error` - a kid that no longer matches) is retired
+                                 // (accounts/<id>/account.retired holds why; nothing deleted) and the next one,
+                                 // or a new registration, is used. Do not delete storage/AutoSSL to fix a stale account.
+verifyAccount(): array           // ['valid' => bool, 'reason' => string]; network errors count as valid
+requiresEab(): bool              // the directory's meta.externalAccountRequired
+createAccount(?array $eab = null): string   // register a new account, switch to it, return its id
 useAccount(string $id): self     // switch to an existing one; unknown id throws
 ensureAccount(): string          // the kid; registers the current key if it never was
 unlinkAccount(?string $id = null): void   // forget the current (or given) account, local files only
@@ -32,7 +45,10 @@ unlinkAccount(?string $id = null): void   // forget the current (or given) accou
 // Inventory
 list(): array                    // locally tracked certificates
 checkSSL(string $domain): array  // days remaining
-renewAll(): void                 // renews everything under 20 days
+renewAll(): void                 // renews everything under 20 days - with ALL its names (meta.json, else the
+                                 // certificate's SANs) and at the CA that issued it (meta.json `ca`); the empty
+                                 // folders of a multi-domain cert's other names are not renewed on their own.
+                                 // A wildcard among the names is skipped (dns-01 is manual).
 
 // The whole flow in one call (no wildcards)
 issue(array $domains, string $challenge_type = "http-01"): array
@@ -45,7 +61,8 @@ challenge(array $authorizations, string $type = "http-01"): array
 publishChallenge(array $challenge): void       // writes the http-01 file itself
 notifyChallenge(array $challenge): string
 challengeAuth(string $authUrl, int $tries = 1): array
-finalize(array $order, array $domains): array
+finalize(array $order, array $domains): array   // waits for the order to be `ready`; a NEW key + CSR every time
+                                                 // (private.key.new), swapped into private.key with the certificate
 getCertificate(array $order, string $domainKey, int $tries = 1): array
 download(string $domain): array
 ```
@@ -67,6 +84,11 @@ foreach ($order['authorizations'] as $a)  $ssl->challengeAuth($a['url']);
 $finalized = $ssl->finalize($order, ['example.com', '*.example.com']);
 $cert      = $ssl->getCertificate($order, $finalized['domainKey']);
 ```
+
+Under the hood: every read is POST-as-GET (RFC 8555 §6.3), `badNonce` is retried with the fresh nonce,
+a 5xx / short `Retry-After` once, requests time out (15 s connect, 60 s total), and errors read
+`HTTP 400 badCSR - <detail>` rather than a raw body. Each issued folder gets `meta.json`
+(domains, ca, account, issued). `tests/autossl.php` runs the client against a stub CA.
 
 Use `AutoSSL::STAGING` while developing — production has rate limits that lock you out for a week.
 Install the result on cPanel with `cPanel\SSL::install()` below.

@@ -2620,7 +2620,8 @@ File::delete('uploads/photo.jpg');               // inside public_dir only: '../
 
 ## 17. AutoSSL
 
-Implements the ACME v2 protocol (Let's Encrypt). Supports `http-01` and `dns-01` challenges.
+Implements the ACME v2 protocol - Let's Encrypt and Google Trust Services (or any ACME CA by its
+directory url). Supports `http-01` and `dns-01` challenges.
 
 ```php
 use zFramework\Core\Helpers\AutoSSL;
@@ -2632,6 +2633,26 @@ $ssl = new AutoSSL(AutoSSL::PROD, 'D:\xampp\apache\conf\openssl.cnf');
 // Staging (for testing):
 $ssl = new AutoSSL(AutoSSL::STAGING);
 ```
+
+On Windows without `OPENSSL_CONF` the minimal `openssl.cnf` the framework ships is used, so the
+second argument is only needed for a config of your own.
+
+### Google Trust Services
+
+```php
+// First time: register with an External Account Binding key from Google Cloud
+//   gcloud publicca external-account-keys create        (staging needs a key of its own)
+$ssl = new AutoSSL(AutoSSL::GTS_PROD, null, null, ['kid' => 'KEY_ID', 'hmac' => 'B64URL_HMAC_KEY']);
+
+// From then on the registered account is used - no EAB needed:
+$ssl = new AutoSSL(AutoSSL::GTS_PROD);
+$ssl->issue(['example.com', 'www.example.com']);
+```
+
+GTS refuses a registration without EAB (`requiresEab()`); without a key and without a registered
+account the constructor throws before writing anything. The key is used once and never stored. A
+domain with a CAA record must list `pki.goog`. Accounts per CA are kept apart, so Let's Encrypt
+and GTS accounts sit side by side.
 
 ### Accounts
 
@@ -2650,7 +2671,14 @@ $ssl->accounts();         // every account on disk, oldest first:
 $id = $ssl->createAccount();   // registers a new account and switches to it; returns its id
 $ssl->useAccount($id);    // switch to an existing one
 $ssl->unlinkAccount();    // forget the current account (or unlinkAccount($id)) - local files only
+$ssl->verifyAccount();    // ['valid' => bool, 'reason' => ...] - asks the CA
 ```
+
+**A stale account heals itself.** The constructor asks the CA whether the account it picked is
+still valid. One the CA rejects - deactivated, or the `JWS verification error` of a kid that no
+longer matches its key - is retired (`account.retired` records why, nothing is deleted) and the
+next account, or a new registration, takes over. Deleting `storage/AutoSSL` is never the fix: it
+takes the certificates with it.
 
 Certificates are stored per domain, not per account, so switching accounts does not
 move or hide them. An installation that had the single `account.key` at the root is
@@ -2664,7 +2692,8 @@ moved into `accounts/<id>/` on first use — same key, same registration, nothin
 ```php
 $ssl->list();                    // list all locally tracked certificates
 $ssl->checkSSL('example.com');   // check days remaining on a certificate
-$ssl->renewAll();                // renew all certs with less than 20 days remaining
+$ssl->renewAll();                // renew all certs with less than 20 days remaining - with every name
+                                 // they cover and at the CA that issued them (each folder's meta.json)
 ```
 
 ### http-01 (automatic, no wildcard)
