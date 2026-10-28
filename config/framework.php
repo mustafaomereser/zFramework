@@ -158,9 +158,13 @@ return [
      *
      * ip() answers with REMOTE_ADDR - the address the connection actually came
      * from, which cannot be forged. Only when that address is listed here does it
-     * go on to read, in order, CF-Connecting-IP, Client-IP, and the first entry of
-     * X-Forwarded-For (the chain is `client, proxy, proxy`). Each candidate is
-     * validated as an address; anything else falls back to REMOTE_ADDR.
+     * read X-Forwarded-For, and then from the RIGHT: every proxy appends, so the
+     * left end is whatever the client wrote. The chain is walked past the proxies
+     * listed here, and the first address that is not one is the client.
+     * Client-IP is never read (no proxy overwrites it). CF-Connecting-IP is read
+     * only when Cloudflare itself connected - list 'cloudflare' for that.
+     * host() takes the last X-Forwarded-Host / -Proto value the same way; make the
+     * proxy overwrite them (nginx: proxy_set_header X-Forwarded-Host $host).
      *
      * The gate is the point. A forwarded header is written by whoever sent the
      * request, so on a directly served site reading it lets any caller pick a fresh
@@ -172,6 +176,7 @@ return [
      * counts as the proxy, so the whole site shares one bucket.
      *
      *   'trusted-proxies' => ['10.0.0.5'],
+     *   'trusted-proxies' => ['10.0.0.0/8', 'cloudflare'],   // a range; Cloudflare's published ranges
      *
      * The default trusts the machine itself: a tunnel like ngrok, or a local
      * nginx in front of Apache, connects from 127.0.0.1 / ::1 and carries the

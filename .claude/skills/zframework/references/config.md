@@ -59,6 +59,8 @@ commit it, never hand-write it.
                              //   the shipped one dies on CLI (not ZF_WORKER) printing the path - add Slack/Sentry/mail there
 ],
 'trusted-proxies' => ['127.0.0.1', '::1'],   // ip() and host() (scheme/host for asset()/route()) read forwarded headers only from these. Default: the machine itself - ngrok, a local nginx. Production: the real proxy; [] when served directly.
+// Entries: addresses, CIDR ('10.0.0.0/8'), or 'cloudflare'. X-Forwarded-For is read from the right
+// (first untrusted hop = client); Client-IP never; CF-Connecting-IP only from a Cloudflare address.
                                // Empty trusts none: REMOTE_ADDR and nothing else.
 'session' => [
     'driver'         => 'file',   // file | redis (redis for multi-server)

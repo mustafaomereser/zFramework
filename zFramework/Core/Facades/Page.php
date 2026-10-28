@@ -458,7 +458,12 @@ class Page
         # The host is part of the key: an application answering on two hostnames
         # renders route() and asset() urls for the one that was asked, and one
         # host's copy must not answer the other.
-        return sha1(strtoupper($method) . '|' . strtolower($_SERVER['HTTP_HOST'] ?? '') . '|' . $uri . '|' . self::localeKey());
+        #
+        # host(), not HTTP_HOST: host() is what built those urls, and behind a proxy
+        # it also reads X-Forwarded-Host and -Proto. Keyed on HTTP_HOST alone, a
+        # request that steered host() elsewhere stored its page under the real
+        # host's key, and every visitor was served links to the other one.
+        return sha1(strtoupper($method) . '|' . strtolower(host()) . '|' . $uri . '|' . self::localeKey());
     }
 
     /**

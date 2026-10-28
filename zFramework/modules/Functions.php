@@ -54,10 +54,17 @@ function host()
     # anyone can send X-Forwarded-Host. Read unconditionally, one request naming
     # `evil.example` made every route() and asset() url in the response point
     # there, and a page cached on that request served those links to everyone.
+    #
+    # The last value, not the first: a proxy that appends writes after whatever
+    # the client sent, so the first entry is the client's own. A proxy that does
+    # not set these headers at all passes the client's through - configure it to
+    # overwrite them (nginx: proxy_set_header X-Forwarded-Host $host).
     if (trusted_proxy()) {
-        if (!empty($_SERVER['HTTP_X_FORWARDED_HOST'])) $host = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_HOST'])[0]);
+        $last = fn(string $header) => trim((string) array_slice(explode(',', $_SERVER[$header]), -1)[0]);
 
-        if ((!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower(trim(explode(',', $_SERVER['HTTP_X_FORWARDED_PROTO'])[0])) === 'https')
+        if (!empty($_SERVER['HTTP_X_FORWARDED_HOST'])) $host = $last('HTTP_X_FORWARDED_HOST');
+
+        if ((!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($last('HTTP_X_FORWARDED_PROTO')) === 'https')
             || (!empty($_SERVER['HTTP_CF_VISITOR']) && str_contains($_SERVER['HTTP_CF_VISITOR'], 'https'))) $https = true;
     }
 
@@ -65,12 +72,51 @@ function host()
 }
 
 // Did this request arrive from an address listed in framework.trusted-proxies?
-function trusted_proxy(): bool
+function trusted_proxy(?string $address = null): bool
 {
     static $trusted = null;
-    $trusted ??= (array) (\zFramework\Core\Facades\Config::framework('trusted-proxies') ?? []);
 
-    return $trusted && in_array($_SERVER['REMOTE_ADDR'] ?? '', $trusted, true);
+    # Entries are addresses, ranges ('10.0.0.0/8') or 'cloudflare', which stands
+    # for the ranges Cloudflare publishes - see cloudflare_ranges().
+    if ($trusted === null) {
+        $trusted = [];
+        foreach ((array) (\zFramework\Core\Facades\Config::framework('trusted-proxies') ?? []) as $entry)
+            $trusted = array_merge($trusted, strtolower((string) $entry) === 'cloudflare' ? cloudflare_ranges() : [(string) $entry]);
+    }
+
+    $address ??= (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    foreach ($trusted as $entry) if ($entry === $address || ip_in_range($address, $entry)) return true;
+
+    return false;
+}
+
+// Is $ip inside $cidr ('192.168.0.0/16', '2400:cb00::/32')? A bare address is not a range.
+function ip_in_range(string $ip, string $cidr): bool
+{
+    if (!str_contains($cidr, '/')) return false;
+    [$subnet, $bits] = explode('/', $cidr, 2);
+
+    $ip     = @inet_pton($ip);
+    $subnet = @inet_pton($subnet);
+    if ($ip === false || $subnet === false || strlen($ip) !== strlen($subnet)) return false;
+
+    $bits = (int) $bits;
+    $mask = str_repeat("\xff", intdiv($bits, 8)) . ($bits % 8 ? chr(0xff << (8 - $bits % 8) & 0xff) : '');
+    $mask = str_pad($mask, strlen($ip), "\0");
+
+    return ($ip & $mask) === ($subnet & $mask);
+}
+
+// The ranges Cloudflare connects from (https://www.cloudflare.com/ips/, 2026-10-28).
+function cloudflare_ranges(): array
+{
+    return [
+        '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18',
+        '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17',
+        '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+        '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32',
+        '2a06:98c0::/29', '2c0f:f248::/32',
+    ];
 }
 
 // no cache public asset
@@ -202,15 +248,23 @@ function ip()
     # or spend somebody else's address until that one was blocked.
     if (!trusted_proxy()) return $remote;
 
-    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR'] as $header) {
-        if (empty($_SERVER[$header])) continue;
+    # Cloudflare connecting straight to PHP: its own header names the visitor.
+    # Read only then - from anywhere else it is just a header the caller wrote.
+    $fromCloudflare = (bool) array_filter(cloudflare_ranges(), fn($range) => ip_in_range($remote, $range));
+    if ($fromCloudflare && filter_var($_SERVER['HTTP_CF_CONNECTING_IP'] ?? '', FILTER_VALIDATE_IP)) return $_SERVER['HTTP_CF_CONNECTING_IP'];
 
-        # X-Forwarded-For is a chain - client, proxy, proxy - and the client is first.
-        $candidate = trim(explode(',', $_SERVER[$header])[0]);
-        if (filter_var($candidate, FILTER_VALIDATE_IP)) return $candidate;
-    }
+    # X-Forwarded-For is client, proxy, proxy - but every proxy APPENDS, so only
+    # the right end is written by machines we trust; the left end is whatever the
+    # client put there. Taking the first entry let any caller name any address and
+    # walk past the sign-in throttle with a new one per request. Walk from the
+    # right instead, past the proxies we trust: the first address that is not one
+    # is the client. Client-IP is not read at all - no proxy overwrites it.
+    $chain = array_values(array_filter(array_map('trim', explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''))), fn($a) => filter_var($a, FILTER_VALIDATE_IP)));
+    $chain[] = $remote;
 
-    return $remote;
+    for ($i = count($chain) - 1; $i > 0; $i--) if (!trusted_proxy($chain[$i])) return $chain[$i];
+
+    return $chain[0];
 }
 
 // Http::abort shorcut

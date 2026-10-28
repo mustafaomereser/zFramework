@@ -449,11 +449,16 @@ are about to refuse. Use it when one account must not spread its quota across ad
 otherwise `ip` is cheaper and harder to get wrong.
 
 **Behind a proxy, list it in `framework.trusted-proxies`.** `ip()` reads `REMOTE_ADDR` and nothing
-else until the request arrives from an address on that list; only then does it read
-`CF-Connecting-IP`, `Client-IP` or the first entry of `X-Forwarded-For`. The headers are set by
-whoever sent the request, so trusting them unconditionally - which is what it used to do - let a
-caller take a fresh bucket on every request by changing one header, or spend somebody else's
-address until it was blocked. The cost of leaving the list empty on a proxied site is the
+else until the request arrives from an address on that list. Then it walks `X-Forwarded-For`
+**from the right**, past the listed proxies, and the first address that is not one is the client
+- every proxy appends, so the left end is the client's own claim. `Client-IP` is never read;
+`CF-Connecting-IP` only when the connection itself came from Cloudflare. Entries may be
+addresses, CIDR ranges (`'10.0.0.0/8'`) or `'cloudflare'` (its published ranges). `host()` takes
+the **last** `X-Forwarded-Host`/`-Proto` value, and the page cache keys on `host()`, so a page
+built for another host is never served under this one. The headers are set by whoever sent the
+request, so trusting them unconditionally - or trusting the first entry, as 3.2 did - let a caller
+take a fresh bucket on every request by changing one header, or spend somebody else's address
+until it was blocked. The cost of leaving the list empty on a proxied site is the
 opposite mistake: every visitor counts as the proxy, so they share one bucket.
 
 `Throttle` **answers 429 itself** rather than declining. A declined middleware with no fallback

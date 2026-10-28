@@ -2036,6 +2036,7 @@ return [
     'log'      => ['enabled' => true, 'level' => 'debug', 'days' => 14],
     'throttle' => ['enabled' => true, 'limit' => 60, 'window' => 60, 'by' => 'ip', 'block' => 0],
     'trusted-proxies' => ['127.0.0.1', '::1'],   // ip()/host() read forwarded headers only from these; the machine itself by default (ngrok, a local nginx) - the real proxy in production
+                                                 // addresses, CIDR ('10.0.0.0/8') or 'cloudflare'; X-Forwarded-For is read from the right, Client-IP never
     'session'  => ['driver' => 'file', 'gc_probability' => 1],
     'response' => ['ajax' => ['include-alerts' => true], 'cache-ttl' => 600, 'page-cache' => true],
     'cache'    => ['apcu' => true],
@@ -2549,7 +2550,7 @@ abort(403, 'Forbidden');        // JSON when the client wants it (X-Requested-Wi
 // Request
 uri();                          // current URI path (strips script name)
 method();                       // HTTP method (reads _method override from POST)
-ip();                           // REMOTE_ADDR; forwarded headers only when it is in framework.trusted-proxies
+ip();                           // REMOTE_ADDR; behind a framework.trusted-proxies address, the right-most untrusted X-Forwarded-For hop
 request('field');               // $_REQUEST['field'] ?? false
 request();                      // full $_REQUEST array
 request('field', 'value');      // set $_REQUEST['field'] = 'value'
