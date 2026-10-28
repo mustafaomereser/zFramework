@@ -1095,6 +1095,12 @@ raw match document, `aggregate([...])` runs a pipeline. There are no joins,
 no `whereRaw`, no migrations (`mongo indexes` covers the one thing a
 deployment must create) — asking for them here would only pretend.
 
+**A request value is not always a string.** PHP turns `email[$ne]=x` into `['$ne' => 'x']`, and
+`where('email', $_POST['email'])` hands that to MongoDB as an operator: `{email: {$ne: 'x'}}`
+matches every user but one. The same goes for `find($_GET['id'])`. Pass validated values
+(`length:` / `email` reject arrays) or cast: `where('email', (string) request('email'))`. On the
+SQL side an array value is only an "Array" string; here it is query syntax.
+
 `tests/mongo.php` runs all of it against a live server:
 `php terminal tests run mongo`.
 

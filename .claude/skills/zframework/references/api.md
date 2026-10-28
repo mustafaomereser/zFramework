@@ -188,6 +188,9 @@ where(string $key, $a = null, $b = null)         // 2 args = equals; 3 = operato
     // a null value throws InvalidArgumentException unless the operator is 'IS NULL'/'IS NOT NULL':
     // where('deleted_by', 'IS NULL', null). There is no whereNull(). where('user_id', Auth::id())
     // for a guest throws - guard the null (2.x silently built `= NULL`, which matches nothing).
+    // ⚠ an ARRAY value is passed through as a Mongo operator: email[$ne]=x in the request makes
+    // where('email', $_POST['email']) match everyone but x; find($_GET['id']) likewise. Never pass a
+    // raw request value - validated output or a (string) cast. Deliberate; not changed in code.
 whereOr(string $key, $a = null, $b = null)       // OR over the whole chain, as on the SQL side
 whereIn / whereNotIn(string $column, array $in) // [] -> matches nothing / no-op
 whereBetween(string $column, $start, $stop)
