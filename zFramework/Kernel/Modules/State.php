@@ -80,6 +80,7 @@ class State
         'zFramework\Core\Helpers\cPanel\API::$domain'    => 'configured at boot - see the note above if you set it per request',
         'zFramework\Core\Helpers\cPanel\API::$username'  => 'configured at boot - see the note above if you set it per request',
         'zFramework\Core\Helpers\cPanel\API::$apiToken'  => 'configured at boot - see the note above if you set it per request',
+        'zFramework\Core\Helpers\cPanel\API::$port'      => 'configured at boot - see the note above if you set it per request',
         'zFramework\Core\Helpers\cPanel\API::$verifySSL' => 'a fixed setting',
     ];
 

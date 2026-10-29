@@ -102,8 +102,13 @@ Install the result on cPanel with `cPanel\SSL::install()` below.
 
 ## cPanel API — `zFramework\Core\Helpers\cPanel\*`
 
-Everything goes through `API::request(string $endpoint, array $params = [], array $post = []): ?array`.
-All methods are static and return `?array` (`null` on failure).
+Everything goes through `API::request(string $endpoint, array $params = [], array $post = []): ?array`
+(UAPI), except Cron: `API::api2(string $module, string $function, array $params = []): ?array` - UAPI
+has no Cron module. api2() returns UAPI's shape `['status' => 1|0, 'data', 'errors' => [...]|null]`;
+a row with `status` 0 inside a successful call counts as a failure. curl failure: `['error' => '...']`.
+All methods are static and return `?array` (`null` when the reply is not JSON).
+Config statics: `$domain`, `$username`, `$apiToken`, `$port = 2083`, `$verifySSL = true` (public;
+false only for a self-signed certificate).
 
 ### Domain
 ```php
@@ -147,11 +152,13 @@ Email::deleteForwarder(string $email, string $destination)
 
 ### Cron
 ```php
-Cron::list()                                    Cron::create(string $time, string $command)
-Cron::edit(int $lineKey, string $time, string $command)
-Cron::delete(int $lineKey)
+Cron::list()            // data rows: linekey, command, minute, hour, day, month, weekday, count
+Cron::create(string $time, string $command)            // $time "m h d M wd", sent as five fields
+Cron::edit(string $linekey, string $time, string $command)   // linekey from list()
+Cron::delete(int $line)                                 // the row's `count` - API 2 takes no linekey
 ```
-Same line-number caveat as DNS records.
+A schedule that is not five fields throws InvalidArgumentException before any request.
+`delete()` uses line numbers: same caveat as DNS records, re-list after a delete.
 
 ### Fileman
 ```php

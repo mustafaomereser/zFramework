@@ -2388,6 +2388,10 @@ back.
 - **PHP 8.2 or newer.** 8.1 is out of security support, and the vulnerability that prompted this
   is open on everything before 8.2. Composer refuses the install on 8.1 - update PHP first, then the
   framework.
+- **cPanel verifies the certificate** (`API::$verifySSL`, now public, defaults to `true`). A host
+  answering with a self-signed one fails until you set it to `false`. `API::$port` is new (2083).
+- **`cPanel\Cron` works** - it called UAPI, which has no cron, and failed every time. It is API 2
+  now: `edit()` takes the `linekey` from `list()`, `delete()` the line number (`count`).
 
 ### Upgrading to 3.3.0
 
@@ -2788,8 +2792,9 @@ $cert      = $ssl->getCertificate($order, $finalized['domainKey']);
 
 ## 18. cPanel
 
-Wraps the cPanel UAPI (port 2083, `Authorization: cpanel user:token` — an API token, not
-Bearer). TLS verification is off in the client, so keep the hostname on a network you trust.
+Wraps the cPanel UAPI (`Authorization: cpanel user:token` — an API token, not Bearer), and
+API 2 for cron, which UAPI does not have. The certificate is verified: before 3.4 it was not,
+and the token went to whoever answered for the hostname.
 
 ```php
 use zFramework\Core\Helpers\cPanel\{API, Domain, Cron, Database, DatabaseUser, Email, Fileman, SSL};
@@ -2798,6 +2803,12 @@ use zFramework\Core\Helpers\cPanel\{API, Domain, Cron, Database, DatabaseUser, E
 API::$domain   = 'example.com';      // cPanel hostname
 API::$username = 'cpanel_user';      // cPanel account username
 API::$apiToken = 'TOKEN_STRING';     // cPanel → Security → Manage API Tokens
+API::$port      = 2083;              // default; 443 when a proxy serves cPanel there
+API::$verifySSL = true;              // default; false only for a self-signed certificate
+
+API::request('DomainInfo/list_domains');    // any UAPI call: module/function
+API::api2('Cron', 'listcron');               // any API 2 call, the reply in UAPI's shape:
+                                             // ['status' => 1|0, 'data' => [...], 'errors' => [...]|null]
 ```
 
 ### Domain & Subdomains
@@ -2827,10 +2838,12 @@ Domain::deleteDNSRecord('example.com', $line);
 ### Cron Jobs
 
 ```php
-Cron::list();
+Cron::list();       // data: [['linekey', 'command', 'minute', 'hour', 'day', 'month', 'weekday', 'count'], ...]
 Cron::create('0 * * * *', '/usr/bin/php /home/user/public_html/terminal schedule');
-Cron::edit($lineKey, '0 */6 * * *', '/usr/bin/php /home/user/public_html/terminal schedule');
-Cron::delete($lineKey);
+Cron::edit($job['linekey'], '0 */6 * * *', '/usr/bin/php /home/user/public_html/terminal schedule');
+Cron::delete($job['count']);   // API 2 deletes by line number only; numbers shift after a delete
+// The schedule is "m h d M wd" - five fields, or InvalidArgumentException before any request.
+// A job cPanel refuses comes back as status 0 with its reason in errors.
 ```
 
 ### Databases
