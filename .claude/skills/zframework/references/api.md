@@ -564,7 +564,7 @@ php terminal make model|mongomodel|controller|request|middleware|migration|seede
        [--resource] [--module=blog] [--table=x] [--dbname=x]
 
 # Database
-php terminal db migrate [--fresh] [--force] [--seed] [--all] [--module=blog] [--db=x] [--path=x]
+php terminal db migrate [--fresh] [--force] [--convert-charset] [--seed] [--all] [--module=blog] [--db=x] [--path=x]
 php terminal db seed [--db=x]
 php terminal db backup [--compress] [--separate]
 php terminal db restore [--db=x]

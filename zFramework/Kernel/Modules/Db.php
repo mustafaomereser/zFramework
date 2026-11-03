@@ -79,6 +79,114 @@ class Db
         return $statements;
     }
 
+    /**
+     * Compared the way the server reports them: `utf8` is utf8mb3 on newer servers.
+     */
+    private static function collationName(string $collation): string
+    {
+        return preg_replace('/^utf8_/', 'utf8mb3_', strtolower($collation));
+    }
+
+    /**
+     * May text in this character set be rewritten into that one? The same set keeps
+     * its bytes; ascii and utf8mb3 are subsets of utf8mb4. Anything else can turn
+     * characters into `?` without an error, whatever sql_mode says.
+     */
+    private static function charsetSafe(string $from, string $to): bool
+    {
+        $from = strtok(self::collationName($from . '_'), '_');
+        $to   = strtok(self::collationName($to . '_'), '_');
+
+        return $from === $to || ($to === 'utf8mb4' && in_array($from, ['ascii', 'utf8mb3']));
+    }
+
+    /**
+     * Character set and collation of a table's text columns, by lower-cased name.
+     */
+    private static function columnCharsets(string $table): array
+    {
+        $charsets = [];
+        foreach (self::$db->prepare("SELECT COLUMN_NAME AS name, CHARACTER_SET_NAME AS charset, COLLATION_NAME AS collation FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = :dbname AND TABLE_NAME = :t AND COLLATION_NAME IS NOT NULL", ['dbname' => self::$dbname, 't' => $table])->fetchAll(\PDO::FETCH_ASSOC) as $row)
+            $charsets[strtolower($row['name'])] = ['charset' => $row['charset'], 'collation' => $row['collation']];
+
+        return $charsets;
+    }
+
+    /**
+     * Compare an existing table with its migration and say what differs. Without
+     * --convert-charset that is all it does; with it, the answer is what migrate()
+     * converts. A change of character set that could lose data is refused either way.
+     *
+     * @return array{columns: array<string, true>, default: bool, pending?: bool}
+     */
+    private static function charsetDrift(string $table, string $charset, array $columns, ?string $prefix, bool $apply): array
+    {
+        $found = self::$db->prepare("SELECT TABLE_COLLATION AS collation FROM information_schema.TABLES WHERE TABLE_SCHEMA = :dbname AND TABLE_NAME = :t", ['dbname' => self::$dbname, 't' => $table])->fetch(\PDO::FETCH_ASSOC);
+        $convert = ['columns' => [], 'default' => false];
+        $differs = $refused = [];
+
+        if ($found && self::collationName($found['collation']) !== self::collationName($charset)) {
+            if (self::charsetSafe($found['collation'], $charset)) $convert['default'] = true;
+            else $refused[] = "table default {$found['collation']} -> $charset";
+            $differs[] = "table default {$found['collation']} -> $charset";
+        }
+
+        $current = self::columnCharsets($table);
+        foreach ($columns as $name => $parameters) {
+            if (!is_array($parameters)) continue;
+
+            $text = false;
+            $want = $charset;
+            foreach ($parameters as $parameter) {
+                $switch = explode(':', (string) $parameter);
+                if (in_array($switch[0], ['text', 'longtext', 'varchar', 'char', 'uuid'])) $text = true;
+                if ($switch[0] === 'charset' && isset($switch[1])) $want = $switch[1];
+            }
+
+            $name = strtolower(($prefix ? $prefix . "_" : '') . $name);
+            if (!$text || !isset($current[$name]) || self::collationName($current[$name]['collation']) === self::collationName($want)) continue;
+
+            $differs[] = "$name {$current[$name]['collation']} -> $want";
+            if (self::charsetSafe($current[$name]['charset'], $want)) $convert['columns'][$name] = true;
+            else $refused[] = "$name {$current[$name]['collation']} -> $want";
+        }
+
+        if (!$differs) return $convert;
+
+        if (!$apply) Terminal::text("[color=yellow]`" . self::$dbname . ".$table` charset differs from its migration: " . implode(', ', $differs) . ".[/color]");
+
+        if ($refused) Terminal::text("[color=red]`" . self::$dbname . ".$table` refused, the character set would change and text could be lost: " . implode(', ', $refused) . ". Convert it by hand after a backup.[/color]");
+
+        # Reported only: `pending` is what the reminder at the end of the run counts.
+        return $apply ? $convert : ['columns' => [], 'default' => false, 'pending' => $convert['columns'] || $convert['default']];
+    }
+
+    /**
+     * The CHARACTER SET / COLLATE part of a column's ADD or MODIFY.
+     *
+     * Left out, MODIFY moves the column to the table's default - so a migration
+     * that only changed a default also changed the column's collation, and rewrote
+     * its text if the default was another character set. What the migration asks
+     * for is written; a change that could lose data is not, and the column stays
+     * exactly as it is.
+     */
+    private static function charsetClause(string $table, string $column, array $data, ?string $charset, array $current): string
+    {
+        if (!preg_match('/\b(VARCHAR|CHAR|TEXT|LONGTEXT)\b/i', (string) ($data['type'] ?? ''))) return (string) ($data['charset'] ?? '');
+
+        $want = preg_match('/COLLATE (\S+)/', (string) ($data['charset'] ?? ''), $m) ? $m[1] : $charset;
+        $have = $current[strtolower($column)] ?? null;
+
+        if ($have && $want && !self::charsetSafe($have['charset'], $want)) {
+            Terminal::text("[color=red]-> `$column` stays {$have['collation']}: $want would change its character set and text could be lost.[/color]");
+            $want = null;
+        }
+
+        if ($want) return " CHARACTER SET " . strtok($want, '_') . " COLLATE $want ";
+
+        return $have ? " CHARACTER SET {$have['charset']} COLLATE {$have['collation']} " : '';
+    }
+
     private static function table_exists($table = null)
     {
         if (!empty($table)) Terminal::$parameters['table'] = $table;
@@ -108,6 +216,7 @@ class Db
      * Usage: php terminal db migrate [--fresh] [--force] [--seed] [--all] [--module=blog] [--db=default] [--path=sub]
      * @param --fresh            (optional) drop all tables and re-migrate
      * @param --force            (optional) force migration even if unchanged
+     * @param --convert-charset  (optional) bring existing text columns and the table default to the migration's collation
      * @param --seed             (optional) run seeders after migrate
      * @param --all              (optional) include all module migrations
      * @param --module={name}    (optional) migrate only this module
@@ -122,6 +231,8 @@ class Db
         $migrations_path    = 'migrations' . ($path ? "/$path" : null);
         $migrate_fresh      = in_array('--fresh', Terminal::$parameters) ?? false;
         $migrate_force      = in_array('--force', Terminal::$parameters) ?? false;
+        $migrate_convert    = in_array('--convert-charset', Terminal::$parameters);
+        $charset_pending    = 0;
         $init_column_name   = "table_initilazing";
         $types              = [3 => ['not changed.', 'dark-gray'], 1 => ['added', 'green'], 2 => ['modified', 'yellow'], 0 => ['FAILED - see the error above', 'red']];
 
@@ -207,7 +318,12 @@ class Db
             }
             #endregion
 
-            if (!($fresh || $migrate_force) && strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
+            # Before the up-to-date check: a table whose migration has not changed can
+            # still have drifted, and that is the table --convert-charset is run for.
+            $convert = !$fresh && $charset && !self::pg() ? self::charsetDrift($table, $charset, $columns, $class::$prefix ?? '', $migrate_convert) : ['columns' => [], 'default' => false];
+            if ($convert['pending'] ?? false) $charset_pending++;
+
+            if (!($fresh || $migrate_force || $convert['columns'] || $convert['default']) && strtotime($last_migrate['tables'][$table]['date'] ?? 0) > $last_modify) {
                 Terminal::text("\n[color=green]`" . self::$dbname . ".$table` is up to date.[/color]");
                 continue;
             }
@@ -265,6 +381,7 @@ class Db
             #
 
             $queue_index_list = [];
+            $current_charsets = self::pg() ? [] : self::columnCharsets($table);
 
             #region: Migrate stuff
             $last_column = null;
@@ -415,7 +532,7 @@ class Db
                 # would fail with 1063; drop the increment instead of breaking the migration.
                 if (isset($data['index']) && (str_contains($data['index'], 'AUTO_INCREMENT') || str_contains($data['index'], 'IDENTITY')) && !preg_match('/\b(TINYINT|SMALLINT|MEDIUMINT|INT|BIGINT)\b/i', $data['type'])) $data['index'] = " PRIMARY KEY ";
 
-                if ($fresh || $migrate_force) $column_need_update = true;
+                if ($fresh || $migrate_force || isset($convert['columns'][strtolower($column)])) $column_need_update = true;
                 else $column_need_update = !isset($last_migrate['tables'][$table]['columns'][$column]['data']) || $last_migrate['tables'][$table]['columns'][$column]['data'] != $data;
 
                 $result = ['loop' => true, 'status' => 0];
@@ -423,7 +540,7 @@ class Db
                     # Column position (AFTER/FIRST) is MySQL-only; PostgreSQL
                     # appends, and the order of columns() is cosmetic anyway.
                     $position = self::pg() ? ' ' : ($last_column ? " AFTER $last_column " : ' FIRST ');
-                    $buildSQL = str_replace(['  ', ' ;'], [' ', ';'], ("ALTER TABLE $table ADD $column " . (@$data['type'] . @$data['charset'] . @$data['nullstatus'] . @$data['default'] . @$data['index']) . $position . (isset($data['extras']) ? ", " . implode(', ', $data['extras']) : null) . ";"));
+                    $buildSQL = str_replace(['  ', ' ;'], [' ', ';'], ("ALTER TABLE $table ADD $column " . (@$data['type'] . (self::pg() ? null : self::charsetClause($table, $column, $data, $charset, $current_charsets)) . @$data['nullstatus'] . @$data['default'] . @$data['index']) . $position . (isset($data['extras']) ? ", " . implode(', ', $data['extras']) : null) . ";"));
                     while ($result['loop'] == true) {
                         try {
                             self::$db->prepare($buildSQL);
@@ -468,7 +585,10 @@ class Db
 
                                 default:
                                     Terminal::text('[color=red]Unkown Error: ' . $e->getMessage() . '[/color]');
-                                    $result['loop'] = false;
+                                    # A MODIFY that failed had status 2 from the ADD before
+                                    # it: printed "modified", recorded as done, never retried.
+                                    $result['status'] = 0;
+                                    $result['loop']   = false;
                                     continue 2;
                             }
                         }
@@ -527,6 +647,17 @@ class Db
             }
             #endregion
 
+            #region: table default collation
+            # Metadata only, no row is touched. Last, and not after a failed column:
+            # the table must not claim a collation its columns did not reach.
+            if ($convert['default'] && !$table_failed) try {
+                self::$db->prepare("ALTER TABLE $table DEFAULT CHARACTER SET " . strtok($charset, '_') . " COLLATE $charset");
+                Terminal::text("[color=yellow]`" . self::$dbname . ".$table` default collation is[/color] [color=blue]`$charset`[/color]");
+            } catch (\PDOException $e) {
+                Terminal::text('[color=red]Error: ' . $e->getMessage() . '[/color]');
+            }
+            #endregion
+
             #region: update storage engine.
             if (!self::pg()) {
                 self::$db->prepare("ALTER TABLE $table ENGINE = '$storageEngine'");
@@ -566,6 +697,8 @@ class Db
 
             file_put_contents2(self::$db->cache_dir . "/" . self::$dbname . "/last-migrate.json", json_encode(['date' => date('Y-m-d H:i:s')] + $last_migrate, JSON_UNESCAPED_UNICODE));
         }
+
+        if ($charset_pending) Terminal::text("\n[color=yellow]$charset_pending table(s) differ from their migration's charset and were not converted. Back up (`php terminal db backup`), then run again with --convert-charset.[/color]");
 
         if (in_array('--seed', Terminal::$parameters)) self::seed();
     }

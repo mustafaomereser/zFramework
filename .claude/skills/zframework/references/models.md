@@ -143,6 +143,12 @@ on pgsql, `json`->JSONB, `datetime`->TIMESTAMP, `tinyint`/`bool`->SMALLINT, `pri
 `onupdate`-> a BEFORE UPDATE trigger; `charset:` and `$storageEngine` are ignored; `db backup`
 and `db restore` are MySQL-only (pg_dump/psql). A `default:(EXPR)` is verbatim - write it in the target's SQL.
 
+`$charset` (MySQL): ADD/MODIFY of a text column writes `charset:` or `$charset`; with neither it keeps the
+column's current collation (never the table default). A table that differs is only reported until
+`db migrate --convert-charset`, which MODIFYs the differing columns, then the table default (no `CONVERT TO`).
+Same character set = same bytes, but a `unique` column can collide and that column then fails with its data
+intact. ascii/utf8mb3 -> utf8mb4 is allowed; any other change of character set is refused, flag or not.
+
 Migrations are **idempotent, not additive**: re-running adds the columns that are missing and
 **drops the ones no longer in `columns()`**, data included - removing a column from a migration
 removes it from the table on the next `db migrate`. `--fresh` rebuilds every table and loses

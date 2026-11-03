@@ -848,7 +848,7 @@ namespace Database\Migrations;
 class Posts
 {
     static $storageEngine = 'InnoDB';
-    static $charset       = 'utf8_general_ci';
+    static $charset       = 'utf8mb4_general_ci';
     static $table         = 'posts';
     static $db            = 'local';
 
@@ -927,7 +927,27 @@ php terminal db migrate --fresh           # drop every MIGRATED table and re-run
 php terminal db migrate --fresh --seed    # drop + migrate + seed
 php terminal db migrate --module=blog     # only migrate the 'blog' module
 php terminal db migrate --all             # include all modules
+php terminal db migrate --convert-charset # bring existing text columns and the table default to $charset
 ```
+
+`$charset` applies to existing tables too. A column `ADD`ed or `MODIFY`ed gets the migration's
+collation (`charset:` first, then `$charset`); with neither it keeps the one it has, instead of
+falling to the table's default. `json` columns have none.
+
+A table that already differs is listed, with a reminder at the end of the run, and waits for
+`--convert-charset`, which
+`MODIFY`s the columns that differ and then sets the table's default. It never goes through `CONVERT
+TO`, so a column's own `charset:` is respected.
+
+- **Same character set, other collation** (`utf8mb4_unicode_ci` -> `utf8mb4_general_ci`): the bytes
+  do not change. Sorting and comparing do, so a `unique` column can collide (`ß` and `s`): that
+  column fails with the error and keeps its data, and the table default waits for the next run.
+- **`ascii` / `utf8mb3` -> `utf8mb4`**: also safe; a wider index can still be refused.
+- **Any other change of character set** (`utf8mb4` -> `utf8mb3`, `latin1`): refused, with or without
+  the flag. It can turn characters into `?` without an error. The column stays as it is; convert it
+  by hand after a backup.
+
+Take a backup first anyway (`php terminal db backup`): columns convert one by one, not atomically.
 
 ---
 
@@ -2385,6 +2405,10 @@ back.
 
 ### Upgrading to 3.4.0
 
+- **`db migrate` respects `$charset` on existing tables** (§2.5). A `MODIFY` no longer moves a column
+  to the table's default collation, and a table that differs is reported; `--convert-charset`
+  converts it. Check that a `$charset = 'utf8_general_ci'` copied from older docs is what you mean:
+  it is utf8mb3, and it will not be applied over utf8mb4 columns.
 - **PHP 8.2 or newer.** 8.1 is out of security support, and the vulnerability that prompted this
   is open on everything before 8.2. Composer refuses the install on 8.1 - update PHP first, then the
   framework.
