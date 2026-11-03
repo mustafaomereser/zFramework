@@ -933,8 +933,10 @@ php terminal db diff                      # what the database and the migrations
 
 `db diff` reads every migration, modules included, and lists per connection: tables with no
 migration (`db migrate` leaves them alone), columns with no migration (**the next `db migrate` of
-that table drops them**, so read this first), and tables and columns the migrations have but the
-database does not. `--db=x` compares one connection, `--path=sub` one folder of migrations.
+that table drops them**, so read this first), tables and columns the migrations have but the
+database does not, and collations that differ from `$charset` / `charset:` - those `--convert-charset`
+would convert apart from those it refuses. `--db=x` compares one connection, `--path=sub` one folder
+of migrations.
 
 `$charset` applies to existing tables too. A column `ADD`ed or `MODIFY`ed gets the migration's
 collation (`charset:` first, then `$charset`); with neither it keeps the one it has, instead of

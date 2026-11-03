@@ -113,19 +113,19 @@ class Db
     }
 
     /**
-     * Compare an existing table with its migration and say what differs. Without
-     * --convert-charset that is all it does; with it, the answer is what migrate()
-     * converts. A change of character set that could lose data is refused either way.
+     * What differs between an existing table and its migration's collations, and
+     * which of it may be converted. A change of character set that could lose data
+     * lands in `refused`. Without a $charset only a column's own charset: counts.
      *
-     * @return array{columns: array<string, true>, default: bool, pending?: bool}
+     * @return array{differs: string[], refused: string[], convert: array{columns: array<string, true>, default: bool}}
      */
-    private static function charsetDrift(string $table, string $charset, array $columns, ?string $prefix, bool $apply): array
+    private static function charsetDifferences(string $table, ?string $charset, array $columns, ?string $prefix = null): array
     {
         $found = self::$db->prepare("SELECT TABLE_COLLATION AS collation FROM information_schema.TABLES WHERE TABLE_SCHEMA = :dbname AND TABLE_NAME = :t", ['dbname' => self::$dbname, 't' => $table])->fetch(\PDO::FETCH_ASSOC);
         $convert = ['columns' => [], 'default' => false];
         $differs = $refused = [];
 
-        if ($found && self::collationName($found['collation']) !== self::collationName($charset)) {
+        if ($charset && $found && self::collationName($found['collation']) !== self::collationName($charset)) {
             if (self::charsetSafe($found['collation'], $charset)) $convert['default'] = true;
             else $refused[] = "table default {$found['collation']} -> $charset";
             $differs[] = "table default {$found['collation']} -> $charset";
@@ -144,12 +144,25 @@ class Db
             }
 
             $name = strtolower(($prefix ? $prefix . "_" : '') . $name);
-            if (!$text || !isset($current[$name]) || self::collationName($current[$name]['collation']) === self::collationName($want)) continue;
+            if (!$want || !$text || !isset($current[$name]) || self::collationName($current[$name]['collation']) === self::collationName($want)) continue;
 
             $differs[] = "$name {$current[$name]['collation']} -> $want";
             if (self::charsetSafe($current[$name]['charset'], $want)) $convert['columns'][$name] = true;
             else $refused[] = "$name {$current[$name]['collation']} -> $want";
         }
+
+        return ['differs' => $differs, 'refused' => $refused, 'convert' => $convert];
+    }
+
+    /**
+     * Say what differs on the way through a migrate. Without --convert-charset that
+     * is all it does; with it, the answer is what migrate() converts.
+     *
+     * @return array{columns: array<string, true>, default: bool, pending?: bool}
+     */
+    private static function charsetDrift(string $table, string $charset, array $columns, ?string $prefix, bool $apply): array
+    {
+        ['differs' => $differs, 'refused' => $refused, 'convert' => $convert] = self::charsetDifferences($table, $charset, $columns, $prefix);
 
         if (!$differs) return $convert;
 
@@ -275,6 +288,7 @@ class Db
             $class = new $class;
             if (isset(Terminal::$parameters['--db'])) $class::$db = Terminal::$parameters['--db'];
             $declared[$class::$db][$class::$table] = array_change_key_case(self::declaredColumns($class, $class::columns()), CASE_LOWER);
+            $charsets[$class::$db][$class::$table] = $class::$charset ?? null;
         }
 
         # A connection nothing migrates has nothing to compare with: every table on it
@@ -293,7 +307,7 @@ class Db
             # Under --path only part of the migrations were read, so the rest of the
             # tables say nothing about having one.
             $orphanTables = $path ? [] : array_values(array_diff(self::$tables, array_keys($tables)));
-            $orphans = $missingTables = $missingColumns = [];
+            $orphans = $missingTables = $missingColumns = $charsetDiffers = $charsetRefused = [];
             foreach ($tables as $table => $columns) {
                 if (!in_array($table, self::$tables)) {
                     $missingTables[] = $table;
@@ -306,6 +320,12 @@ class Db
 
                 foreach (array_diff($existing, array_keys($columns)) as $column) $orphans[] = "$table.$column";
                 foreach (array_diff(array_keys($columns), $existing) as $column) $missingColumns[] = "$table.$column";
+
+                if (!self::pg()) {
+                    $charsetState = self::charsetDifferences($table, $charsets[$connection][$table], $columns);
+                    foreach (array_diff($charsetState['differs'], $charsetState['refused']) as $item) $charsetDiffers[] = "$table: $item";
+                    foreach ($charsetState['refused'] as $item) $charsetRefused[] = "$table: $item";
+                }
             }
 
             Terminal::text("\n[color=green]`" . self::$dbname . "` ($connection):[/color]");
@@ -315,9 +335,11 @@ class Db
                 ['Columns with no migration', 'the next db migrate of that table DROPS them', 'red', $orphans],
                 ['Tables not in the database', 'db migrate creates them', 'blue', $missingTables],
                 ['Columns not in the database', 'db migrate adds them', 'blue', $missingColumns],
+                ['Charset differs', 'db migrate --convert-charset converts them', 'yellow', $charsetDiffers],
+                ['Charset differs, refused', 'the character set would change and text could be lost: by hand, after a backup', 'red', $charsetRefused],
             ];
 
-            if (!$orphanTables && !$orphans && !$missingTables && !$missingColumns) Terminal::text('[color=dark-gray]No difference.[/color]');
+            if (!$orphanTables && !$orphans && !$missingTables && !$missingColumns && !$charsetDiffers && !$charsetRefused) Terminal::text('[color=dark-gray]No difference.[/color]');
 
             foreach ($sections as [$title, $note, $color, $items]) if ($items) {
                 Terminal::text("[color=$color]{$title}[/color] [color=dark-gray]({$note})[/color]");

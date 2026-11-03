@@ -25,22 +25,26 @@ if ($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) !== 'mysql') {
 $table  = Test::table('diff');
 $orphan = Test::table('diff_orphan');
 $absent = Test::table('diff_absent');
+$charsetTable = Test::table('diff_charset');
 $folder = 'zftestdiff';
 $dir    = BASE_PATH . "/database/migrations/$folder";
 @mkdir($dir, 0777, true);
 
-Test::cleanup(function () use ($pdo, $table, $orphan, $dir) {
-    foreach ([$table, $orphan] as $t) $pdo->exec("DROP TABLE IF EXISTS $t");
+Test::cleanup(function () use ($pdo, $table, $orphan, $charsetTable, $dir) {
+    foreach ([$table, $orphan, $charsetTable] as $t) $pdo->exec("DROP TABLE IF EXISTS $t");
     rrmdir($dir);
 });
 
-foreach ([$table, $orphan] as $t) $pdo->exec("DROP TABLE IF EXISTS $t");
+foreach ([$table, $orphan, $charsetTable] as $t) $pdo->exec("DROP TABLE IF EXISTS $t");
 $pdo->exec("CREATE TABLE $table (id INT AUTO_INCREMENT PRIMARY KEY, x_Email VARCHAR(50), x_legacy VARCHAR(50), created_at DATETIME, updated_at DATETIME)");
 $pdo->exec("CREATE TABLE $orphan (id INT)");
 
 $class = fn(string $name, string $t, string $prefix, string $columns) => "<?php\nnamespace Database\\Migrations\\$folder;\n\nclass $name\n{\n    static \$table = '$t';\n    static \$db = '$testDb';\n    static \$prefix = '$prefix';\n\n    public static function columns()\n    {\n        return $columns;\n    }\n}\n";
 file_put_contents("$dir/Probe.php", $class('Probe', $table, 'x', "['email' => ['varchar:50'], 'pending' => ['int'], 'timestamps']"));
 file_put_contents("$dir/Absent.php", $class('Absent', $absent, '', "['id' => ['primary']]"));
+
+$pdo->exec("CREATE TABLE $charsetTable (id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(50) COLLATE utf8mb4_unicode_ci, same VARCHAR(50) COLLATE utf8mb4_general_ci, own VARCHAR(50) COLLATE utf8mb4_unicode_ci, lossy VARCHAR(50) CHARACTER SET latin1 COLLATE latin1_general_ci, narrow VARCHAR(50) COLLATE utf8mb4_unicode_ci) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+file_put_contents("$dir/Charset.php", str_replace('static $prefix', "static \$charset = 'utf8mb4_general_ci';\n    static \$prefix", $class('Charset', $charsetTable, '', "['id' => ['primary'], 'email' => ['varchar:50'], 'same' => ['varchar:50'], 'own' => ['varchar:50', 'charset:utf8mb4_unicode_ci'], 'lossy' => ['varchar:50'], 'narrow' => ['varchar:50', 'charset:latin1_general_ci']]")));
 
 $diff = fn(string ...$flags) => preg_replace('/\e\[[\d;]*m/', '', (string) shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(BASE_PATH . '/terminal') . " db diff --db=$testDb " . implode(' ', $flags) . ' 2>&1'));
 
@@ -66,7 +70,22 @@ test('--path does not call the tables outside it orphans', function () use ($dif
     same('', $section($diff("--path=$folder"), 'Tables with no migration'));
 });
 
-test('it changes nothing', function () use ($pdo, $table, $orphan, $absent) {
+test('a collation that differs is listed: convertible apart from refused, a column\'s own charset: respected', function () use ($diff, $section, $charsetTable) {
+    $out = $diff();
+
+    $differs = $section($out, 'Charset differs (');
+    contains("-> $charsetTable: table default utf8mb4_unicode_ci -> utf8mb4_general_ci", $differs, $out);
+    contains("-> $charsetTable: email utf8mb4_unicode_ci -> utf8mb4_general_ci", $differs);
+    falsy(str_contains($out, "$charsetTable: same "), 'a column already at the collation is not a difference');
+    falsy(str_contains($out, "$charsetTable: own "), 'its own charset: is what it is compared with');
+    contains("-> $charsetTable: lossy latin1_general_ci -> utf8mb4_general_ci", $section($out, 'Charset differs (') . $section($out, 'Charset differs, refused'));
+
+    contains("-> $charsetTable: narrow utf8mb4_unicode_ci -> latin1_general_ci", $section($out, 'Charset differs, refused'));
+    falsy(str_contains($differs, 'narrow'), 'a lossy change is not offered for conversion');
+});
+
+test('it changes nothing', function () use ($pdo, $table, $orphan, $absent, $charsetTable) {
+    same('utf8mb4_unicode_ci', $pdo->query("SELECT TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = database() AND TABLE_NAME = '$charsetTable'")->fetchColumn());
     same(['id', 'x_Email', 'x_legacy', 'created_at', 'updated_at'], $pdo->query("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN));
     same('id', $pdo->query("DESCRIBE $orphan")->fetchColumn());
     same(0, (int) $pdo->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = database() AND TABLE_NAME = '$absent'")->fetchColumn());
