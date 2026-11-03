@@ -212,8 +212,123 @@ class Db
     }
 
     /**
+     * A migration's columns() as the table will have them: prefix applied, the
+     * timestamps and softDelete shorthands expanded.
+     */
+    private static function declaredColumns(object $class, array $columns): array
+    {
+        #region: setting prefix.
+        if (isset($class::$prefix)) foreach ($columns as $name => $val) {
+            unset($columns[$name]);
+            $name = ($class::$prefix ? $class::$prefix . "_" : null) . $name;
+            $columns[$name] = $val;
+        }
+        #endregion
+
+        #region: Setting consts
+        $consts = config('model.consts');
+        if (strlen($key = array_search('timestamps', $columns))) {
+            unset($columns[$key]);
+            $columns = ($columns + [
+                $consts['updated_at'] => ['required', 'datetime', 'default:CURRENT_TIMESTAMP', 'onupdate'],
+                $consts['created_at'] => ['required', 'datetime', 'default:CURRENT_TIMESTAMP'],
+            ]);
+        }
+
+        if (strlen($key = array_search('softDelete', $columns))) {
+            unset($columns[$key]);
+            $columns = ($columns + [$consts['deleted_at'] => [
+                'date' => ['nullable', 'datetime', 'default'],
+                'bool' => ['bool', 'default:1', 'required']
+            ][config('model.deleted_at_type') ?? 'date']]);
+        }
+        #endregion
+
+        return $columns;
+    }
+
+    /**
+     * Description: List what the database and the migrations disagree on. Changes nothing.
+     * Usage: php terminal db diff [--db=default] [--path=sub]
+     * @param --db={key}         (optional) compare only this connection, all migrations against it
+     * @param --path={subdir}    (optional) sub-path inside migrations folder
+     */
+    public static function diff()
+    {
+        $path  = Terminal::$parameters['--path'] ?? null;
+        $sub   = 'migrations' . ($path ? "/$path" : null);
+        $files = [];
+
+        # Every module, always: a table a module migrates is not an orphan just
+        # because the module was not asked about.
+        foreach (array_merge([BASE_PATH . "/database/$sub"], array_map(fn($module) => BASE_PATH . "/modules/$module/$sub", self::$all_modules)) as $scan)
+            if (is_dir($scan)) $files = array_merge($files, self::recursiveScanMigrations($scan));
+
+        $declared = [];
+        foreach ($files as $file) {
+            $class = str_replace(['.php', BASE_PATH, '/'], ['', '', '\\'], $file);
+            if (!class_exists($class)) {
+                Terminal::text("[color=red]There are not a $class migrate class.[/color]");
+                continue;
+            }
+
+            $class = new $class;
+            if (isset(Terminal::$parameters['--db'])) $class::$db = Terminal::$parameters['--db'];
+            $declared[$class::$db][$class::$table] = array_change_key_case(self::declaredColumns($class, $class::columns()), CASE_LOWER);
+        }
+
+        # A connection nothing migrates has nothing to compare with: every table on it
+        # would be listed, and it may well belong to something else entirely.
+        if (!$declared) return Terminal::text("[color=red]You haven't a migration to compare with.[/color]");
+
+        foreach ($declared as $connection => $tables) {
+            if (!isset($GLOBALS['databases']['connections'][$connection])) {
+                Terminal::text("[color=red]$connection database is not exists.[/color]");
+                continue;
+            }
+
+            self::connectDB($connection);
+            self::table_exists(array_key_first($tables));
+
+            # Under --path only part of the migrations were read, so the rest of the
+            # tables say nothing about having one.
+            $orphanTables = $path ? [] : array_values(array_diff(self::$tables, array_keys($tables)));
+            $orphans = $missingTables = $missingColumns = [];
+            foreach ($tables as $table => $columns) {
+                if (!in_array($table, self::$tables)) {
+                    $missingTables[] = $table;
+                    continue;
+                }
+
+                $existing = array_map('strtolower', self::pg()
+                    ? self::$db->prepare('SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = :t', ['t' => $table])->fetchAll(\PDO::FETCH_COLUMN)
+                    : self::$db->prepare("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN));
+
+                foreach (array_diff($existing, array_keys($columns)) as $column) $orphans[] = "$table.$column";
+                foreach (array_diff(array_keys($columns), $existing) as $column) $missingColumns[] = "$table.$column";
+            }
+
+            Terminal::text("\n[color=green]`" . self::$dbname . "` ($connection):[/color]");
+
+            $sections = [
+                ['Tables with no migration', 'db migrate leaves them alone', 'yellow', $orphanTables],
+                ['Columns with no migration', 'the next db migrate of that table DROPS them', 'red', $orphans],
+                ['Tables not in the database', 'db migrate creates them', 'blue', $missingTables],
+                ['Columns not in the database', 'db migrate adds them', 'blue', $missingColumns],
+            ];
+
+            if (!$orphanTables && !$orphans && !$missingTables && !$missingColumns) Terminal::text('[color=dark-gray]No difference.[/color]');
+
+            foreach ($sections as [$title, $note, $color, $items]) if ($items) {
+                Terminal::text("[color=$color]{$title}[/color] [color=dark-gray]({$note})[/color]");
+                foreach ($items as $item) Terminal::text("[color=$color]-> {$item}[/color]");
+            }
+        }
+    }
+
+    /**
      * Description: Migrate database
-     * Usage: php terminal db migrate [--fresh] [--force] [--seed] [--all] [--module=blog] [--db=default] [--path=sub]
+     * Usage: php terminal db migrate [--fresh] [--force] [--convert-charset] [--seed] [--all] [--module=blog] [--db=default] [--path=sub]
      * @param --fresh            (optional) drop all tables and re-migrate
      * @param --force            (optional) force migration even if unchanged
      * @param --convert-charset  (optional) bring existing text columns and the table default to the migration's collation
@@ -339,33 +454,7 @@ class Db
             }
             #endregion
 
-            #region: setting prefix.
-            if (isset($class::$prefix)) foreach ($columns as $name => $val) {
-                unset($columns[$name]);
-                $name = ($class::$prefix ? $class::$prefix . "_" : null) . $name;
-                $columns[$name] = $val;
-            }
-            #endregion
-
-            #region: Setting consts
-            $consts = config('model.consts');
-            if (strlen($key = array_search('timestamps', $columns))) {
-                unset($columns[$key]);
-                $columns = ($columns + [
-                    $consts['updated_at'] => ['required', 'datetime', 'default:CURRENT_TIMESTAMP', 'onupdate'],
-                    $consts['created_at'] => ['required', 'datetime', 'default:CURRENT_TIMESTAMP'],
-                ]);
-            }
-
-            if (strlen($key = array_search('softDelete', $columns))) {
-                unset($columns[$key]);
-                $columns = ($columns + [$consts['deleted_at'] => [
-                    'date' => ['nullable', 'datetime', 'default'],
-                    'bool' => ['bool', 'default:1', 'required']
-                ][config('model.deleted_at_type') ?? 'date']]);
-            }
-            #endregion
-            //
+            $columns = self::declaredColumns($class, $columns);
 
             Terminal::text("\n[color=green]`" . self::$dbname . ".$table` migrating:[/color]");
 

@@ -928,7 +928,13 @@ php terminal db migrate --fresh --seed    # drop + migrate + seed
 php terminal db migrate --module=blog     # only migrate the 'blog' module
 php terminal db migrate --all             # include all modules
 php terminal db migrate --convert-charset # bring existing text columns and the table default to $charset
+php terminal db diff                      # what the database and the migrations disagree on; changes nothing
 ```
+
+`db diff` reads every migration, modules included, and lists per connection: tables with no
+migration (`db migrate` leaves them alone), columns with no migration (**the next `db migrate` of
+that table drops them**, so read this first), and tables and columns the migrations have but the
+database does not. `--db=x` compares one connection, `--path=sub` one folder of migrations.
 
 `$charset` applies to existing tables too. A column `ADD`ed or `MODIFY`ed gets the migration's
 collation (`charset:` first, then `$charset`); with neither it keeps the one it has, instead of
@@ -2127,6 +2133,7 @@ php terminal db migrate --fresh
 php terminal db migrate --fresh --seed
 php terminal db migrate --module=blog
 php terminal db migrate --all             # include all modules
+php terminal db diff                      # tables/columns the migrations and the database disagree on
 php terminal db seed
 php terminal db backup
 php terminal db backup --compress
