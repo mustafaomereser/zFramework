@@ -4,8 +4,9 @@
  * php terminal tests run profiling-queries
  *
  * The Queries tab of /profiling: what the analyzer recorded, grouped and suggested
- * back, escaped, and closed once debug is off. No database: the records are written
- * here in the analyzer's shape. tests/analyzer.php covers the shape itself.
+ * back, escaped, and closed once debug is off. The records are written here in the
+ * analyzer's shape; tests/analyzer.php covers the shape itself. Applying a suggestion
+ * goes through the real db migrate.
  */
 
 use modules\Profiling\Controllers\QueriesController;
@@ -121,4 +122,184 @@ test('clear empties the store, only when it holds nothing of anybody else', func
 
     same(1, Queries::clear());
     same([], glob("$directory/*.jsonl"));
+});
+
+test('an index that is the start of another is not offered, nor one the table has', function () use ($record) {
+    $short = ['index_suggestions' => ['t' => ['stable' => ['CREATE INDEX a ON t (x, y)']]]];
+    $long  = ['index_suggestions' => ['t' => ['stable' => ['CREATE INDEX b ON t (x, y, z)']]]];
+
+    $list = Queries::suggestions(Queries::summary([$record('short', 1, $short), $record('long', 1, $long)]));
+    same(['CREATE INDEX b ON t (x, y, z)'], array_column($list, 'statement'));
+});
+
+# --- applying, on a real table and through the real command
+
+$testDb = Test::db();
+try {
+    $pdo = Test::pdo();
+    $mysql = $pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql';
+} catch (\Throwable) {
+    $mysql = false;
+}
+
+if (!$mysql) {
+    test('applying a suggestion', fn() => skip('needs a MySQL connection'));
+    return;
+}
+
+if (Queries::store() !== 'file') {
+    test('applying a suggestion', fn() => skip('queryStore is table here; these write their records as a file'));
+    return;
+}
+
+$table     = Test::table('apply');
+$noFile    = Test::table('apply_nofile');
+$folder    = 'zftestapply';
+$migration = BASE_PATH . "/database/migrations/$folder";
+@mkdir($migration, 0777, true);
+
+$forget = function () use ($pdo, $table, $testDb) {
+    $db    = new \zFramework\Core\Facades\DB($testDb);
+    $name  = $pdo->query('SELECT database()')->fetchColumn();
+    $file  = $db->cache_dir . "/$name/last-migrate.json";
+    $state = json_decode((string) @file_get_contents($file), true);
+    if (isset($state['tables'][$table])) {
+        unset($state['tables'][$table]);
+        file_put_contents($file, json_encode($state, JSON_UNESCAPED_UNICODE));
+    }
+    $db->forgetScheme();
+};
+
+Test::cleanup(function () use ($pdo, $table, $noFile, $migration, $forget) {
+    $pdo->exec("DROP TABLE IF EXISTS $table, $noFile");
+    rrmdir($migration);
+    $forget();
+});
+
+$start = function () use ($pdo, $table, $noFile, $migration, $folder, $testDb, $forget) {
+    $forget();
+    $pdo->exec("DROP TABLE IF EXISTS $table, $noFile");
+    $pdo->exec("CREATE TABLE $table (id INT AUTO_INCREMENT PRIMARY KEY, a INT, b INT)");
+    $pdo->exec("CREATE TABLE $noFile (id INT AUTO_INCREMENT PRIMARY KEY, a INT)");
+    file_put_contents("$migration/Probe.php", "<?php\nnamespace Database\\Migrations\\$folder;\n\nclass Probe\n{\n    static \$table = '$table';\n    static \$db = '$testDb';\n\n    public static function columns()\n    {\n        return ['id' => ['primary'], 'a' => ['int'], 'b' => ['int']];\n    }\n}\n");
+};
+
+$offer = function (string $name, string $on, string $columns) use ($record, $own, $directory, $testDb) {
+    @mkdir($directory, 0755, true);
+    file_put_contents($own, json_encode($record($name, 3, ['connection' => $testDb, 'index_suggestions' => ['t' => ['stable' => ["CREATE INDEX $name ON $on ($columns)"]]]])) . PHP_EOL, FILE_APPEND);
+    return "CREATE INDEX $name ON $on ($columns)";
+};
+
+$indexes = fn(string $on) => $pdo->query("SELECT DISTINCT INDEX_NAME FROM information_schema.statistics WHERE table_schema = database() AND table_name = '$on' AND INDEX_NAME != 'PRIMARY'")->fetchAll(\PDO::FETCH_COLUMN);
+$dbMigrate = fn() => (string) shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(BASE_PATH . '/terminal') . " db migrate --force --path=$folder --db=$testDb 2>&1");
+
+test('Run now creates it, says the migration will drop it, and db migrate does', function () use ($start, $offer, $indexes, $dbMigrate, $table, $own) {
+    $start();
+    @unlink($own);
+    $statement = $offer('zf_now', $table, 'b, a');
+
+    $result = Queries::apply([$statement], 'now')[0];
+    truthy($result['ok'], json_encode($result));
+    same(['zf_now'], $indexes($table));
+    contains('drops', $result['message']);
+
+    $dbMigrate();
+    same([], $indexes($table), 'the warning was true');
+});
+
+test('Write to migration changes nothing yet; db migrate creates it, in that order, and keeps it', function () use ($start, $offer, $indexes, $dbMigrate, $pdo, $table, $migration, $own) {
+    $start();
+    @unlink($own);
+    $statement = $offer('zf_kept', $table, 'b, a');
+
+    $result = Queries::apply([$statement], 'migration')[0];
+    truthy($result['ok'], json_encode($result));
+    same([], $indexes($table), 'nothing ran');
+    contains("'zf_kept' => ['b', 'a'],", file_get_contents("$migration/Probe.php"));
+
+    $out = $dbMigrate();
+    same(['zf_kept'], $indexes($table), $out);
+    same(['b', 'a'], $pdo->query("SELECT COLUMN_NAME FROM information_schema.statistics WHERE table_schema = database() AND table_name = '$table' AND INDEX_NAME = 'zf_kept' ORDER BY SEQ_IN_INDEX")->fetchAll(\PDO::FETCH_COLUMN));
+
+    $dbMigrate();
+    same(['zf_kept'], $indexes($table), 'and the next migrate keeps it');
+
+});
+
+test('a second index joins the first in the migration, and asking twice writes once', function () use ($start, $offer, $table, $migration, $own) {
+    $start();
+    @unlink($own);
+    $one = $offer('zf_one', $table, 'a');
+    $two = $offer('zf_two', $table, 'b');
+
+    Queries::apply([$one], 'migration');
+    Queries::apply([$two], 'migration');
+    $again = Queries::apply([$one], 'migration')[0];
+
+    $source = file_get_contents("$migration/Probe.php");
+    same(1, substr_count($source, 'static $indexes'), $source);
+    same(1, substr_count($source, "'zf_one' =>"));
+    contains("'zf_two' =>", $source);
+    truthy($again['ok']);
+    contains('already', $again['message']);
+    truthy(str_contains((string) shell_exec(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg("$migration/Probe.php")), 'No syntax errors'), $source);
+});
+
+test('a table no migration declares: Run now works, Write to migration says why not', function () use ($start, $offer, $indexes, $noFile, $own) {
+    $start();
+    @unlink($own);
+    $statement = $offer('zf_free', $noFile, 'a');
+
+    $written = Queries::apply([$statement], 'migration')[0];
+    falsy($written['ok']);
+    contains('no migration', $written['message']);
+    same([], $indexes($noFile));
+
+    $run = Queries::apply([$statement], 'now')[0];
+    truthy($run['ok'], json_encode($run));
+    same('created', $run['message']);
+    same(['zf_free'], $indexes($noFile));
+});
+
+test('what was created stops being offered', function () use ($start, $offer, $table, $own, $testDb) {
+    $start();
+    @unlink($own);
+    $statement = $offer('zf_gone', $table, 'a');
+
+    Queries::apply([$statement], 'now');
+    falsy(in_array($statement, array_column(Queries::suggestions(Queries::summary(Queries::all()), true), 'statement')));
+});
+
+test('only a current suggestion is accepted, whatever the form sends', function () use ($start, $pdo, $table, $own) {
+    $start();
+    @unlink($own);
+
+    foreach (["DROP TABLE $table", "CREATE INDEX evil ON $table (a)"] as $statement) {
+        $result = Queries::apply([$statement], 'now')[0];
+        falsy($result['ok']);
+        contains('not a current suggestion', $result['message']);
+    }
+    same(1, (int) $pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = database() AND table_name = '$table'")->fetchColumn());
+});
+
+test('one that fails leaves the others', function () use ($start, $offer, $indexes, $table, $own) {
+    $start();
+    @unlink($own);
+    $bad  = $offer('zf_bad', $table, 'nosuchcolumn');
+    $good = $offer('zf_good', $table, 'a');
+
+    $results = Queries::apply([$bad, $good], 'now');
+    same([false, true], array_column($results, 'ok'), json_encode($results));
+    same(['zf_good'], $indexes($table));
+});
+
+test('a record from before connection was recorded is not run anywhere', function () use ($start, $record, $indexes, $table, $own, $directory) {
+    $start();
+    $statement = "CREATE INDEX zf_old ON $table (a)";
+    file_put_contents($own, json_encode($record('old', 3, ['index_suggestions' => ['t' => ['stable' => [$statement]]]])) . PHP_EOL);
+
+    $result = Queries::apply([$statement], 'now')[0];
+    falsy($result['ok']);
+    contains('without its connection', $result['message']);
+    same([], $indexes($table));
 });

@@ -18,6 +18,7 @@ class SystemDbCollector
             'analyze_id'           => ['varchar'],
             'fingerprint'          => ['varchar'],
             'url'                  => ['varchar', 'nullable'],
+            'connection'           => ['varchar', 'nullable'],
             'query'                => ['text'],
             'executed'             => ['text'],
             'query_time_ms'        => ['real'],

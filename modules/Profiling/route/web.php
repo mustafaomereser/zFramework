@@ -13,5 +13,6 @@ Route::pre('/profiling')->group(function () {
     Route::get('/', [ReportController::class, 'index'])->name('index');
     Route::get('/clear', [ReportController::class, 'clear'])->name('clear');
     Route::get('/queries', [QueriesController::class, 'index'])->name('queries');
+    Route::post('/queries/apply', [QueriesController::class, 'apply'])->name('queries.apply');
     Route::post('/queries/clear', [QueriesController::class, 'clear'])->name('queries.clear');
 });

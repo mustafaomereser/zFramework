@@ -70,6 +70,7 @@ class DbCollector
                 'analyze_id'           => Analyze::id(),
                 'fingerprint'          => self::fingerprint($sql),
                 'url'                  => self::origin(),
+                'connection'           => $db->db,
                 'query'                => $sql,
                 'executed'             => $executed,
                 'query_time_ms'        => round($queryTime * 1000, 2),
@@ -287,7 +288,7 @@ class DbCollector
      */
     private static function createIndex(string $prefix, string $table, array $columns): string
     {
-        return 'CREATE INDEX ' . substr("{$prefix}_{$table}_" . implode('_', $columns), 0, 64) . " ON $table (" . implode(', ', $columns) . ')';
+        return 'CREATE INDEX ' . substr("{$prefix}_{$table}_" . implode('_', $columns), 0, 60) . " ON $table (" . implode(', ', $columns) . ')';
     }
 
     /**

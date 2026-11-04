@@ -3,6 +3,7 @@
 namespace modules\Profiling;
 
 use zFramework\Core\Facades\Config;
+use zFramework\Core\Facades\DB;
 
 /**
  * Reads back what the query analyzer recorded (framework.profiling.queryStore) and
@@ -102,6 +103,7 @@ class Queries
             $summary[] = [
                 'fingerprint' => $fingerprint,
                 'query'       => $runs[0]['query'] ?? '',
+                'connection'  => $runs[0]['connection'] ?? null,
                 'runs'        => count($runs),
                 'total_ms'    => round(array_sum($times), 2),
                 'avg_ms'      => round(array_sum($times) / count($times), 2),
@@ -124,7 +126,9 @@ class Queries
     }
 
     /**
-     * Each index worth creating once, with what it would help.
+     * Each index worth creating once, with what it would help. One that is the start
+     * of another goes: the longer index serves its queries too. One the table already
+     * has goes, so what has been run stops being offered.
      *
      * @param array $summary
      * @param bool $small Advice for small tables too. A development database is full
@@ -134,20 +138,167 @@ class Queries
     public static function suggestions(array $summary, bool $small = false): array
     {
         $suggestions = [];
-        foreach ($summary as $query) {
-            if ($query['small'] && !$small) continue;
+        foreach ($summary as $query) foreach ($query['suggestions'] as $statement) {
+            $parsed = self::parse($statement);
+            if (!$parsed) continue;
 
-            foreach ($query['suggestions'] as $statement) {
-                $suggestions[$statement] ??= ['statement' => $statement, 'queries' => 0, 'runs' => 0, 'total_ms' => 0];
-                $suggestions[$statement]['queries']++;
-                $suggestions[$statement]['runs'] += $query['runs'];
-                $suggestions[$statement]['total_ms'] = round($suggestions[$statement]['total_ms'] + $query['total_ms'], 2);
+            $suggestions[$statement] ??= $parsed + ['statement' => $statement, 'connection' => $query['connection'] ?? null, 'queries' => 0, 'runs' => 0, 'total_ms' => 0, 'small' => true];
+            $suggestions[$statement]['queries']++;
+            $suggestions[$statement]['runs'] += $query['runs'];
+            $suggestions[$statement]['total_ms'] = round($suggestions[$statement]['total_ms'] + $query['total_ms'], 2);
+            if (!$query['small']) $suggestions[$statement]['small'] = false;
+        }
+
+        foreach ($suggestions as $statement => $suggestion) {
+            foreach ($suggestions as $other) if ($other['statement'] !== $statement && $other['table'] === $suggestion['table'] && self::startsWith($other['columns'], $suggestion['columns'])) {
+                unset($suggestions[$statement]);
+                continue 2;
+            }
+
+            foreach (self::existingIndexes($suggestion['connection'], $suggestion['table']) as $columns) if (self::startsWith($columns, $suggestion['columns'])) {
+                unset($suggestions[$statement]);
+                continue 2;
             }
         }
 
+        if (!$small) $suggestions = array_filter($suggestions, fn($suggestion) => !$suggestion['small']);
         usort($suggestions, fn($a, $b) => $b['total_ms'] <=> $a['total_ms']);
 
         return $suggestions;
+    }
+
+    /**
+     * @param string $statement CREATE INDEX name ON table (a, b)
+     * @return ?array name, table, columns
+     */
+    private static function parse(string $statement): ?array
+    {
+        if (!preg_match('/^CREATE INDEX (\w+) ON (\w+) \(([\w, ]+)\)$/', $statement, $m)) return null;
+
+        return ['name' => $m[1], 'table' => $m[2], 'columns' => array_map('trim', explode(',', $m[3]))];
+    }
+
+    private static function startsWith(array $columns, array $start): bool
+    {
+        return array_map('strtolower', array_slice($columns, 0, count($start))) === array_map('strtolower', $start);
+    }
+
+    /**
+     * The table's indexes, each as its columns in order.
+     */
+    private static function existingIndexes(?string $connection, string $table): array
+    {
+        if (!$connection || !isset($GLOBALS['databases']['connections'][$connection])) return [];
+
+        try {
+            $statement = (new DB($connection))->connection()->prepare('SELECT INDEX_NAME, COLUMN_NAME FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? ORDER BY INDEX_NAME, SEQ_IN_INDEX');
+            $statement->execute([$table]);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $indexes = [];
+        foreach ($statement->fetchAll(\PDO::FETCH_ASSOC) as $row) $indexes[$row['INDEX_NAME']][] = $row['COLUMN_NAME'];
+
+        return array_values($indexes);
+    }
+
+    /**
+     * Act on chosen suggestions, each on its own: one that fails leaves the others.
+     *
+     * Only what the records suggest right now is accepted, whatever arrives. This is
+     * a page without a login and the statements came through a form.
+     *
+     * @param array $statements
+     * @param string $how migration: declare it, the next db migrate creates it.
+     *                    now: create it. A table with a migration loses it at its next
+     *                    db migrate unless it is declared too.
+     * @return array statement, ok, message
+     */
+    public static function apply(array $statements, string $how): array
+    {
+        $offered = array_column(self::suggestions(self::summary(self::all()), true), null, 'statement');
+
+        $results = [];
+        foreach ($statements as $statement) {
+            $statement  = (string) $statement;
+            $suggestion = $offered[$statement] ?? null;
+
+            if (!$suggestion) {
+                $results[] = ['statement' => $statement, 'ok' => false, 'message' => 'not a current suggestion, not touched'];
+                continue;
+            }
+
+            if (!$suggestion['connection'] || !isset($GLOBALS['databases']['connections'][$suggestion['connection']])) {
+                $results[] = ['statement' => $statement, 'ok' => false, 'message' => 'recorded without its connection: clear and record again'];
+                continue;
+            }
+
+            try {
+                $results[] = ['statement' => $statement, 'ok' => true, 'message' => $how === 'now' ? self::runNow($suggestion) : self::declare($suggestion)];
+            } catch (\Throwable $e) {
+                $results[] = ['statement' => $statement, 'ok' => false, 'message' => $e->getMessage()];
+            }
+        }
+
+        return $results;
+    }
+
+    private static function runNow(array $suggestion): string
+    {
+        $quote = fn(string $identifier) => '`' . str_replace('`', '``', $identifier) . '`';
+
+        (new DB($suggestion['connection']))->connection()->exec('CREATE INDEX ' . $quote($suggestion['name']) . ' ON ' . $quote($suggestion['table']) . ' (' . implode(', ', array_map($quote, $suggestion['columns'])) . ')');
+
+        return self::migrationOf($suggestion['connection'], $suggestion['table'])
+            ? 'created. Its table has a migration: the next db migrate of it drops this unless it is written there too'
+            : 'created';
+    }
+
+    private static function declare(array $suggestion): string
+    {
+        $file = self::migrationOf($suggestion['connection'], $suggestion['table']);
+        if (!$file) throw new \RuntimeException('no migration declares this table, nothing to write to');
+
+        $source = file_get_contents($file);
+        $eol    = str_contains($source, "\r\n") ? "\r\n" : "\n";
+        $entry  = var_export($suggestion['name'], true) . ' => [' . implode(', ', array_map(fn($column) => var_export($column, true), $suggestion['columns'])) . '],';
+
+        if (str_contains($source, var_export($suggestion['name'], true) . ' =>')) return basename($file) . ' already declares it. php terminal db migrate creates it';
+
+        $added = preg_match('/static\s+\$indexes\s*=\s*\[/', $source)
+            ? preg_replace('/(static\s+\$indexes\s*=\s*\[)/', '$1' . $eol . '        ' . addcslashes($entry, '\\$') , $source, 1)
+            : preg_replace('/^([ \t]*)(static\s+\$table\s*=[^;]+;)/m', '$1$2' . $eol . '$1static $indexes = [' . $eol . '$1    ' . addcslashes($entry, '\\$') . $eol . '$1];', $source, 1);
+
+        if (!$added || $added === $source || file_put_contents($file, $added, LOCK_EX) === false) throw new \RuntimeException('could not write ' . basename($file));
+
+        return 'written to ' . basename($file) . '. php terminal db migrate creates it';
+    }
+
+    /**
+     * The file declaring a table on a connection. Read, not loaded: this runs in a
+     * request, and a migration class has no business being autoloaded by one.
+     */
+    private static function migrationOf(string $connection, string $table): ?string
+    {
+        $folders = [base_path('/database/migrations')];
+        foreach (glob(base_path('/modules/*/migrations')) ?: [] as $folder) $folders[] = $folder;
+
+        foreach ($folders as $folder) {
+            if (!is_dir($folder)) continue;
+
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($folder, \RecursiveDirectoryIterator::SKIP_DOTS)) as $file) {
+                if (!$file->isFile() || $file->getExtension() !== 'php') continue;
+
+                $source = (string) file_get_contents($file->getPathname());
+                if (!preg_match('/static\s+\$table\s*=\s*[\'"]' . preg_quote($table, '/') . '[\'"]/i', $source)) continue;
+                if (preg_match('/static\s+\$db\s*=\s*[\'"]([^\'"]+)[\'"]/', $source, $m) && $m[1] !== $connection) continue;
+
+                return $file->getPathname();
+            }
+        }
+
+        return null;
     }
 
     /**

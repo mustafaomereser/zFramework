@@ -5,6 +5,7 @@ namespace modules\Profiling\Controllers;
 use modules\Profiling\Queries;
 use zFramework\Core\Abstracts\Controller;
 use zFramework\Core\Facades\Config;
+use zFramework\Core\Facades\Session;
 
 class QueriesController extends Controller
 {
@@ -31,12 +32,17 @@ class QueriesController extends Controller
 
         $summary = Queries::summary($records);
         $small   = isset($_GET['small']);
+        $every   = Queries::suggestions($summary, true);
+
+        $applied = Session::get('profiling-applied') ?? [];
+        Session::delete('profiling-applied');
 
         return view('Profiling.views.queries', [
             'locked'      => false,
             'summary'     => $summary,
-            'suggestions' => Queries::suggestions($summary, $small),
-            'hidden'      => count(Queries::suggestions($summary, true)) - count(Queries::suggestions($summary)),
+            'suggestions' => $small ? $every : array_filter($every, fn($suggestion) => !$suggestion['small']),
+            'hidden'      => count(array_filter($every, fn($suggestion) => $suggestion['small'])),
+            'applied'     => $applied,
             'small'       => $small,
             'records'     => count($records),
             'limit'       => Queries::LIMIT,
@@ -46,6 +52,22 @@ class QueriesController extends Controller
             'keep'        => (int) (Config::framework('profiling.keep') ?? 200),
             'error'       => $error,
         ]);
+    }
+
+    /**
+     * Act on the suggestions ticked on the page: write them to their migrations, or
+     * create them now.
+     *
+     * @return mixed
+     */
+    public function apply()
+    {
+        if (Config::debug()) {
+            $statements = array_filter((array) ($_POST['statements'] ?? []), 'is_string');
+            Session::set('profiling-applied', Queries::apply($statements, ($_POST['how'] ?? '') === 'now' ? 'now' : 'migration'));
+        }
+
+        return redirect(route('profiling.queries'));
     }
 
     /**

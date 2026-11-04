@@ -1,7 +1,10 @@
 <style>
+    body {
+        background: #0f0f14;
+    }
+
     .zp {
         font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-        background: #0f0f14;
         color: #cdd6f4;
         padding: 24px;
         margin: 0;
@@ -47,6 +50,10 @@
         border-bottom: 1px solid #1e1e2e
     }
 
+    .zp th.n {
+        text-align: right
+    }
+
     .zp td.n {
         text-align: right;
         font-variant-numeric: tabular-nums;
@@ -89,6 +96,7 @@
         vertical-align: middle;
         margin-left: 8px
     }
+
     .zp h2 {
         font-size: 13px;
         margin: 0 0 8px;
@@ -149,6 +157,20 @@
 
     .zp dd {
         margin: 0
+    }
+
+    .zp .apply {
+        margin: -16px 0 28px
+    }
+
+    .zp .apply button {
+        background: #313244;
+        border: 1px solid #45475a;
+        border-radius: 3px;
+        color: #cdd6f4;
+        font: inherit;
+        padding: 3px 12px;
+        cursor: pointer
     }
 
     .zp .clear {

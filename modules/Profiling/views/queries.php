@@ -38,9 +38,24 @@
         <?php else : ?>
 
             <h2>Index suggestions</h2>
+            <?php if (count($applied)) : ?>
+                <table>
+                    <?php foreach ($applied as $result) : ?>
+                        <tr>
+                            <td class="<?= $result['ok'] ? 'ok' : 'slow' ?>"><?= $result['ok'] ? 'done' : 'failed' ?></td>
+                            <td><code><?= e($result['statement']) ?></code></td>
+                            <td><?= e($result['message']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </table>
+            <?php endif; ?>
+
             <?php if (count($suggestions)) : ?>
+                <form method="POST" action="<?= route('profiling.queries.apply') ?>">
+                <?= csrf() ?>
                 <table>
                     <tr>
+                        <th></th>
                         <th>statement</th>
                         <th class="n">queries</th>
                         <th class="n">runs</th>
@@ -48,6 +63,7 @@
                     </tr>
                     <?php foreach ($suggestions as $suggestion) : ?>
                         <tr>
+                            <td><input type="checkbox" name="statements[]" value="<?= e($suggestion['statement']) ?>" <?= str_starts_with($suggestion['name'], 'idx_cover_') ? '' : 'checked' ?>></td>
                             <td><code><?= e($suggestion['statement']) ?></code></td>
                             <td class="n dim"><?= $suggestion['queries'] ?></td>
                             <td class="n dim"><?= $suggestion['runs'] ?></td>
@@ -55,11 +71,19 @@
                         </tr>
                     <?php endforeach; ?>
                 </table>
+                <div class="apply">
+                    <button type="submit" name="how" value="migration">Write to migration</button>
+                    <span class="dim">permanent; php terminal db migrate creates it</span>
+                    &nbsp;&nbsp;
+                    <button type="submit" name="how" value="now">Run now</button>
+                    <span class="dim">created here and now; the table's next db migrate drops it unless it is in the migration too</span>
+                </div>
+                </form>
             <?php else : ?>
                 <p class="dim">None.</p>
             <?php endif; ?>
             <div class="sub">
-                Advice to weigh, not to run: add what makes sense through a migration, then clear and measure again. An index costs every write to the table.
+                Advice to weigh: an index costs every write to the table, and building one on a big table takes time and can lock it. Clear and measure again afterwards. Covering indexes start unticked.
                 <?php if ($small) : ?>
                     <a href="<?= route('profiling.queries') ?>">hide small tables</a>
                 <?php elseif ($hidden > 0) : ?>

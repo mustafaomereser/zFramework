@@ -817,6 +817,10 @@ class Db
             }
             #endregion
 
+            # Composite indexes in the order an index needs, which index:name can not
+            # say: it groups columns in the order they are declared.
+            if (isset($class::$indexes)) foreach ($class::$indexes as $index_name => $index_columns) $queue_index_list[$index_name] = (array) $index_columns;
+
             #region: index management
             foreach ($indexes as $index) try {
                 self::$db->prepare(self::pg() ? "DROP INDEX $index" : "ALTER TABLE $table DROP INDEX $index");

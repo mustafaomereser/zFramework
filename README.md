@@ -902,6 +902,16 @@ class Posts
 | `timestamps` | adds `created_at DATETIME` + `updated_at DATETIME` |
 | `softDelete` | adds `deleted_at DATETIME NULL` |
 
+**Indexes in a column order of their own:** `index:group_name` groups columns in the order they are
+declared. Where an index needs another order, declare it apart, with the real column names:
+
+```php
+static $indexes = ['idx_orders_status_created' => ['status', 'created_at']];
+```
+
+`db migrate` drops every index of a table it migrates and creates the declared ones, so an index in
+neither place does not survive it.
+
 **Non auto-increment primary keys:**
 
 ```php
@@ -2423,7 +2433,7 @@ back.
 
 ### Upgrading to 3.4.0
 
-- **`system_db_collector` has a `url` column.** With `queryStore` set to `table`, run `php terminal db migrate`
+- **`system_db_collector` has `url` and `connection` columns.** With `queryStore` set to `table`, run `php terminal db migrate`
   before turning the analyzer back on, or its inserts fail and nothing is recorded.
 - **The query analyzer records on MySQL 8.** It asked for a JSON form of `EXPLAIN ANALYZE` that
   MySQL 8.0 and 8.4 do not have, failed silently, and wrote nothing. On MariaDB a join now reports
@@ -3220,9 +3230,12 @@ with `enabled` false it shows the old runs and says recording is off).
 
 `/profiling/queries` shows what the query analyzer (`queryAnalyze`, debug only) recorded: each
 query shape with its runs, total and average time, rows scanned and returned, its indexes and the
-urls calling it, most total time first, and every suggested index once. Suggestions are text to
-copy into a migration, nothing on the page runs them. It needs `debug` on, because `/profiling` has
-no login, and it shows the statement without its bound values. With the analyzer on, a request's
+urls calling it, most total time first, and every suggested index once, without the ones the table
+already has or a longer suggestion covers. Tick them and either **Write to migration** (`static
+$indexes`, created by the next `db migrate`) or **Run now** (created on the spot; a table with a
+migration loses it at its next `db migrate` unless it is written there too). Only what the records
+suggest right now is accepted. It needs `debug` on, because `/profiling` has no login, and it shows
+the statement without its bound values. With the analyzer on, a request's
 record says `analyzer`: its queries ran twice.
 
 Two switches on purpose: the module can be disabled in its `info.php` and then
