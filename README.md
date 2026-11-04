@@ -2423,6 +2423,10 @@ back.
 
 ### Upgrading to 3.4.0
 
+- **The query analyzer records on MySQL 8.** It asked for a JSON form of `EXPLAIN ANALYZE` that
+  MySQL 8.0 and 8.4 do not have, failed silently, and wrote nothing. On MariaDB a join now reports
+  every table, not the last. `fingerprint` ignores placeholder names and the length of `IN` lists,
+  so rows already in `system_db_collector` will not group with new ones.
 - **`db migrate` respects `$charset` on existing tables** (§2.5). A `MODIFY` no longer moves a column
   to the table's default collation, and a table that differs is reported; `--convert-charset`
   converts it. Check that a `$charset = 'utf8_general_ci'` copied from older docs is what you mean:

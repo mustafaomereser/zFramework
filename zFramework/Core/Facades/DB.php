@@ -249,7 +249,7 @@ class DB
             }
 
             $rate = (float) $configured;
-            if ($rate > 0 && ($rate >= 1 || (mt_rand() / mt_getrandmax()) < $rate)) DbCollector::analyze($this, $sql, $data, $queryTime);
+            if ($rate > 0 && ($rate >= 1 || (mt_rand() / mt_getrandmax()) < $rate)) DbCollector::analyze($this, $sql, $data, $queryTime, $e->rowCount());
         }
         $this->reset();
         return $e;
@@ -1504,7 +1504,10 @@ class DB
             var_dump($debug_sql);
             echo "\nAnalyze query: ";
             try {
-                var_dump($this->connection()->query("EXPLAIN ANALYZE $debug_sql")->fetchAll(\PDO::FETCH_ASSOC));
+                # A SELECT only: measuring a statement runs it, and both servers would
+                # run an UPDATE here too, before the real one.
+                if (!DbCollector::isSelect($debug_sql)) echo "*NOT A SELECT, NOT RUN*";
+                else var_dump($this->connection()->query(DbCollector::measureStatement($this->connection(), $debug_sql))->fetchAll(\PDO::FETCH_ASSOC));
             } catch (\Throwable) {
                 echo "*UNSUPPORTED EXPLAIN ANALYZE*";
             }

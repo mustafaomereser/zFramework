@@ -25,4 +25,16 @@ class Analyze
         if (PHP_SAPI != 'cli') Session::set('analyze-id', $id);
         self::$process_id = $id;
     }
+
+    /**
+     * This request's id. init() runs when the class loads, which in a worker is once
+     * for the life of the process, while the flush above comes after every request.
+     *
+     * @return string
+     */
+    public static function id(): string
+    {
+        if (self::$process_id === null) self::init();
+        return self::$process_id;
+    }
 }

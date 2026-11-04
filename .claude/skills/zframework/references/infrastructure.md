@@ -520,8 +520,10 @@ indexes used, missing-index suggestions.
 ```php
 zFramework\Core\Facades\DB\Analyzer\Analyze::init()
 DbCollector::isSelect(string $sql): bool
-DbCollector::analyze(DB $db, string $sql, array $data, float $queryTime): void
-DbCollector::fingerprint(string $sql): string     // groups the same query shape together
+Analyze::id(): string                             // this request's id; a worker's next request gets a new one
+DbCollector::analyze(DB $db, string $sql, array $data, float $queryTime, ?int $returned = null): void
+DbCollector::measureStatement(\PDO $pdo, string $sql, bool $json = false): string   // ANALYZE on MariaDB, EXPLAIN ANALYZE on MySQL
+DbCollector::fingerprint(string $sql): string     // the query's shape: values, placeholder names and IN list length do not count
 ```
 
 Driven entirely by `config/framework.php` → `profiling.queryAnalyze` (`true` / `false` / a
@@ -533,7 +535,16 @@ the plan walker are theirs; on another driver the analyzer skips instead of gues
   writes into the same database it is measuring.
 
 Requires `debug`, so production is unaffected either way. **An analysed query is executed a
-second time to measure it** — it costs roughly twice what it reports.
+second time to measure it** — it costs roughly twice what it reports. What would act twice
+(`@var :=`, `GET_LOCK()`, `SLEEP()`, `NEXTVAL()`, `INTO OUTFILE`) is only explained, not measured,
+and `SQL_CALC_FOUND_ROWS` is skipped, because the analyzer's statement would become the one
+`FOUND_ROWS()` answers for. Tested on MariaDB 10.4, MySQL 8.0 and 8.4.
+
+In the record, tables go by their real name, aliases resolved; `metrics.<table>.estimated_rows` is
+`null` for a derived table or CTE; `row_stats.<table>.returned` is the rows the query gave back.
+`index_suggestions.<table>.stable` is written per table and left out when the plan had `possible_keys`.
+`covering` needs MySQL, MariaDB's plan does not list the columns a table needs. A failed measurement
+is `warnings.query`; a query with no record at all left its reason in PHP's `error_log`.
 
 Per-query alternative, no config needed: `$model->sqlDebug(true)`.
 Skip a model entirely with `$model->ignoreAnalyze = true`.
