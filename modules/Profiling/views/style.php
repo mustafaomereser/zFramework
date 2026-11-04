@@ -24,6 +24,8 @@
     }
 
     .zp table {
+        color: #cdd6f4;
+        font-size: inherit;
         border-collapse: collapse;
         width: 100%;
         margin-bottom: 28px
