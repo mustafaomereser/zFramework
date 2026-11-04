@@ -195,3 +195,28 @@ test('a new table and a json column take no clause they should not', function ()
     same($general, $collation('email'));
     contains('`meta` added', $out);
 });
+
+test('MySQL 8: a migration saying utf8_general_ci is the utf8mb3 column it finds, not a difference', function () use ($pdo, $start, $migration, $migrate, $collation) {
+    if (stripos($pdo->getAttribute(\PDO::ATTR_SERVER_VERSION), 'mariadb') !== false) skip('MySQL 8 names this collation differently, MariaDB 10.4 does not');
+
+    $start('utf8mb3_general_ci', ['email' => 'VARCHAR(100) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci']);
+    $migration('utf8_general_ci', ['id' => ['primary'], 'email' => ['varchar:100']]);
+
+    $out = $migrate();
+    falsy(str_contains($out, 'charset differs'), $out);
+    same('utf8mb3_general_ci', $collation('email'));
+});
+
+test('MySQL 8: 0900 keeps trailing spaces apart, so going to general_ci can collide: that column fails, its data stays', function () use ($pdo, $table, $start, $migration, $migrate, $collation, $general) {
+    if (stripos($pdo->getAttribute(\PDO::ATTR_SERVER_VERSION), 'mariadb') !== false) skip('no utf8mb4_0900_ai_ci on MariaDB');
+
+    $zero = 'utf8mb4_0900_ai_ci';
+    $start($zero, ['email' => "VARCHAR(100) CHARACTER SET utf8mb4 COLLATE $zero"], [['email' => 'a'], ['email' => 'a ']]);
+    $pdo->exec("CREATE UNIQUE INDEX unique_email ON $table (email)");
+    $migration($general, ['id' => ['primary'], 'email' => ['varchar:100', 'unique']]);
+
+    $out = $migrate('--convert-charset');
+    same($zero, $collation('email'), $out);
+    same(2, (int) $pdo->query("SELECT COUNT(*) FROM $table")->fetchColumn());
+    contains('FAILED', $out);
+});
