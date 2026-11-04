@@ -1,95 +1,8 @@
-<style>
-    .zp {
-        font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-        background: #0f0f14;
-        color: #cdd6f4;
-        padding: 24px;
-        margin: 0;
-        min-height: 100vh;
-        font-size: 13px;
-        line-height: 1.6
-    }
-
-    .zp h1 {
-        font-size: 15px;
-        margin: 0 0 4px;
-        color: #89b4fa;
-        font-weight: 600
-    }
-
-    .zp .sub {
-        color: #6c7086;
-        margin-bottom: 20px;
-        font-size: 12px
-    }
-
-    .zp table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-bottom: 28px
-    }
-
-    .zp th {
-        text-align: left;
-        color: #6c7086;
-        font-weight: 500;
-        border-bottom: 1px solid #313244;
-        padding: 6px 12px 6px 0;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: .5px
-    }
-
-    .zp td {
-        padding: 5px 12px 5px 0;
-        border-bottom: 1px solid #1e1e2e
-    }
-
-    .zp td.n {
-        text-align: right;
-        font-variant-numeric: tabular-nums;
-        color: #fff
-    }
-
-    .zp .url {
-        color: #a6e3a1
-    }
-
-    .zp .slow {
-        color: #f38ba8
-    }
-
-    .zp .ok {
-        color: #a6e3a1
-    }
-
-    .zp .dim {
-        color: #6c7086
-    }
-
-    .zp .off {
-        background: #45213a;
-        border-left: 3px solid #f38ba8;
-        padding: 10px 14px;
-        margin-bottom: 20px;
-        border-radius: 3px
-    }
-
-    .zp a {
-        color: #89b4fa
-    }
-
-    .zp .bar {
-        display: inline-block;
-        height: 8px;
-        background: #45475a;
-        border-radius: 2px;
-        vertical-align: middle;
-        margin-left: 8px
-    }
-</style>
+@include('Profiling.views.style')
 
 <div class="zp">
+    @include('Profiling.views.tabs')
+
     <h1>Profiling</h1>
     <div class="sub">
         <?= $total ?> record(s), keeping up to <?= $keep ?>.
@@ -102,6 +15,10 @@
             Recording is off. Set <b>profiling.enabled</b> in <b>config/framework.php</b> to start.
             Anything below was recorded while it was on.
         </div>
+    <?php endif; ?>
+
+    <?php if ($analyzing) : ?>
+        <div class="warn">The query analyzer is on: every analysed query runs twice, so these times are higher than real ones. Records made that way say <b>analyzer</b>.</div>
     <?php endif; ?>
 
     <?php if (!count($summary)) : ?>
@@ -123,7 +40,7 @@
             <?php $slowest = max(array_column($summary, 'median_ms')); ?>
             <?php foreach ($summary as $row) : ?>
                 <tr>
-                    <td class="url"><?= $row['url'] ?></td>
+                    <td class="url"><?= e($row['url']) ?></td>
                     <td class="n dim"><?= $row['runs'] ?></td>
                     <td class="n ok"><?= $row['best_ms'] ?></td>
                     <td class="n"><b><?= $row['median_ms'] ?></b></td>
@@ -158,7 +75,7 @@
             <?php foreach ($recent as $row) : ?>
                 <tr>
                     <td class="dim"><?= $row['at'] ?></td>
-                    <td class="url"><?= $row['url'] ?></td>
+                    <td class="url"><?= e($row['url']) ?></td>
                     <td class="n dim"><?= $row['boot_ms'] ?></td>
                     <td class="n dim"><?= $row['handle_ms'] ?></td>
                     <td class="n dim"><?= $row['controller_ms'] ?? '-' ?></td>
@@ -168,6 +85,7 @@
                     <td class="dim">
                         <?= ($row['opcache'] ?? false) ? 'opcache' : '<span class="slow">no opcache</span>' ?>
                         <?= ($row['apcu'] ?? false) ? ' · apcu' : '' ?>
+                        <?= ($row['analyzer'] ?? false) ? ' · <span class="slow">analyzer</span>' : '' ?>
                     </td>
                 </tr>
             <?php endforeach; ?>

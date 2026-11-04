@@ -2423,6 +2423,8 @@ back.
 
 ### Upgrading to 3.4.0
 
+- **`system_db_collector` has a `url` column.** With `queryStore` set to `table`, run `php terminal db migrate`
+  before turning the analyzer back on, or its inserts fail and nothing is recorded.
 - **The query analyzer records on MySQL 8.** It asked for a JSON form of `EXPLAIN ANALYZE` that
   MySQL 8.0 and 8.4 do not have, failed silently, and wrote nothing. On MariaDB a join now reports
   every table, not the last. `fingerprint` ignores placeholder names and the length of `IN` lists,
@@ -3215,6 +3217,13 @@ with `enabled` false it shows the old runs and says recording is off).
     'keep'    => 200,
 ],
 ```
+
+`/profiling/queries` shows what the query analyzer (`queryAnalyze`, debug only) recorded: each
+query shape with its runs, total and average time, rows scanned and returned, its indexes and the
+urls calling it, most total time first, and every suggested index once. Suggestions are text to
+copy into a migration, nothing on the page runs them. It needs `debug` on, because `/profiling` has
+no login, and it shows the statement without its bound values. With the analyzer on, a request's
+record says `analyzer`: its queries ran twice.
 
 Two switches on purpose: the module can be disabled in its `info.php` and then
 nothing is recorded whatever the config says, and the config can be off while the

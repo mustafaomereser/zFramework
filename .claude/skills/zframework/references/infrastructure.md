@@ -540,7 +540,7 @@ second time to measure it** — it costs roughly twice what it reports. What wou
 and `SQL_CALC_FOUND_ROWS` is skipped, because the analyzer's statement would become the one
 `FOUND_ROWS()` answers for. Tested on MariaDB 10.4, MySQL 8.0 and 8.4.
 
-In the record, tables go by their real name, aliases resolved; `metrics.<table>.estimated_rows` is
+In the record, `url` is the request's method and path (`cli` from a terminal), tables go by their real name, aliases resolved; `metrics.<table>.estimated_rows` is
 `null` for a derived table or CTE; `row_stats.<table>.returned` is the rows the query gave back.
 `index_suggestions.<table>.stable` is written per table and left out when the plan had `possible_keys`.
 `covering` needs MySQL, MariaDB's plan does not list the columns a table needs. A failed measurement
@@ -562,6 +562,17 @@ Recorder::clear(): int          Recorder::directory(): string
 
 Profiler::listen(?\Closure $collector)   Profiler::active(): bool
 Profiler::mark(string $stage, float $nanoseconds)
+```
+
+`/profiling/queries` reads what the query analyzer recorded, from either `queryStore`, grouped by
+fingerprint with the most total time first, plus each index suggestion once (small tables hidden until
+`?small=1`). Debug only, since `/profiling` has no login; it shows the statement without its values.
+Suggestions are text to copy, nothing on the page runs them.
+
+```php
+Queries::all(): array   Queries::summary(array $records): array
+Queries::suggestions(array $summary, bool $small = false): array
+Queries::analyzing(): bool   Queries::full(): bool   Queries::store(): string   Queries::clear(): int
 ```
 
 Config lives in `config/framework.php` → `profiling`: `enabled`, `rate` (1 = every request,

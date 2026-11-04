@@ -141,6 +141,7 @@ class Recorder
             # depending on them.
             'opcache'   => function_exists('opcache_get_status') && (@\opcache_get_status(false)['opcache_enabled'] ?? false),
             'apcu'      => \zFramework\Core\GlobalCache::apcu(),
+            'analyzer'  => Queries::analyzing(),
         ];
 
         @file_put_contents(

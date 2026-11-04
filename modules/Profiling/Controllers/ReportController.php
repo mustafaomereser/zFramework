@@ -22,6 +22,7 @@ class ReportController extends Controller
             'rate'     => Config::framework('profiling.rate'),
             'keep'     => (int) (Config::framework('profiling.keep') ?? 200),
             'total'    => count(Recorder::all()),
+            'analyzing' => \modules\Profiling\Queries::analyzing(),
         ]);
     }
 

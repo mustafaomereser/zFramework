@@ -69,6 +69,7 @@ class DbCollector
             $analysis = [
                 'analyze_id'           => Analyze::id(),
                 'fingerprint'          => self::fingerprint($sql),
+                'url'                  => self::origin(),
                 'query'                => $sql,
                 'executed'             => $executed,
                 'query_time_ms'        => round($queryTime * 1000, 2),
@@ -110,6 +111,17 @@ class DbCollector
             # no analysis.
             error_log('[zFramework] query analyzer: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * The request a query belongs to. An id can not say: AJAX calls share their page's.
+     * No query string, it is where tokens travel.
+     */
+    private static function origin(): string
+    {
+        if (!isset($_SERVER['REQUEST_URI'])) return 'cli';
+
+        return substr((($_SERVER['REQUEST_METHOD'] ?? 'GET') . ' ' . strtok($_SERVER['REQUEST_URI'], '?')), 0, 255);
     }
 
     /**
