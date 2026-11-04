@@ -244,15 +244,32 @@ test('a column from the timestamps shorthand can be indexed, and a prefix counts
     same(['idx_zf_shorthand'], $indexes($table), $out);
 });
 
-test('columns declared in another order are refused, and nothing is written', function () use ($start, $offer, $table, $migration, $own) {
+test('the index has the suggested order, whatever order the columns are declared in', function () use ($start, $offer, $dbMigrate, $pdo, $table, $migration, $own) {
     $start();
     @unlink($own);
-    $before = file_get_contents("$migration/Probe.php");
 
     $result = Queries::apply([$offer('idx_zf_order', $table, 'b, a')], 'migration')[0];
-    falsy($result['ok']);
-    contains('(a, b)', $result['message']);
-    same($before, file_get_contents("$migration/Probe.php"));
+    truthy($result['ok'], json_encode($result));
+    contains("'zf_order' => ['b', 'a'],", file_get_contents("$migration/Probe.php"));
+
+    $out = $dbMigrate();
+    same(['b', 'a'], $pdo->query("SELECT COLUMN_NAME FROM information_schema.statistics WHERE table_schema = database() AND table_name = '$table' AND INDEX_NAME = 'idx_zf_order' ORDER BY SEQ_IN_INDEX")->fetchAll(\PDO::FETCH_COLUMN), $out);
+
+    $dbMigrate();
+    same(1, (int) $pdo->query("SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.statistics WHERE table_schema = database() AND table_name = '$table' AND INDEX_NAME = 'idx_zf_order'")->fetchColumn(), 'and the next migrate keeps it');
+});
+
+test('a column later removed from the migration does not stop the migrate or the rest of the index', function () use ($start, $offer, $dbMigrate, $pdo, $table, $migration, $own) {
+    $start();
+    @unlink($own);
+    Queries::apply([$offer('idx_zf_later', $table, 'a, b')], 'migration');
+
+    $source = file_get_contents("$migration/Probe.php");
+    file_put_contents("$migration/Probe.php", str_replace(", 'b' => ['int']]", ']', $source));
+
+    $out = $dbMigrate();
+    same(['a'], $pdo->query("SELECT COLUMN_NAME FROM information_schema.statistics WHERE table_schema = database() AND table_name = '$table' AND INDEX_NAME = 'idx_zf_later' ORDER BY SEQ_IN_INDEX")->fetchAll(\PDO::FETCH_COLUMN), $out);
+    falsy(str_contains(strtolower($out), 'err:'), $out);
 });
 
 test('a column the migration does not have is refused', function () use ($start, $offer, $table, $migration, $own) {

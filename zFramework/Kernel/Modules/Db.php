@@ -569,11 +569,6 @@ class Db
 
             $columns = self::declaredColumns($class, $columns);
 
-            # Written by /profiling/queries: the same as index:name on each column.
-            if (isset($class::$suggested_indexes) && is_array($class::$suggested_indexes) && count($class::$suggested_indexes))
-                foreach ($class::$suggested_indexes as $index_name => $index_columns) foreach ((array) $index_columns as $index_column)
-                    if (isset($columns[$index_column])) $columns[$index_column][] = "index:$index_name";
-
             Terminal::text("\n[color=green]`" . self::$dbname . ".$table` migrating:[/color]");
 
             # detect dropped columns
@@ -821,6 +816,13 @@ class Db
                 $last_column = $column;
             }
             #endregion
+
+            # Written by /profiling/queries. Beside the columns' own, not merged into them:
+            # index:name follows the order columns are declared in, and an index's order
+            # is what the suggestion is about.
+            if (isset($class::$suggested_indexes) && is_array($class::$suggested_indexes) && count($class::$suggested_indexes))
+                foreach ($class::$suggested_indexes as $index_name => $index_columns)
+                    $queue_index_list["idx_$index_name"] = array_values(array_filter((array) $index_columns, fn($index_column) => isset($declared[strtolower($index_column)])));
 
             #region: index management
             foreach ($indexes as $index) try {

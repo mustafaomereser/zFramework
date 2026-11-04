@@ -129,7 +129,7 @@ Types: `primary` `int` `bigint` `smallint` `tinyint` `bool` `varchar:N` `char:N`
 Modifiers: `required` `nullable` `unique:<name>` `index:<name>` `default:<value>`.
 
 `static $suggested_indexes = ['name' => ['status', 'created_at']];` is written by `/profiling/queries`, with the real column
-names. `db migrate` merges it into the columns as `index:name`, so the declared order applies; `timestamps`/`softDelete` columns work too.
+names. `db migrate` creates each as `idx_name` in exactly that order (`index:name` follows declared order); `timestamps`/`softDelete` columns work too.
 It drops every undeclared index of a table it migrates.
 
 `unique:user` and `index:find_user` are **named** — two columns sharing a name form one

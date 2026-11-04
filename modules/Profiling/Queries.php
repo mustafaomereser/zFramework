@@ -266,7 +266,8 @@ class Queries
         # What migrate makes of it: index:name becomes idx_name.
         $name = preg_replace('/^idx_/', '', $suggestion['name']);
 
-        self::requireDeclaredOrder($tokens, $suggestion['columns']);
+        $declared = array_map('strtolower', self::declaredColumns($tokens));
+        foreach ($suggestion['columns'] as $column) if (!in_array(strtolower($column), $declared)) throw new \RuntimeException("this migration has no column `$column`");
 
         $eol   = str_contains($source, "\r\n") ? "\r\n" : "\n";
         $entry = var_export($name, true) . ' => [' . implode(', ', array_map(fn($column) => var_export($column, true), $suggestion['columns'])) . '],';
@@ -303,31 +304,6 @@ class Queries
         if (file_put_contents($file, $added, LOCK_EX) === false) throw new \RuntimeException('could not write ' . basename($file));
 
         return 'written to ' . basename($file) . '. php terminal db migrate creates it';
-    }
-
-    /**
-     * index:name groups columns in the order they are declared, whatever order the
-     * suggestion has. An index in the wrong order may serve nothing, so it says so
-     * rather than write one that only looks like what was asked for.
-     */
-    private static function requireDeclaredOrder(array $tokens, array $columns): void
-    {
-        $declared = self::declaredColumns($tokens);
-        $lower    = array_map('strtolower', $declared);
-
-        $positions = [];
-        foreach ($columns as $column) {
-            $position = array_search(strtolower($column), $lower);
-            if ($position === false) throw new \RuntimeException("this migration has no column `$column`");
-            $positions[] = $position;
-        }
-
-        $sorted = $positions;
-        sort($sorted);
-        if ($positions !== $sorted) {
-            $order = array_map(fn($position) => $declared[$position], $sorted);
-            throw new \RuntimeException('the migration declares these as (' . implode(', ', $order) . '), and index:name would follow that instead of (' . implode(', ', $columns) . '). Use Run now, or reorder them in columns()');
-        }
     }
 
     /**

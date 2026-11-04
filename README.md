@@ -912,9 +912,9 @@ static $suggested_indexes = [
 ];
 ```
 
-`db migrate` merges them into the columns, the same as `index:orders_status_created` on each, so the
-index follows the order the columns are declared in. It drops every index of a table it migrates and
-creates the declared ones: an index in neither place does not survive it.
+`db migrate` creates each as `idx_<name>` in exactly that column order, which `index:group_name` can
+not do: it follows the order the columns are declared in. It drops every index of a table it migrates
+and creates the declared ones: an index in neither place does not survive it.
 
 **Non auto-increment primary keys:**
 
@@ -3236,7 +3236,7 @@ with `enabled` false it shows the old runs and says recording is off).
 query shape with its runs, total and average time, rows scanned and returned, its indexes and the
 urls calling it, most total time first, and every suggested index once, without the ones the table
 already has or a longer suggestion covers. Tick them and either **Write to migration** (`static
-$suggested_indexes`, created by the next `db migrate`; refused if the columns are declared in another order) or **Run now** (created on the spot; a table with a
+$suggested_indexes`, created by the next `db migrate` in the suggested order) or **Run now** (created on the spot; a table with a
 migration loses it at its next `db migrate` unless it is written there too). Only what the records
 suggest right now is accepted. It needs `debug` on, because `/profiling` has no login, and it shows
 the statement without its bound values. With the analyzer on, a request's

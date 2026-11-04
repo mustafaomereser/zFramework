@@ -567,7 +567,7 @@ Profiler::mark(string $stage, float $nanoseconds)
 `/profiling/queries` reads what the query analyzer recorded, from either `queryStore`, grouped by
 fingerprint with the most total time first, plus each index suggestion once (small tables hidden until
 `?small=1`, existing and prefix-covered ones dropped). Debug only, since `/profiling` has no login; it shows
-the statement without its values. Ticked suggestions go to **Write to migration** (`static $suggested_indexes`, refused if the columns are declared in another order) or
+the statement without its values. Ticked suggestions go to **Write to migration** (`static $suggested_indexes`, created in the suggested order) or
 **Run now** (a table with a migration loses it at its next `db migrate`). Only current suggestions are accepted.
 
 ```php
