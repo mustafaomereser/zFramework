@@ -261,23 +261,111 @@ class Queries
         if (!$file) throw new \RuntimeException('no migration declares this table, nothing to write to');
 
         $source = file_get_contents($file);
-        $eol    = str_contains($source, "\r\n") ? "\r\n" : "\n";
-        $entry  = var_export($suggestion['name'], true) . ' => [' . implode(', ', array_map(fn($column) => var_export($column, true), $suggestion['columns'])) . '],';
+        $tokens = \PhpToken::tokenize($source);
 
-        if (str_contains($source, var_export($suggestion['name'], true) . ' =>')) return basename($file) . ' already declares it. php terminal db migrate creates it';
+        # What migrate makes of it: index:name becomes idx_name.
+        $name = preg_replace('/^idx_/', '', $suggestion['name']);
 
-        $added = preg_match('/static\s+\$indexes\s*=\s*\[/', $source)
-            ? preg_replace('/(static\s+\$indexes\s*=\s*\[)/', '$1' . $eol . '        ' . addcslashes($entry, '\\$') , $source, 1)
-            : preg_replace('/^([ \t]*)(static\s+\$table\s*=[^;]+;)/m', '$1$2' . $eol . '$1static $indexes = [' . $eol . '$1    ' . addcslashes($entry, '\\$') . $eol . '$1];', $source, 1);
+        self::requireDeclaredOrder($tokens, $suggestion['columns']);
 
-        if (!$added || $added === $source || file_put_contents($file, $added, LOCK_EX) === false) throw new \RuntimeException('could not write ' . basename($file));
+        $eol   = str_contains($source, "\r\n") ? "\r\n" : "\n";
+        $entry = var_export($name, true) . ' => [' . implode(', ', array_map(fn($column) => var_export($column, true), $suggestion['columns'])) . '],';
+        $open  = self::valueOf($tokens, '$suggested_indexes');
+
+        if ($open !== null) {
+            foreach (array_slice($tokens, $open) as $token) if ($token->is(T_CONSTANT_ENCAPSED_STRING) && trim($token->text, "'\"") === $name) return basename($file) . ' already declares it. php terminal db migrate creates it';
+            if (!in_array($tokens[$open]->text, ['[', 'array'])) throw new \RuntimeException('could not read $suggested_indexes in ' . basename($file));
+
+            # Past the array( of the long form, which is two tokens.
+            $at = $tokens[$open]->text === '[' ? $tokens[$open]->pos + 1 : strpos($source, '(', $tokens[$open]->pos) + 1;
+            $added = substr($source, 0, $at) . $eol . '        ' . $entry . substr($source, $at);
+        } else {
+            $value = self::valueOf($tokens, '$table');
+            $end   = strpos($source, ';', $tokens[$value]->pos) + 1;
+            $start = strrpos(substr($source, 0, $end), "\n");
+            $line  = substr($source, $start === false ? 0 : $start + 1);
+            $tab   = preg_match('/^[ \t]*/', $line, $m) ? $m[0] : '    ';
+
+            $added = substr($source, 0, $end) . $eol . $eol
+                . $tab . '# added from profiling suggestions' . $eol
+                . $tab . 'static $suggested_indexes = [' . $eol
+                . $tab . '    ' . $entry . $eol
+                . $tab . '];' . substr($source, $end);
+        }
+
+        # Parsed before it is written: a migration this broke would take db migrate with it.
+        try {
+            token_get_all($added, TOKEN_PARSE);
+        } catch (\ParseError $e) {
+            throw new \RuntimeException(basename($file) . ' would not parse, not written: ' . $e->getMessage());
+        }
+
+        if (file_put_contents($file, $added, LOCK_EX) === false) throw new \RuntimeException('could not write ' . basename($file));
 
         return 'written to ' . basename($file) . '. php terminal db migrate creates it';
     }
 
     /**
+     * index:name groups columns in the order they are declared, whatever order the
+     * suggestion has. An index in the wrong order may serve nothing, so it says so
+     * rather than write one that only looks like what was asked for.
+     */
+    private static function requireDeclaredOrder(array $tokens, array $columns): void
+    {
+        $declared = self::declaredColumns($tokens);
+        $lower    = array_map('strtolower', $declared);
+
+        $positions = [];
+        foreach ($columns as $column) {
+            $position = array_search(strtolower($column), $lower);
+            if ($position === false) throw new \RuntimeException("this migration has no column `$column`");
+            $positions[] = $position;
+        }
+
+        $sorted = $positions;
+        sort($sorted);
+        if ($positions !== $sorted) {
+            $order = array_map(fn($position) => $declared[$position], $sorted);
+            throw new \RuntimeException('the migration declares these as (' . implode(', ', $order) . '), and index:name would follow that instead of (' . implode(', ', $columns) . '). Use Run now, or reorder them in columns()');
+        }
+    }
+
+    /**
+     * The columns of columns(), as the table will have them.
+     */
+    private static function declaredColumns(array $tokens): array
+    {
+        $prefixAt = self::valueOf($tokens, '$prefix');
+        $prefix   = $prefixAt !== null && $tokens[$prefixAt]->is(T_CONSTANT_ENCAPSED_STRING) ? trim($tokens[$prefixAt]->text, "'\"") : '';
+        $prefix   = $prefix === '' ? '' : $prefix . '_';
+
+        $inside = false;
+        $columns = $shorthands = [];
+        foreach ($tokens as $key => $token) {
+            if ($token->is(T_FUNCTION)) {
+                $next = self::nextSolid($tokens, $key);
+                $inside = $next !== null && strtolower($tokens[$next]->text) === 'columns';
+                continue;
+            }
+            if (!$inside || !$token->is(T_CONSTANT_ENCAPSED_STRING)) continue;
+
+            $text = trim($token->text, "'\"");
+            $next = self::nextSolid($tokens, $key);
+            if ($next !== null && $tokens[$next]->is(T_DOUBLE_ARROW)) $columns[] = $prefix . $text;
+            elseif (in_array($text, ['timestamps', 'softDelete'])) $shorthands[] = $text;
+        }
+
+        $consts = config('model.consts');
+        if (in_array('timestamps', $shorthands)) array_push($columns, $consts['updated_at'], $consts['created_at']);
+        if (in_array('softDelete', $shorthands)) $columns[] = $consts['deleted_at'];
+
+        return $columns;
+    }
+
+    /**
      * The file declaring a table on a connection. Read, not loaded: this runs in a
-     * request, and a migration class has no business being autoloaded by one.
+     * request, and a migration class has no business being autoloaded by one. Tokens,
+     * so a commented-out line is the comment it is.
      */
     private static function migrationOf(string $connection, string $table): ?string
     {
@@ -290,13 +378,40 @@ class Queries
             foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($folder, \RecursiveDirectoryIterator::SKIP_DOTS)) as $file) {
                 if (!$file->isFile() || $file->getExtension() !== 'php') continue;
 
-                $source = (string) file_get_contents($file->getPathname());
-                if (!preg_match('/static\s+\$table\s*=\s*[\'"]' . preg_quote($table, '/') . '[\'"]/i', $source)) continue;
-                if (preg_match('/static\s+\$db\s*=\s*[\'"]([^\'"]+)[\'"]/', $source, $m) && $m[1] !== $connection) continue;
+                $tokens = \PhpToken::tokenize((string) file_get_contents($file->getPathname()));
+                $at     = self::valueOf($tokens, '$table');
+                if ($at === null || !$tokens[$at]->is(T_CONSTANT_ENCAPSED_STRING) || strcasecmp(trim($tokens[$at]->text, "'\""), $table) !== 0) continue;
+
+                $db = self::valueOf($tokens, '$db');
+                if ($db !== null && $tokens[$db]->is(T_CONSTANT_ENCAPSED_STRING) && trim($tokens[$db]->text, "'\"") !== $connection) continue;
 
                 return $file->getPathname();
             }
         }
+
+        return null;
+    }
+
+    /**
+     * Where the value of `static $name = ...` starts, as a token key.
+     */
+    private static function valueOf(array $tokens, string $name): ?int
+    {
+        foreach ($tokens as $key => $token) {
+            if (!$token->is(T_VARIABLE) || $token->text !== $name) continue;
+
+            $equals = self::nextSolid($tokens, $key);
+            if ($equals === null || $tokens[$equals]->text !== '=') continue;
+
+            return self::nextSolid($tokens, $equals);
+        }
+
+        return null;
+    }
+
+    private static function nextSolid(array $tokens, int $key): ?int
+    {
+        for ($i = $key + 1; $i < count($tokens); $i++) if (!$tokens[$i]->isIgnorable()) return $i;
 
         return null;
     }

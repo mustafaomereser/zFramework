@@ -128,8 +128,9 @@ Types: `primary` `int` `bigint` `smallint` `tinyint` `bool` `varchar:N` `char:N`
 `longtext` `json` `uuid` `decimal` `float` `real` `date` `datetime` `time`.
 Modifiers: `required` `nullable` `unique:<name>` `index:<name>` `default:<value>`.
 
-`static $indexes = ['idx_name' => ['status', 'created_at']];` declares a composite index in the order given, with the
-real column names (`index:name` groups them in declared order). `db migrate` drops every undeclared index of a table it migrates.
+`static $suggested_indexes = ['name' => ['status', 'created_at']];` is written by `/profiling/queries`, with the real column
+names. `db migrate` merges it into the columns as `index:name`, so the declared order applies; `timestamps`/`softDelete` columns work too.
+It drops every undeclared index of a table it migrates.
 
 `unique:user` and `index:find_user` are **named** — two columns sharing a name form one
 composite index. That is what `title` + `user_id` above do, and what `username` + `email` do

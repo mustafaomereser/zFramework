@@ -902,15 +902,19 @@ class Posts
 | `timestamps` | adds `created_at DATETIME` + `updated_at DATETIME` |
 | `softDelete` | adds `deleted_at DATETIME NULL` |
 
-**Indexes in a column order of their own:** `index:group_name` groups columns in the order they are
-declared. Where an index needs another order, declare it apart, with the real column names:
+**Suggested indexes:** `/profiling/queries` writes what it suggests beside `columns()`, by the real
+column names, so `timestamps` and `softDelete` columns can be indexed too:
 
 ```php
-static $indexes = ['idx_orders_status_created' => ['status', 'created_at']];
+# added from profiling suggestions
+static $suggested_indexes = [
+    'orders_status_created' => ['status', 'created_at'],
+];
 ```
 
-`db migrate` drops every index of a table it migrates and creates the declared ones, so an index in
-neither place does not survive it.
+`db migrate` merges them into the columns, the same as `index:orders_status_created` on each, so the
+index follows the order the columns are declared in. It drops every index of a table it migrates and
+creates the declared ones: an index in neither place does not survive it.
 
 **Non auto-increment primary keys:**
 
@@ -3232,7 +3236,7 @@ with `enabled` false it shows the old runs and says recording is off).
 query shape with its runs, total and average time, rows scanned and returned, its indexes and the
 urls calling it, most total time first, and every suggested index once, without the ones the table
 already has or a longer suggestion covers. Tick them and either **Write to migration** (`static
-$indexes`, created by the next `db migrate`) or **Run now** (created on the spot; a table with a
+$suggested_indexes`, created by the next `db migrate`; refused if the columns are declared in another order) or **Run now** (created on the spot; a table with a
 migration loses it at its next `db migrate` unless it is written there too). Only what the records
 suggest right now is accepted. It needs `debug` on, because `/profiling` has no login, and it shows
 the statement without its bound values. With the analyzer on, a request's

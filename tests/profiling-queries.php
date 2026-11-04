@@ -207,41 +207,114 @@ test('Run now creates it, says the migration will drop it, and db migrate does',
     same([], $indexes($table), 'the warning was true');
 });
 
-test('Write to migration changes nothing yet; db migrate creates it, in that order, and keeps it', function () use ($start, $offer, $indexes, $dbMigrate, $pdo, $table, $migration, $own) {
+test('Write to migration changes nothing yet; db migrate creates it and keeps it', function () use ($start, $offer, $indexes, $dbMigrate, $pdo, $table, $migration, $own) {
     $start();
     @unlink($own);
-    $statement = $offer('zf_kept', $table, 'b, a');
+    $statement = $offer('idx_zf_kept', $table, 'a, b');
 
     $result = Queries::apply([$statement], 'migration')[0];
     truthy($result['ok'], json_encode($result));
     same([], $indexes($table), 'nothing ran');
-    contains("'zf_kept' => ['b', 'a'],", file_get_contents("$migration/Probe.php"));
+
+    $source = file_get_contents("$migration/Probe.php");
+    contains("# added from profiling suggestions", $source);
+    contains("static \$suggested_indexes = [", $source);
+    contains("'zf_kept' => ['a', 'b'],", $source);
 
     $out = $dbMigrate();
-    same(['zf_kept'], $indexes($table), $out);
-    same(['b', 'a'], $pdo->query("SELECT COLUMN_NAME FROM information_schema.statistics WHERE table_schema = database() AND table_name = '$table' AND INDEX_NAME = 'zf_kept' ORDER BY SEQ_IN_INDEX")->fetchAll(\PDO::FETCH_COLUMN));
+    same(['idx_zf_kept'], $indexes($table), $out);
+    same(['a', 'b'], $pdo->query("SELECT COLUMN_NAME FROM information_schema.statistics WHERE table_schema = database() AND table_name = '$table' AND INDEX_NAME = 'idx_zf_kept' ORDER BY SEQ_IN_INDEX")->fetchAll(\PDO::FETCH_COLUMN));
 
     $dbMigrate();
-    same(['zf_kept'], $indexes($table), 'and the next migrate keeps it');
-
+    same(['idx_zf_kept'], $indexes($table), 'and the next migrate keeps it');
 });
 
-test('a second index joins the first in the migration, and asking twice writes once', function () use ($start, $offer, $table, $migration, $own) {
+test('a column from the timestamps shorthand can be indexed, and a prefix counts', function () use ($start, $offer, $indexes, $dbMigrate, $pdo, $table, $migration, $folder, $testDb, $own) {
     $start();
     @unlink($own);
-    $one = $offer('zf_one', $table, 'a');
-    $two = $offer('zf_two', $table, 'b');
+    $pdo->exec("DROP TABLE $table");
+    file_put_contents("$migration/Probe.php", "<?php\nnamespace Database\\Migrations\\$folder;\n\nclass Probe\n{\n    static \$table = '$table';\n    static \$db = '$testDb';\n    static \$prefix = 'x';\n\n    public static function columns()\n    {\n        return ['id' => ['primary'], 'a' => ['int'], 'timestamps'];\n    }\n}\n");
+    $dbMigrate();
+
+    $statement = $offer('idx_zf_shorthand', $table, 'x_a, updated_at');
+    $result    = Queries::apply([$statement], 'migration')[0];
+    truthy($result['ok'], json_encode($result));
+
+    $out = $dbMigrate();
+    same(['idx_zf_shorthand'], $indexes($table), $out);
+});
+
+test('columns declared in another order are refused, and nothing is written', function () use ($start, $offer, $table, $migration, $own) {
+    $start();
+    @unlink($own);
+    $before = file_get_contents("$migration/Probe.php");
+
+    $result = Queries::apply([$offer('idx_zf_order', $table, 'b, a')], 'migration')[0];
+    falsy($result['ok']);
+    contains('(a, b)', $result['message']);
+    same($before, file_get_contents("$migration/Probe.php"));
+});
+
+test('a column the migration does not have is refused', function () use ($start, $offer, $table, $migration, $own) {
+    $start();
+    @unlink($own);
+    $before = file_get_contents("$migration/Probe.php");
+
+    $result = Queries::apply([$offer('idx_zf_absent', $table, 'nosuch')], 'migration')[0];
+    falsy($result['ok']);
+    contains('no column', $result['message']);
+    same($before, file_get_contents("$migration/Probe.php"));
+});
+
+test('a file it would break is left as it was, with the reason', function () use ($start, $offer, $table, $migration, $own) {
+    $start();
+    @unlink($own);
+    $broken = rtrim(file_get_contents("$migration/Probe.php")) . "\nclass {\n";
+    file_put_contents("$migration/Probe.php", $broken);
+
+    $result = Queries::apply([$offer('idx_zf_broken', $table, 'a')], 'migration')[0];
+    falsy($result['ok']);
+    contains('would not parse', $result['message']);
+    same($broken, file_get_contents("$migration/Probe.php"));
+});
+
+test('a commented-out table line is not the migration of that table', function () use ($start, $offer, $noFile, $migration, $own) {
+    $start();
+    @unlink($own);
+    file_put_contents("$migration/Comment.php", "<?php\nnamespace Database\\Migrations\\zftestapply;\n\nclass Comment\n{\n    # static \$table = '$noFile';\n    static \$table = 'zf_test_something_else';\n\n    public static function columns()\n    {\n        return ['a' => ['int']];\n    }\n}\n");
+
+    $result = Queries::apply([$offer('idx_zf_comment', $noFile, 'a')], 'migration')[0];
+    unlink("$migration/Comment.php");
+
+    falsy($result['ok']);
+    contains('no migration', $result['message']);
+});
+
+test('a second index joins the first, in array() too, and asking twice writes once', function () use ($start, $offer, $table, $migration, $own) {
+    $start();
+    @unlink($own);
+    $one = $offer('idx_zf_one', $table, 'a');
+    $two = $offer('idx_zf_two', $table, 'b');
 
     Queries::apply([$one], 'migration');
     Queries::apply([$two], 'migration');
     $again = Queries::apply([$one], 'migration')[0];
 
     $source = file_get_contents("$migration/Probe.php");
-    same(1, substr_count($source, 'static $indexes'), $source);
+    same(1, substr_count($source, 'static $suggested_indexes'), $source);
+    same(1, substr_count($source, '# added from profiling suggestions'));
     same(1, substr_count($source, "'zf_one' =>"));
     contains("'zf_two' =>", $source);
     truthy($again['ok']);
     contains('already', $again['message']);
+    truthy(str_contains((string) shell_exec(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg("$migration/Probe.php")), 'No syntax errors'), $source);
+
+    $start();
+    file_put_contents("$migration/Probe.php", str_replace("    static \$db", "    static \$suggested_indexes = array('zf_old' => array('a'));\n    static \$db", file_get_contents("$migration/Probe.php")));
+    $three  = Queries::apply([$two], 'migration')[0];
+    $source = file_get_contents("$migration/Probe.php");
+    truthy($three['ok'], json_encode($three));
+    same(1, substr_count($source, 'static $suggested_indexes'), $source);
     truthy(str_contains((string) shell_exec(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg("$migration/Probe.php")), 'No syntax errors'), $source);
 });
 
