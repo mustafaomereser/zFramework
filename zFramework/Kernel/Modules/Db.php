@@ -3,6 +3,7 @@
 namespace zFramework\Kernel\Modules;
 
 use zFramework\Core\Facades\DB as FacadesDB;
+use zFramework\Kernel\Helpers\Ask;
 use zFramework\Kernel\Helpers\MySQLBackup;
 use zFramework\Kernel\Terminal;
 use zFramework\Run;
@@ -261,8 +262,9 @@ class Db
     }
 
     /**
-     * Description: List what the database and the migrations disagree on. Changes nothing.
-     * Usage: php terminal db diff [--db=default] [--path=sub]
+     * Description: List what the database and the migrations disagree on. Changes nothing without --prune.
+     * Usage: php terminal db diff [--prune] [--db=default] [--path=sub]
+     * @param --prune            (optional) after the list and a Y, drop the tables and columns with no migration
      * @param --db={key}         (optional) compare only this connection, all migrations against it
      * @param --path={subdir}    (optional) sub-path inside migrations folder
      */
@@ -277,23 +279,43 @@ class Db
         foreach (array_merge([BASE_PATH . "/database/$sub"], array_map(fn($module) => BASE_PATH . "/modules/$module/$sub", self::$all_modules)) as $scan)
             if (is_dir($scan)) $files = array_merge($files, self::recursiveScanMigrations($scan));
 
+        $prune    = in_array('--prune', Terminal::$parameters);
+        $unread   = false;
         $declared = [];
         foreach ($files as $file) {
+            if (!str_ends_with($file, '.php')) continue;
+
             $class = str_replace(['.php', BASE_PATH, '/'], ['', '', '\\'], $file);
             if (!class_exists($class)) {
                 Terminal::text("[color=red]There are not a $class migrate class.[/color]");
+                $unread = true;
                 continue;
             }
 
             $class = new $class;
             if (isset(Terminal::$parameters['--db'])) $class::$db = Terminal::$parameters['--db'];
-            $declared[$class::$db][$class::$table] = array_change_key_case(self::declaredColumns($class, $class::columns()), CASE_LOWER);
+            # Added, not replaced: two migrations of one table both declare what they declare.
+            $declared[$class::$db][$class::$table] = ($declared[$class::$db][$class::$table] ?? []) + array_change_key_case(self::declaredColumns($class, $class::columns()), CASE_LOWER);
             $charsets[$class::$db][$class::$table] = $class::$charset ?? null;
         }
 
         # A connection nothing migrates has nothing to compare with: every table on it
         # would be listed, and it may well belong to something else entirely.
         if (!$declared) return Terminal::text("[color=red]You haven't a migration to compare with.[/color]");
+
+        # Two connection keys can reach one database, and a table the other key
+        # migrates has a migration all the same.
+        $migrated = [];
+        foreach ($declared as $connection => $tables) if (isset($GLOBALS['databases']['connections'][$connection])) {
+            self::connectDB($connection);
+            foreach ($tables as $table => $columns) $migrated[self::$dbname][strtolower($table)] = true;
+        }
+
+        # A migration that could not be read makes its table look unneeded.
+        if ($prune && $unread) {
+            Terminal::text('[color=red]--prune refused: a migration above could not be read, and its table would look unneeded. Nothing will be dropped.[/color]');
+            $prune = false;
+        }
 
         foreach ($declared as $connection => $tables) {
             if (!isset($GLOBALS['databases']['connections'][$connection])) {
@@ -306,7 +328,9 @@ class Db
 
             # Under --path only part of the migrations were read, so the rest of the
             # tables say nothing about having one.
-            $orphanTables = $path ? [] : array_values(array_diff(self::$tables, array_keys($tables)));
+            # Without regard to case: on lower_case_table_names=1 the server answers
+            # `users` for a migration that says `Users`.
+            $orphanTables = $path ? [] : array_values(array_filter(self::$tables, fn($table) => !isset($migrated[self::$dbname][strtolower($table)])));
             $orphans = $missingTables = $missingColumns = $charsetDiffers = $charsetRefused = [];
             foreach ($tables as $table => $columns) {
                 if (!in_array($table, self::$tables)) {
@@ -314,12 +338,12 @@ class Db
                     continue;
                 }
 
-                $existing = array_map('strtolower', self::pg()
+                $existing = self::pg()
                     ? self::$db->prepare('SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = :t', ['t' => $table])->fetchAll(\PDO::FETCH_COLUMN)
-                    : self::$db->prepare("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN));
+                    : self::$db->prepare("DESCRIBE $table")->fetchAll(\PDO::FETCH_COLUMN);
 
-                foreach (array_diff($existing, array_keys($columns)) as $column) $orphans[] = "$table.$column";
-                foreach (array_diff(array_keys($columns), $existing) as $column) $missingColumns[] = "$table.$column";
+                foreach ($existing as $column) if (!isset($columns[strtolower($column)])) $orphans[] = [$table, $column];
+                foreach (array_diff(array_keys($columns), array_map('strtolower', $existing)) as $column) $missingColumns[] = "$table.$column";
 
                 if (!self::pg()) {
                     $charsetState = self::charsetDifferences($table, $charsets[$connection][$table], $columns);
@@ -332,7 +356,7 @@ class Db
 
             $sections = [
                 ['Tables with no migration', 'db migrate leaves them alone', 'yellow', $orphanTables],
-                ['Columns with no migration', 'the next db migrate of that table DROPS them', 'red', $orphans],
+                ['Columns with no migration', 'the next db migrate of that table DROPS them', 'red', array_map(fn($orphan) => implode('.', $orphan), $orphans)],
                 ['Tables not in the database', 'db migrate creates them', 'blue', $missingTables],
                 ['Columns not in the database', 'db migrate adds them', 'blue', $missingColumns],
                 ['Charset differs', 'db migrate --convert-charset converts them', 'yellow', $charsetDiffers],
@@ -345,7 +369,74 @@ class Db
                 Terminal::text("[color=$color]{$title}[/color] [color=dark-gray]({$note})[/color]");
                 foreach ($items as $item) Terminal::text("[color=$color]-> {$item}[/color]");
             }
+
+            if (!$orphanTables && !$orphans) continue;
+
+            if (!in_array('--prune', Terminal::$parameters)) {
+                Terminal::text('[color=dark-gray]db diff --prune drops the tables and columns with no migration, after asking.[/color]');
+                continue;
+            }
+
+            if ($prune) self::prune($orphanTables, $orphans);
         }
+    }
+
+    /**
+     * Asks, naming the database, then drops. There is no undo, so there is no flag
+     * that skips the question: where nobody can answer, nothing is dropped.
+     *
+     * @param array $tables  Table names.
+     * @param array $columns [table, column] pairs.
+     */
+    private static function prune(array $tables, array $columns): void
+    {
+        if (in_array('--web', Terminal::$parameters) || !function_exists('readline')) {
+            Terminal::text('[color=red]--prune asks first, and nobody can answer here. Nothing was dropped: run it in a terminal.[/color]');
+            return;
+        }
+
+        # information_schema lists views as tables, and DROP TABLE does not take one.
+        $views = self::pg()
+            ? self::$db->prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'VIEW'")->fetchAll(\PDO::FETCH_COLUMN)
+            : self::$db->prepare("SELECT TABLE_NAME FROM information_schema.tables WHERE table_schema = :dbname AND table_type = 'VIEW'", ['dbname' => self::$dbname])->fetchAll(\PDO::FETCH_COLUMN);
+
+        foreach (array_intersect($tables, $views) as $view) Terminal::text("[color=dark-gray]-> $view is a view, it stays.[/color]");
+        $tables = array_values(array_diff($tables, $views));
+        if (!$tables && !$columns) return;
+
+        Terminal::text("\n[color=yellow]Take a backup first if you may want these back (db backup).[/color]");
+        Ask::do('[color=red]Drop ' . count($tables) . ' table(s) and ' . count($columns) . ' column(s) from `' . self::$dbname . '`? This cannot be undone.[/color]', function () use ($tables, $columns) {
+            $q    = self::pg() ? '"' : '`';
+            $name = fn(string $identifier) => $q . str_replace($q, $q . $q, $identifier) . $q;
+
+            foreach ($columns as [$table, $column]) try {
+                self::$db->prepare('ALTER TABLE ' . $name($table) . ' DROP COLUMN ' . $name($column));
+                Terminal::text("[color=yellow]Dropped column: {$table}.{$column}[/color]");
+            } catch (\Throwable $e) {
+                Terminal::text("[color=red]Column stays: $table.$column - " . $e->getMessage() . '[/color]');
+            }
+
+            # A table another one points at can only go after it, and nothing says which
+            # comes first: round again while a round dropped something. Foreign key
+            # checks stay on, so a table something still points at stays too.
+            $errors = [];
+            do {
+                $dropped = false;
+                foreach ($tables as $key => $table) try {
+                    self::$db->prepare('DROP TABLE ' . $name($table));
+                    Terminal::text("[color=yellow]Dropped table: {$table}[/color]");
+                    unset($tables[$key], $errors[$table]);
+                    $dropped = true;
+                } catch (\Throwable $e) {
+                    $errors[$table] = $e->getMessage();
+                }
+            } while ($dropped && $tables);
+
+            foreach ($errors as $table => $error) Terminal::text("[color=red]Table stays: {$table} - {$error}[/color]");
+
+            self::$tables = null;
+            self::$db->forgetScheme();
+        });
     }
 
     /**

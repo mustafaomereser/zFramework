@@ -565,7 +565,7 @@ php terminal make model|mongomodel|controller|request|middleware|migration|seede
 
 # Database
 php terminal db migrate [--fresh] [--force] [--convert-charset] [--seed] [--all] [--module=blog] [--db=x] [--path=x]
-php terminal db diff [--db=x] [--path=x]   # read-only: tables/columns with no migration, migrated ones not in the db, collations that differ
+php terminal db diff [--prune] [--db=x] [--path=x]   # tables/columns with no migration, migrated ones not in the db, collations that differ. Read-only without --prune; --prune asks Y, then drops the first two (no flag skips the question; refused in the web terminal or if a migration cannot be read)
 php terminal db seed [--db=x]
 php terminal db backup [--compress] [--separate]
 php terminal db restore [--db=x]

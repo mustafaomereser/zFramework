@@ -929,6 +929,7 @@ php terminal db migrate --module=blog     # only migrate the 'blog' module
 php terminal db migrate --all             # include all modules
 php terminal db migrate --convert-charset # bring existing text columns and the table default to $charset
 php terminal db diff                      # what the database and the migrations disagree on; changes nothing
+php terminal db diff --prune              # the same list, then asks and drops the tables and columns with no migration
 ```
 
 `db diff` reads every migration, modules included, and lists per connection: tables with no
@@ -937,6 +938,14 @@ that table drops them**, so read this first), tables and columns the migrations 
 database does not, and collations that differ from `$charset` / `charset:` - those `--convert-charset`
 would convert apart from those it refuses. `--db=x` compares one connection, `--path=sub` one folder
 of migrations.
+
+`--prune` drops the first two of those lists, tables and columns with no migration, after the list
+and a `Y` naming the database. There is no undo and no flag that skips the question, so take a
+`db backup` first. It refuses to run where nobody can answer (the web terminal, no `readline`), and
+when a migration could not be read, since its table would look unneeded. Views stay, and foreign key
+checks stay on: a table something still points at stays, with the reason. A table is only called
+unneeded if no migration on any connection reaching that database declares it, whatever the case of
+its name. Under `--path` it drops columns only.
 
 `$charset` applies to existing tables too. A column `ADD`ed or `MODIFY`ed gets the migration's
 collation (`charset:` first, then `$charset`); with neither it keeps the one it has, instead of
@@ -2135,7 +2144,7 @@ php terminal db migrate --fresh
 php terminal db migrate --fresh --seed
 php terminal db migrate --module=blog
 php terminal db migrate --all             # include all modules
-php terminal db diff                      # tables/columns the migrations and the database disagree on
+php terminal db diff [--prune]            # tables/columns the migrations and the database disagree on; --prune asks, then drops the extras
 php terminal db seed
 php terminal db backup
 php terminal db backup --compress
