@@ -21,7 +21,7 @@ class Auth
     /**
      * Column names to match on, when the user model names none.
      */
-    private const COLUMNS = ['email' => 'email', 'password' => 'password', 'passwordencode' => 'crypter'];
+    private const COLUMNS = ['email' => 'email', 'password' => 'password', 'passwordencode' => 'bcrypt'];
 
     /**
      * What the model actually named, resolved on first use.
